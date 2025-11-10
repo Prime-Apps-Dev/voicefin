@@ -1,0 +1,7 @@
+{
+  "name": "Telegram VoiceFin v0.3.0",
+  "description": "An intelligent financial assistant that allows you to add income and expense transactions simply by speaking. The app uses AI to parse details like amount, category, and date from your voice.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}

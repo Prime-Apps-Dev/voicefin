@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VoiceFin: Voice Transaction Tracker</title>
+    
+    <!-- 
+      ШАГ 1: ДОБАВЛЯЕМ "ПРОПУСК" TELEGRAM 
+      Этот скрипт должен быть здесь, чтобы window.Telegram.WebApp работал
+    -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              'gray-900': '#121212',
+              'gray-800': '#1E1E1E',
+              'gray-700': '#2C2C2C',
+              'gray-600': '#3E3E3E',
+              'brand-green': '#1DB954',
+              'brand-red': '#E53E3E',
+              'brand-purple': '#8B5CF6',
+              'brand-blue': '#3B82F6',
+              'brand-lavender': '#E6E6FA',
+              'brand-electric-red': '#FF3131',
+              'green-start': '#10B981',
+              'green-end': '#1DB954',
+              'red-start': '#EF4444',
+              'red-end': '#DC2626',
+              'blue-start': '#3B82F6',
+              'blue-end': '#2563EB',
+              'purple-start': '#A855F7',
+              'purple-end': '#9333EA',
+            }
+          }
+        }
+      }
+    </script>
+  <style>
+    /* ... (ваш <style> тег) ... */
+    .scrollbar-hide::-webkit-scrollbar {
+      display: none;
+    }
+    .scrollbar-hide {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.28.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.417.0",
+    "framer-motion": "https://aistudiocdn.com/framer-motion@^11.3.19",
+    /* ШАГ 2: ДОБАВЛЯЕМ БИБЛИОТЕКУ SUPABASE
+      Теперь ваше приложение сможет использовать команду createClient
+    */
+    "@supabase/supabase-js": "https://aistudiocdn.com/@supabase/supabase-js@^2.44.4"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body class="bg-gray-900 text-white font-sans">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
