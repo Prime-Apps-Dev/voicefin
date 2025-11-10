@@ -69,7 +69,7 @@ serve(async (req) => {
   try {
     const { initData } = await req.json();
     const BOT_TOKEN = Deno.env.get("TELEGRAM_BOT_TOKEN");
-    const JWT_SECRET = Deno.env.get("SUPABASE_JWT_SECRET");
+    const JWT_SECRET = Deno.env.get("JWT_SECRET");
 
     if (!BOT_TOKEN || !JWT_SECRET) {
       throw new Error("Missing environment variables");
