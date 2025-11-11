@@ -1,161 +1,275 @@
-import React, { useMemo, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, Plus, Star } from 'lucide-react';
-import { useLocalization } from '../context/LocalizationContext';
-import { Category, TransactionType } from '../types';
-import { ICONS } from './icons';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { UserProfile, Category, TransactionType } from '../types';
+// Импортируем НОВЫЕ сервисы для работы с JSONB данными
+import { fetchUserProfile, updateUserDataJsonB } from '../services/data-access';
+import { Header } from './Header'; // Предполагается, что этот компонент существует
+import { PlusIcon } from './icons/PlusIcon'; // Предполагается, что этот компонент существует
+import CategoryForm from './CategoryForm'; // Предполагается, что этот компонент существует
 
-interface CategoriesScreenProps {
-  categories: Category[];
-  onBack: () => void;
-  onCreateCategory: (type: TransactionType) => void;
-  onEditCategory: (category: Category) => void;
-  onDeleteCategory: (category: Category) => void;
-  onToggleFavorite: (category: Category) => void;
+// --- Имитация Auth Context ---
+const MOCK_USER_ID = 'user-uuid-from-auth-service'; 
+// --- Конец Имитации ---
+
+type CategoryFormMode = 'create' | 'edit';
+
+/**
+ * Вспомогательный компонент для отображения отдельной категории.
+ * (Для упрощения, здесь будет только базовый HTML, но в реальном приложении это будет CategoryItem)
+ */
+interface CategoryListItemProps {
+    category: Category;
+    onEdit: (category: Category) => void;
+    onDelete: (categoryId: string) => void;
 }
 
-const IconDisplay: React.FC<{ name: string; className?: string; }> = ({ name, className }) => {
-    const IconComponent = ICONS[name] || ICONS.LayoutGrid;
-    return <IconComponent className={className} />;
-};
+const CategoryListItem: React.FC<CategoryListItemProps> = React.memo(({ category, onEdit, onDelete }) => {
+    // Определяем цвет иконки и тип
+    const isExpense = category.type === TransactionType.EXPENSE;
+    const typeLabel = isExpense ? 'Расход' : 'Доход';
+    const typeColor = isExpense ? 'text-red-500 bg-red-100' : 'text-green-500 bg-green-100';
 
-const CategoryItem: React.FC<{
-  category: Category;
-  onSelect: (category: Category) => void;
-  onToggleFavorite: (category: Category) => void;
-  isFavoriteDisabled: boolean;
-}> = ({ category, onSelect, onToggleFavorite, isFavoriteDisabled }) => {
     return (
-        <motion.div
-            layout
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            className="flex items-center bg-gray-800 p-3 rounded-2xl border border-gray-700/50"
-        >
-            <button onClick={() => onSelect(category)} className="flex items-center gap-4 flex-grow text-left">
-                <div className="w-10 h-10 bg-gray-700 rounded-xl flex items-center justify-center flex-shrink-0">
-                    <IconDisplay name={category.icon} className="w-5 h-5 text-gray-300" />
+        <div className="flex items-center justify-between p-4 bg-white rounded-xl shadow-sm hover:shadow-md transition duration-150">
+            <div className="flex items-center space-x-4">
+                <div className={`p-2 rounded-full ${typeColor} font-mono`}>
+                    {/* Здесь должна быть иконка, но используем заглушку */}
+                    {category.icon || (isExpense ? '📉' : '📈')}
                 </div>
-                <span className="text-white font-medium truncate">{category.name}</span>
-            </button>
-            <button
-                onClick={() => onToggleFavorite(category)}
-                disabled={isFavoriteDisabled && !category.isFavorite}
-                className="p-2 rounded-full hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                aria-label="Toggle favorite"
-            >
-                <Star className={`w-5 h-5 transition-colors ${category.isFavorite ? 'text-yellow-400 fill-current' : 'text-gray-500'}`} />
-            </button>
-        </motion.div>
+                <div>
+                    <p className="font-semibold text-gray-800">{category.name}</p>
+                    <p className={`text-sm ${isExpense ? 'text-red-500' : 'text-green-500'}`}>{typeLabel}</p>
+                </div>
+            </div>
+            <div className="flex space-x-2">
+                <button
+                    onClick={() => onEdit(category)}
+                    className="text-indigo-600 hover:text-indigo-800 p-2 rounded-lg transition"
+                    aria-label={`Редактировать ${category.name}`}
+                >
+                    📝
+                </button>
+                <button
+                    onClick={() => onDelete(category.id)}
+                    className="text-red-600 hover:text-red-800 p-2 rounded-lg transition"
+                    aria-label={`Удалить ${category.name}`}
+                >
+                    🗑️
+                </button>
+            </div>
+        </div>
     );
-};
+});
 
 
-export const CategoriesScreen: React.FC<CategoriesScreenProps> = (props) => {
-  const { categories, onBack, onCreateCategory, onEditCategory, onToggleFavorite } = props;
-  const { t, language } = useLocalization();
-  const [activeTab, setActiveTab] = useState<'ALL' | 'EXPENSE' | 'INCOME'>('ALL');
+/**
+ * ЭКРАН УПРАВЛЕНИЯ КАТЕГОРИЯМИ (CategoriesScreen)
+ * Загружает и обновляет категории из JSONB-поля 'data' в таблице 'profiles'.
+ */
+const CategoriesScreen: React.FC = () => {
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Состояние для модального окна формы
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [formMode, setFormMode] = useState<CategoryFormMode>('create');
 
-  const { expenseCategories, incomeCategories, favorites } = useMemo(() => {
-    const expenseCats: Category[] = [];
-    const incomeCats: Category[] = [];
-    const favs: Category[] = [];
-
-    for (const cat of categories) {
-        if (cat.type === TransactionType.EXPENSE) {
-            expenseCats.push(cat);
-        } else {
-            incomeCats.push(cat);
-        }
-        if (cat.isFavorite) {
-            favs.push(cat);
-        }
+  // ------------------------------------------------------------------
+  // 1. ЛОГИКА ЗАГРУЗКИ (ИЗ profiles.data.categories)
+  // ------------------------------------------------------------------
+  const loadCategories = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const profile = await fetchUserProfile(MOCK_USER_ID); // Загрузка всего профиля
+      if (profile) {
+        setCategories(profile.data.categories);
+      } else {
+        setError('Не удалось загрузить данные пользователя.');
+        setCategories([]);
+      }
+    } catch (err) {
+      console.error(err);
+      setError('Ошибка при загрузке категорий. Пожалуйста, попробуйте позже.');
+    } finally {
+      setIsLoading(false);
     }
-    return { expenseCategories: expenseCats, incomeCategories: incomeCats, favorites: favs };
-  }, [categories]);
-  
-  const localeCompare = (a: Category, b: Category) => a.name.localeCompare(b.name, language === 'ru' ? 'ru' : 'en');
-  
-  const sortedExpenses = useMemo(() => [...expenseCategories].sort(localeCompare), [expenseCategories, language]);
-  const sortedIncomes = useMemo(() => [...incomeCategories].sort(localeCompare), [incomeCategories, language]);
+  }, []);
 
-  const handleCreate = () => {
-    const type = activeTab === 'INCOME' ? TransactionType.INCOME : TransactionType.EXPENSE;
-    onCreateCategory(type);
+  useEffect(() => {
+    loadCategories();
+    // Мы можем также подписаться на real-time обновления, но это более сложная тема
+  }, [loadCategories]);
+
+  // ------------------------------------------------------------------
+  // 2. ЛОГИКА ОБНОВЛЕНИЯ (ЗАПИСЬ В profiles.data.categories)
+  // ------------------------------------------------------------------
+  
+  /**
+   * Обновляет состояние категорий локально и отправляет полный массив в Supabase.
+   * @param updatedCategories Новый массив категорий.
+   */
+  const updateCategoriesInDB = useCallback(async (updatedCategories: Category[]) => {
+    try {
+      // 1. Локальное обновление
+      setCategories(updatedCategories); 
+      
+      // 2. Обновление в БД через JSONB сервис. Передаем только часть JSONB.
+      await updateUserDataJsonB(MOCK_USER_ID, { categories: updatedCategories });
+      
+    } catch (err) {
+      console.error('Ошибка при сохранении категорий:', err);
+      // В случае ошибки, лучше перезагрузить данные из БД
+      loadCategories(); 
+    }
+  }, [loadCategories]);
+
+
+  // ------------------------------------------------------------------
+  // 3. ОБРАБОТЧИКИ ФОРМЫ И ДЕЙСТВИЙ
+  // ------------------------------------------------------------------
+
+  const handleCreateNewCategory = () => {
+    setEditingCategory(null);
+    setFormMode('create');
+    setIsModalOpen(true);
+  };
+
+  const handleEditCategory = (category: Category) => {
+    setEditingCategory(category);
+    setFormMode('edit');
+    setIsModalOpen(true);
   };
   
-  const TabButton = ({ tab, label }: { tab: typeof activeTab; label: string }) => (
-    <button
-        onClick={() => setActiveTab(tab)}
-        className={`w-full py-2 rounded-full text-sm font-semibold transition-colors ${activeTab === tab ? 'bg-brand-green text-white shadow' : 'text-gray-300 hover:bg-gray-700'}`}
-    >
-        {label}
-    </button>
-  );
+  const handleFormSubmit = async (formData: Omit<Category, 'id' | 'isfavorite' | 'isdefault'> & { isfavorite: boolean, isdefault: boolean }) => {
+    if (formMode === 'create') {
+      // Создание: генерируем ID и добавляем
+      const newCategory: Category = { ...formData, id: crypto.randomUUID() };
+      
+      const newCategoriesArray = [...categories, newCategory];
+      await updateCategoriesInDB(newCategoriesArray);
+      
+    } else if (editingCategory) {
+      // Редактирование: обновляем существующую категорию
+      const updatedCategory: Category = { ...formData, id: editingCategory.id };
+      const newCategoriesArray = categories.map(cat => 
+        cat.id === editingCategory.id ? updatedCategory : cat
+      );
+      await updateCategoriesInDB(newCategoriesArray);
+    }
+    
+    setIsModalOpen(false);
+  };
 
-  const renderCategoryList = (categoryList: Category[]) => (
-      <div className="space-y-3">
-          <AnimatePresence>
-              {categoryList.map(cat => (
-                  <CategoryItem 
-                      key={cat.id} 
-                      category={cat} 
-                      onSelect={onEditCategory}
-                      onToggleFavorite={onToggleFavorite}
-                      isFavoriteDisabled={favorites.length >= 10}
-                  />
-              ))}
-          </AnimatePresence>
+  const handleDelete = async (categoryId: string) => {
+    // В реальном приложении здесь должна быть проверка, используются ли транзакции
+    // и модальное окно подтверждения.
+    const newCategoriesArray = categories.filter(cat => cat.id !== categoryId);
+    await updateCategoriesInDB(newCategoriesArray);
+  };
+
+  // ------------------------------------------------------------------
+  // 4. РЕНДЕРИНГ СПИСКА
+  // ------------------------------------------------------------------
+
+  const expenseCategories = useMemo(() => categories.filter(c => c.type === TransactionType.EXPENSE), [categories]);
+  const incomeCategories = useMemo(() => categories.filter(c => c.type === TransactionType.INCOME), [categories]);
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-screen bg-gray-50">
+        <p className="text-xl text-indigo-600">Загрузка категорий...</p>
       </div>
-  );
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-4 text-red-700 bg-red-100 rounded-lg">
+        <p className="font-bold">Ошибка:</p>
+        <p>{error}</p>
+        <button onClick={loadCategories} className="mt-2 text-indigo-600 hover:text-indigo-800">
+          Повторить попытку
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gray-900 flex flex-col pb-24">
-      <header className="px-4 pt-8 pb-4 flex items-center justify-between sticky top-0 bg-gray-900/80 backdrop-blur-sm z-10">
-        <button onClick={onBack} className="p-2 rounded-full hover:bg-gray-700">
-          <ChevronLeft className="w-6 h-6 text-white" />
-        </button>
-        <h1 className="text-xl font-bold text-white">{t('categories')}</h1>
-        <button onClick={handleCreate} className="p-2 rounded-full hover:bg-gray-700" aria-label={t('addNewCategory')}>
-          <Plus className="w-6 h-6 text-white" />
-        </button>
-      </header>
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      <Header title="Мои Категории" />
 
-      <main className="flex-grow px-4 space-y-6">
-        <div className="flex justify-center p-1 bg-gray-800 rounded-full">
-            <TabButton tab="INCOME" label={t('income')} />
-            <TabButton tab="ALL" label={t('allCategories')} />
-            <TabButton tab="EXPENSE" label={t('expense')} />
+      <main className="flex-grow p-4 space-y-8">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold text-gray-800">Управление категориями</h2>
+          <button
+            onClick={handleCreateNewCategory}
+            className="p-3 bg-indigo-600 text-white rounded-full shadow-lg hover:bg-indigo-700 transition duration-150 ease-in-out flex items-center justify-center"
+            aria-label="Добавить новую категорию"
+          >
+            <PlusIcon className="w-6 h-6" />
+          </button>
         </div>
 
-        <AnimatePresence mode="wait">
-            <motion.div
-                key={activeTab}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.2 }}
-            >
-                {activeTab === 'ALL' && (
-                    <div className="space-y-6">
-                        <div className="space-y-4">
-                            <h2 className="text-lg font-semibold text-gray-300 px-2">{t('expense')} {t('categories')}</h2>
-                            {renderCategoryList(sortedExpenses)}
-                        </div>
-                        {sortedIncomes.length > 0 && <div className="border-t border-gray-700/50" />}
-                        <div className="space-y-4">
-                            <h2 className="text-lg font-semibold text-gray-300 px-2">{t('income')} {t('categories')}</h2>
-                            {renderCategoryList(sortedIncomes)}
-                        </div>
-                    </div>
+        {/* Список Категорий Расходов */}
+        <section className="space-y-4">
+            <h3 className="text-lg font-semibold text-gray-700 border-b pb-1">Расходы ({expenseCategories.length})</h3>
+            <div className="space-y-3">
+                {expenseCategories.length === 0 ? (
+                    <p className="text-gray-500 text-sm">Нет категорий расходов.</p>
+                ) : (
+                    expenseCategories.map(cat => (
+                        <CategoryListItem 
+                            key={cat.id} 
+                            category={cat} 
+                            onEdit={handleEditCategory} 
+                            onDelete={handleDelete} 
+                        />
+                    ))
                 )}
-                {activeTab === 'EXPENSE' && renderCategoryList(sortedExpenses)}
-                {activeTab === 'INCOME' && renderCategoryList(sortedIncomes)}
-            </motion.div>
-        </AnimatePresence>
+            </div>
+        </section>
+
+        {/* Список Категорий Доходов */}
+        <section className="space-y-4">
+            <h3 className="text-lg font-semibold text-gray-700 border-b pb-1">Доходы ({incomeCategories.length})</h3>
+            <div className="space-y-3">
+                {incomeCategories.length === 0 ? (
+                    <p className="text-gray-500 text-sm">Нет категорий доходов.</p>
+                ) : (
+                    incomeCategories.map(cat => (
+                        <CategoryListItem 
+                            key={cat.id} 
+                            category={cat} 
+                            onEdit={handleEditCategory} 
+                            onDelete={handleDelete} 
+                        />
+                    ))
+                )}
+            </div>
+        </section>
+        
       </main>
+
+      {/* Модальное окно для создания/редактирования категории */}
+      {isModalOpen && (
+        <CategoryForm
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          onSubmit={handleFormSubmit}
+          initialData={editingCategory || { 
+            name: '', 
+            icon: '', 
+            isfavorite: false, 
+            isdefault: false,
+            type: TransactionType.EXPENSE 
+          }}
+          mode={formMode}
+        />
+      )}
     </div>
   );
 };
+
+export default CategoriesScreen;

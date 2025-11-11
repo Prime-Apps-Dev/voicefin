@@ -1,9 +1,9 @@
 import React from 'react';
-import { User, Transaction } from '../types';
+import { UserProfile, Transaction } from '../types';
 import { useLocalization } from '../context/LocalizationContext';
 
 interface HeaderProps {
-    user: User;
+    user: UserProfile;
     transactions: Transaction[];
 }
 

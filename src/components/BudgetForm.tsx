@@ -1,165 +1,173 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Budget, Category } from '../types';
-import { useLocalization } from '../context/LocalizationContext';
-import { ICONS } from './icons';
-import { ChevronDown } from 'lucide-react';
-import { COMMON_CURRENCIES } from '../constants';
+import React, { useState, useEffect } from 'react';
+import { Budget, Category, TransactionType } from '../types';
+import { addBudget } from '../services/data-access'; // Нужен для обновления/создания
 
-const defaultState: Omit<Budget, 'id'> = {
-  monthkey: '',
-  category: '',
-  limit: 0,
-  icon: 'LayoutGrid',
-  currency: 'USD',
-};
+type BudgetFormMode = 'create' | 'edit';
 
-export const BudgetForm: React.FC<{
-  isOpen: boolean;
-  onClose: () => void;
-  onSave: (budget: Omit<Budget, 'id'> | Budget) => void;
-  budget?: Partial<Budget> | null;
-  allCategories: Category[];
-  budgetsForMonth: Budget[];
-  onCreateNewCategory: () => void;
-  defaultCurrency: string;
-}> = ({ isOpen, onClose, onSave, budget, allCategories, budgetsForMonth, onCreateNewCategory, defaultCurrency }) => {
-  const { t } = useLocalization();
-  const [formData, setFormData] = useState(defaultState);
-  const [limitStr, setLimitStr] = useState('');
+interface BudgetFormProps {
+    isOpen: boolean;
+    onClose: () => void;
+    // onSubmit принимает полный объект Budget (с id или без)
+    onSubmit: (formData: Omit<Budget, 'id'>) => Promise<void>;
+    initialData: Partial<Budget>;
+    mode: BudgetFormMode;
+    categories: Category[]; // Список категорий расходов для выбора
+}
 
-  const availableCategories = useMemo(() => {
-    const budgetedCategories = budgetsForMonth.map(b => b.category);
-    let unbudgeted = allCategories.filter(c => !budgetedCategories.includes(c.name)).map(c => c.name);
-    if (budget && 'category' in budget && budget.category) {
-        unbudgeted = [budget.category, ...unbudgeted];
-    }
-    return unbudgeted.sort();
-  }, [allCategories, budgetsForMonth, budget]);
+/**
+ * ФОРМА БЮДЖЕТА (BudgetForm)
+ * Используется для создания/редактирования объектов Budget в реляционной таблице.
+ */
+const BudgetForm: React.FC<BudgetFormProps> = ({ isOpen, onClose, onSubmit, initialData, mode, categories }) => {
+    // Состояние формы
+    const [monthKey, setMonthKey] = useState(initialData.monthkey || new Date().toISOString().substring(0, 7)); // YYYY-MM
+    const [categoryId, setCategoryId] = useState(initialData.category || '');
+    const [limit, setLimit] = useState(initialData.limit || 0);
+    const [currency, setCurrency] = useState(initialData.currency || 'RUB');
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    if (isOpen) {
-        const initialData: Partial<Budget> = {
-            ...defaultState,
-            currency: defaultCurrency,
-            ...budget,
-        };
+    // Сброс состояния при открытии формы
+    useEffect(() => {
+        if (isOpen) {
+            setMonthKey(initialData.monthkey || new Date().toISOString().substring(0, 7));
+            setCategoryId(initialData.category || '');
+            setLimit(initialData.limit || 0);
+            setCurrency(initialData.currency || 'RUB');
+            setIsSubmitting(false);
 
-        if (!initialData.category && availableCategories.length > 0) {
-            initialData.category = availableCategories[0];
-        }
-
-        if (initialData.category) {
-            const categoryDetails = allCategories.find(c => c.name === initialData.category);
-            if (categoryDetails) {
-                initialData.icon = categoryDetails.icon;
+            // Если режим редактирования, то категория уже должна быть выбрана
+            if (mode === 'edit' && initialData.category) {
+                setCategoryId(initialData.category);
             }
         }
+    }, [isOpen, initialData, mode]);
 
-        setFormData(initialData as Budget);
-        setLimitStr(String(initialData.limit || ''));
-    }
-  }, [budget, isOpen, defaultCurrency, allCategories, availableCategories]);
+    // Фильтруем категории только для расходов (бюджетирование обычно для расходов)
+    const expenseCategories = useMemo(() => 
+        categories.filter(c => c.type === TransactionType.EXPENSE), 
+        [categories]
+    );
 
-  const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const { value } = e.target;
-    if (value === '__CREATE_NEW__') {
-      onCreateNewCategory();
-    } else {
-      const categoryDetails = allCategories.find(c => c.name === value);
-      setFormData(prev => ({ 
-          ...prev, 
-          category: value,
-          icon: categoryDetails ? categoryDetails.icon : 'LayoutGrid'
-      }));
-    }
-  };
+    const handleFormSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    if (name === 'limit') {
-      const sanitizedValue = value.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1');
-      setLimitStr(sanitizedValue);
-      setFormData(prev => ({ ...prev, limit: parseFloat(sanitizedValue) || 0 }));
-    } else {
-      setFormData(prev => ({ ...prev, [name]: value }));
-    }
-  };
+        if (!categoryId || limit <= 0) {
+            console.warn('Пожалуйста, выберите категорию и укажите лимит.');
+            return;
+        }
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (formData.category && formData.limit > 0 && formData.monthKey) {
-      onSave(formData);
-    }
-  };
-  
-  const IconDisplay: React.FC<{ name: string; className?: string; }> = ({ name, className }) => {
-    const IconComponent = ICONS[name] || ICONS.LayoutGrid;
-    return <IconComponent className={className} />;
-  };
+        setIsSubmitting(true);
+        
+        // Находим иконку категории для сохранения
+        const categoryIcon = categories.find(c => c.id === categoryId)?.icon || '💸';
 
-  return (
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center z-50 p-4"
-          onClick={onClose}
-        >
-          <motion.div
-            initial={{ opacity: 0, y: 10, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.98 }}
-            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-            className="relative bg-zinc-900 rounded-3xl shadow-2xl w-full max-w-md max-h-[85vh] overflow-hidden flex flex-col border border-zinc-800/60"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="sticky top-0 bg-zinc-900/95 backdrop-blur-xl px-6 py-5 border-b border-zinc-800/60 z-10 flex-shrink-0">
-                <h2 className="text-xl font-semibold text-white tracking-tight">{budget && 'id' in budget ? t('editBudget') : t('createBudget')}</h2>
-            </div>
-            <form onSubmit={handleSubmit} className="overflow-y-auto">
-              <div className="px-6 py-6 space-y-4">
-                <div>
-                  <label htmlFor="category" className="block text-sm font-medium text-zinc-300 mb-1.5">{t('category')}</label>
-                  <div className="relative">
-                    <select name="category" value={formData.category} onChange={handleCategoryChange} required className="w-full appearance-none px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-600 transition-all duration-200 pr-10">
-                      {availableCategories.length > 0 ? (
-                        availableCategories.map(c => <option key={c} value={c}>{c}</option>)
-                      ) : (
-                        <option value="" disabled>No available categories</option>
-                      )}
-                      <option value="__CREATE_NEW__">＋ Create New Category...</option>
-                    </select>
-                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 pointer-events-none" />
-                  </div>
+        const formData: Omit<Budget, 'id'> = {
+            monthkey: monthKey,
+            category: categoryId,
+            limit: limit,
+            icon: categoryIcon,
+            currency: currency,
+        };
+
+        try {
+            await onSubmit(formData);
+        } catch (error) {
+            console.error('Ошибка при сохранении бюджета:', error);
+            setIsSubmitting(false);
+        }
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-70 flex items-end justify-center z-50 transition-opacity duration-300">
+            <div className="bg-white p-6 rounded-t-3xl shadow-2xl w-full max-w-lg transform transition-transform duration-300 translate-y-0"
+                 role="dialog"
+                 aria-modal="true"
+            >
+                <div className="flex justify-between items-center border-b pb-3 mb-4">
+                    <h2 className="text-2xl font-bold text-gray-800">
+                        {mode === 'create' ? 'Установить Бюджет' : 'Редактировать Бюджет'}
+                    </h2>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-2 transition rounded-full">
+                        ✕
+                    </button>
                 </div>
-                 <div className="grid grid-cols-2 gap-4">
+
+                <form onSubmit={handleFormSubmit} className="space-y-4">
+                    
+                    {/* 1. Месяц (YYYY-MM) */}
                     <div>
-                        <label htmlFor="limit" className="block text-sm font-medium text-zinc-300 mb-1.5">{t('budgetLimit')}</label>
-                        <input type="text" inputMode="decimal" name="limit" value={limitStr} onChange={handleChange} required className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white" />
+                        <label htmlFor="month" className="block text-sm font-medium text-gray-700">Месяц</label>
+                        <input
+                            id="month"
+                            type="month"
+                            value={monthKey}
+                            onChange={(e) => setMonthKey(e.target.value)}
+                            className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-3"
+                            required
+                            disabled={mode === 'edit'} // Месяц обычно не меняется при редактировании
+                        />
                     </div>
+                    
+                    {/* 2. Категория */}
                     <div>
-                        <label htmlFor="currency" className="block text-sm font-medium text-zinc-300 mb-1.5">{t('currency')}</label>
-                         <div className="relative">
-                            <select name="currency" value={formData.currency} onChange={handleChange} required className="w-full appearance-none px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-600 transition-all duration-200 pr-10">
-                                {COMMON_CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
-                            </select>
-                            <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 pointer-events-none" />
+                        <label htmlFor="category" className="block text-sm font-medium text-gray-700">Категория расхода *</label>
+                        <select
+                            id="category"
+                            value={categoryId}
+                            onChange={(e) => setCategoryId(e.target.value)}
+                            className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-3 bg-white"
+                            required
+                            disabled={mode === 'edit'} // Категория обычно не меняется при редактировании
+                        >
+                            <option value="" disabled>Выберите категорию</option>
+                            {expenseCategories.map(cat => (
+                                <option key={cat.id} value={cat.id}>
+                                    {cat.icon} {cat.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* 3. Лимит */}
+                    <div>
+                        <label htmlFor="limit" className="block text-sm font-medium text-gray-700">Лимит бюджета</label>
+                        <div className="mt-1 flex rounded-lg shadow-sm">
+                            <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 text-gray-500 sm:text-sm">
+                                {currency}
+                            </span>
+                            <input
+                                id="limit"
+                                type="number"
+                                step="0.01"
+                                value={limit || ''}
+                                onChange={(e) => setLimit(parseFloat(e.target.value) || 0)}
+                                className="flex-1 block w-full rounded-r-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 p-3 text-lg font-bold"
+                                placeholder="50000.00"
+                                required
+                            />
                         </div>
                     </div>
-                 </div>
-              </div>
+                    
+                    {/* 4. Валюта (Может быть скрыта, если предполагается основная валюта) */}
+                    {/* <input type="hidden" value={currency} /> */}
 
-              <div className="sticky bottom-0 bg-zinc-900/95 backdrop-blur-xl px-6 py-4 border-t border-zinc-800/60 flex items-center justify-end space-x-3 flex-shrink-0">
-                <button type="button" onClick={onClose} className="px-5 py-2.5 text-zinc-300 hover:text-white text-sm font-medium rounded-xl hover:bg-zinc-800 active:scale-95 transition-all duration-200">{t('cancel')}</button>
-                <button type="submit" className="px-5 py-2.5 bg-brand-blue text-white text-sm font-medium rounded-xl hover:bg-blue-700 active:scale-95 transition-all duration-200">{t('save')}</button>
-              </div>
-            </form>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
+                    {/* Кнопка Отправки */}
+                    <div className="pt-4">
+                        <button
+                            type="submit"
+                            disabled={isSubmitting || !categoryId || limit <= 0}
+                            className="w-full py-3 px-4 border border-transparent rounded-xl shadow-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition disabled:opacity-50"
+                        >
+                            {isSubmitting ? 'Сохранение...' : (mode === 'create' ? 'Установить Бюджет' : 'Сохранить Изменения')}
+                        </button>
+                    </div>
+
+                </form>
+            </div>
+        </div>
+    );
 };
+
+export default BudgetForm;
