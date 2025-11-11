@@ -2,8 +2,9 @@
 // Мы храним здесь типы данных и "инструменты" (tools) для Gemini.
 
 // ❌ БЫЛО: import { FunctionDeclaration, Type } from "npm:@google/generative-ai";
-// ✅ СТАЛО: Импортируем весь модуль с использованием стабильного URL esm.sh
+// ✅ СТАЛО: Используем стабильный URL esm.sh и импортируем как пространство имен
 import * as GoogleGenerativeAI from "https://esm.sh/@google/genai@1.28.0";
+import { GoogleGenerativeAI } from "https://esm.sh/@google/genai@1.28.0";
 
 export enum TransactionType {
   INCOME = 'INCOME',
@@ -11,7 +12,6 @@ export enum TransactionType {
 }
 
 // Декларация функции, которую Gemini будет вызывать
-//
 export const addTransactionFunctionDeclaration: GoogleGenerativeAI.FunctionDeclaration = {
   name: 'addTransaction',
   description: 'Adds a new income or expense transaction to the user\'s financial records. Infer the type (income/expense) from the context.',
