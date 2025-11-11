@@ -1,3 +1,5 @@
+// src/components/RecordingOverlay.tsx
+// ИСПРАВЛЕННАЯ ВЕРСИЯ
 import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Square } from 'lucide-react';
@@ -8,9 +10,14 @@ interface RecordingOverlayProps {
   stream: MediaStream | null;
   onStop: () => void;
   isRecording: boolean;
+  // ----------------------------------------------------------------
+  // 🚨 ИСПРАВЛЕНИЕ 1: Добавляем 'audioContext' в props
+  // ----------------------------------------------------------------
+  audioContext: AudioContext | null;
 }
 
 const generateWavePath = (time: number, amplitude: number, frequency: number) => {
+    // ... (эта функция без изменений) ...
     const points = 100;
     const width = 800;
     const height = 150;
@@ -38,7 +45,16 @@ const generateWavePath = (time: number, amplitude: number, frequency: number) =>
 };
 
 
-export const RecordingOverlay: React.FC<RecordingOverlayProps> = ({ transcription, stream, onStop, isRecording }) => {
+export const RecordingOverlay: React.FC<RecordingOverlayProps> = ({ 
+  transcription, 
+  stream, 
+  onStop, 
+  isRecording,
+  // ----------------------------------------------------------------
+  // 🚨 ИСПРАВЛЕНИЕ 2: Получаем 'audioContext' из props
+  // ----------------------------------------------------------------
+  audioContext
+}) => {
   const { t } = useLocalization();
   const [audioLevel, setAudioLevel] = useState(0);
   const [time, setTime] = useState(0);
@@ -53,14 +69,22 @@ export const RecordingOverlay: React.FC<RecordingOverlayProps> = ({ transcriptio
   }, []);
 
   useEffect(() => {
-      if (!stream) {
+      // ----------------------------------------------------------------
+      // 🚨 ИСПРАВЛЕНИЕ 3: Проверяем не только stream, но и audioContext
+      // ----------------------------------------------------------------
+      if (!stream || !audioContext) {
         setAudioLevel(0);
         smoothedLevelRef.current = 0;
         if(animationFrameId.current) cancelAnimationFrame(animationFrameId.current);
         return;
       };
   
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      // ----------------------------------------------------------------
+      // 🚨 ИСПРАВЛЕНИЕ 4: УДАЛЯЕМ создание 'new AudioContext()'
+      // ----------------------------------------------------------------
+      // const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      
+      // Теперь 'audioContext' используется из props
       const source = audioContext.createMediaStreamSource(stream);
       const analyser = audioContext.createAnalyser();
       
@@ -88,11 +112,17 @@ export const RecordingOverlay: React.FC<RecordingOverlayProps> = ({ transcriptio
         cancelAnimationFrame(animationFrameId.current);
         source.disconnect();
         analyser.disconnect();
-        audioContext.close().catch(console.error);
+        // ----------------------------------------------------------------
+        // 🚨 ИСПРАВЛЕНИЕ 5: УДАЛЯЕМ 'audioContext.close()'
+        // ----------------------------------------------------------------
+        // audioContext.close().catch(console.error);
         smoothedLevelRef.current = 0;
         setAudioLevel(0);
       };
-  }, [stream]);
+  // ----------------------------------------------------------------
+  // 🚨 ИСПРАВЛЕНИЕ 6: Добавляем 'audioContext' в зависимости
+  // ----------------------------------------------------------------
+  }, [stream, audioContext]);
 
   const words = useMemo(() => transcription.split(' ').filter(w => w !== ''), [transcription]);
 
@@ -100,6 +130,7 @@ export const RecordingOverlay: React.FC<RecordingOverlayProps> = ({ transcriptio
 
   return (
       <motion.div
+          // ... (весь ваш JSX без изменений) ...
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -169,6 +200,7 @@ export const RecordingOverlay: React.FC<RecordingOverlayProps> = ({ transcriptio
                   style={{ minWidth: '800px' }}
                   preserveAspectRatio="none"
               >
+                  {/* ... (defs без изменений) ... */}
                   <defs>
                       <linearGradient id="waveGradient1" x1="0%" y1="0%" x2="0%" y2="100%">
                           <stop offset="0%" stopColor="rgba(255, 255, 255, 0.9)" />

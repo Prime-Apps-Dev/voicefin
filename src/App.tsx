@@ -1,3 +1,5 @@
+// src/App.tsx
+// ИСПРАВЛЕННАЯ ВЕРСИЯ (на основе вашего старого кода)
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import * as api from './services/api';
@@ -34,8 +36,6 @@ import { useLocalization } from './context/LocalizationContext';
 
 
 // --- App State & Backend Interaction ---
-// usePersistentState удален. Все получаем с бэкенда.
-
 const App: React.FC = () => {
   const { t, language } = useLocalization();
   
@@ -55,8 +55,12 @@ const App: React.FC = () => {
   // UI State
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  // ... (остальное UI State) ...
-  const [transcription, setTranscription] = useState(''); // Мы можем удалить это, если не будем показывать транскрипцию
+  // ----------------------------------------------------------------
+  // 🚨 ИСПРАВЛЕНИЕ 1: Добавляем state для `stream` (потока)
+  // ----------------------------------------------------------------
+  const [stream, setStream] = useState<MediaStream | null>(null);
+  
+  const [transcription, setTranscription] = useState(''); 
   const [potentialTransaction, setPotentialTransaction] = useState<Omit<Transaction, 'id'> | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [savingsTips, setSavingsTips] = useState<string | null>(null);
@@ -68,7 +72,6 @@ const App: React.FC = () => {
   const [isTextInputOpen, setIsTextInputOpen] = useState(false);
   const [isProcessingText, setIsProcessingText] = useState(false);
   const [textInputValue, setTextInputValue] = useState('');
-  // ... (остальное UI State, как в вашем файле) ...
   const [isAccountFormOpen, setIsAccountFormOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [accountForActions, setAccountForActions] = useState<Account | null>(null);
@@ -83,27 +86,28 @@ const App: React.FC = () => {
   const [carryOverInfo, setCarryOverInfo] = useState<{ from: string, to: string } | null>(null);
   const [categoryFormState, setCategoryFormState] = useState<{ isOpen: boolean; category: Category | null; context?: { type: TransactionType; from?: 'budget' } }>({ isOpen: false, category: null });
 
-  // --- НОВОЕ: Refs для записи аудио ---
+  // --- Refs для записи аудио ---
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  // ----------------------------------------------------------------
+  // 🚨 ИСПРАВЛЕНИЕ 2: Добавляем Ref для "аудио-движка"
+  // ----------------------------------------------------------------
+  const audioCtxRef = useRef<AudioContext | null>(null);
+
 
   // --- НОВОЕ: Data Fetching и Аутентификация ---
   useEffect(() => {
-    // Получаем объект Telegram
-    // @ts-ignore (Telegram SDK добавляется в index.html)
+    // @ts-ignore
     const tg = window.Telegram.WebApp;
 
     const initializeApp = async (initData: string) => {
       try {
-        // 1. Аутентификация: получаем токен и данные TG
-        // authResponse = { token: "...", user: { (объект пользователя Telegram) } }
         const authResponse = await api.authenticateWithTelegram(initData);
         
         if (!authResponse || !authResponse.token || !authResponse.user) {
             throw new Error("Invalid auth response from server");
         }
 
-        // 2. Устанавливаем сессию в Supabase И ЖДЕМ РЕЗУЛЬТАТ
         const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
           access_token: authResponse.token,
           refresh_token: authResponse.token,
@@ -113,34 +117,24 @@ const App: React.FC = () => {
           throw new Error(`Failed to set session: ${sessionError.message}`);
         }
         
-        // 3. Убеждаемся, что сессия и пользователь установлены
         if (!sessionData || !sessionData.user) {
-          // Если setSession вернул null, значит токен невалидный
-          // (хотя наша функция telegram-auth должна была это поймать)
           throw new Error("Auth session missing after setSession!");
         }
 
-        // 4. Формируем объект пользователя для ProfileScreen
-        // (sessionData.user - это пользователь Supabase)
-        // (authResponse.user - это пользователь Telegram)
-        const teleUser = authResponse.user; // { id, first_name, ... }
-        const supUser = sessionData.user;   // { id (UUID), email, ... }
+        const teleUser = authResponse.user; 
+        const supUser = sessionData.user;   
 
         const appUser: User = {
-            id: supUser.id, // Используем настоящий UUID из Supabase
+            id: supUser.id,
             name: teleUser.first_name || teleUser.username || supUser.email || 'User',
             email: supUser.email
         };
         
-        // Сохраняем пользователя в стейт
         setTgUser(appUser);
         
-        // 5. Загрузка данных
-        // Теперь api.initializeUser() будет вызван ПОСЛЕ
-        // того, как клиент Supabase 100% получил сессию.
         const [exchangeRates, initialData] = await Promise.all([
           getExchangeRates(),
-          api.initializeUser(), // Вызываем API (уже с токеном)
+          api.initializeUser(),
         ]);
         
         setRates(exchangeRates);
@@ -149,9 +143,6 @@ const App: React.FC = () => {
         setCategories(initialData.categories);
         setSavingsGoals(initialData.savingsGoals);
         setBudgets(initialData.budgets);
-        
-        // (Опционально) Устанавливаем валюту пользователя
-        // setDefaultCurrency(initialData.settings.defaultCurrency);
 
       } catch (err: any) {
         console.error("Initialization failed:", err);
@@ -161,22 +152,18 @@ const App: React.FC = () => {
       }
     };
 
-    // --- Логика "Охранника" (без изменений) ---
     tg.ready();
     tg.expand();
 
     if (tg.initData) {
-      // Если "пропуск" (initData) есть, запускаем приложение
       initializeApp(tg.initData);
     } else {
-      // Если "пропуска" нет (открыли в обычном браузере)
-      setError(t('telegramError')); // "Пожалуйста, откройте приложение из Telegram"
+      setError(t('telegramError'));
       setIsLoading(false);
     }
-  }, [t]); // t - зависимость от языка
+  }, [t]); 
   
   // --- Memoized Calculations (без изменений) ---
-  // ... (весь ваш код useMemo для totalBalance, summary и т.д. остается здесь) ...
   const displayCurrency = useMemo(() => defaultCurrency === 'DEFAULT' ? 'USD' : defaultCurrency, [defaultCurrency]);
 
   const filteredTransactions = useMemo(() => {
@@ -184,7 +171,6 @@ const App: React.FC = () => {
     return transactions.filter(tx => tx.accountId === selectedAccountId);
   }, [transactions, selectedAccountId]);
   
-  // (и так далее... все ваши useMemo)
   const totalBalance = useMemo(() => {
     return transactions.reduce((balance, tx) => {
       const amountInDefaultCurrency = convertCurrency(tx.amount, tx.currency, displayCurrency, rates);
@@ -237,11 +223,8 @@ const App: React.FC = () => {
   
 
   // --- Handlers for Data Mutation (ОБНОВЛЕНЫ) ---
-
   const handleConfirmTransaction = async (transactionData: Omit<Transaction, 'id'> | Transaction) => {
-    // 1. Обработка новой категории
     if (transactionData.category && !categories.some(c => c.name.toLowerCase() === transactionData.category.toLowerCase())) {
-        // Вызываем бэкенд-функцию для подбора иконки
         const iconName = await api.getIconForCategory(transactionData.category);
         const newCategoryData: Omit<Category, 'id'> = {
             name: transactionData.category,
@@ -250,28 +233,24 @@ const App: React.FC = () => {
             isdefault: false,
             type: transactionData.type,
         };
-        // Сохраняем категорию в БД
         const newCategory = await api.addCategory(newCategoryData);
         setCategories(prev => [...prev, newCategory]);
     }
 
-    // 2. Обновление целей (остается на клиенте для скорости)
     const originalTransaction = 'id' in transactionData ? transactions.find(t => t.id === transactionData.id) : null;
-    if (transactionData.goalId || originalTransaction?.goalId) {
-        // (Этот код можно оставить, он обновляет UI)
+    if (transactionData.goalid || originalTransaction?.goalId) {
         setSavingsGoals(prevGoals => prevGoals.map(g => {
             let newCurrentAmount = g.currentAmount;
             if (originalTransaction?.goalId === g.id) {
                 newCurrentAmount -= convertCurrency(originalTransaction.amount, originalTransaction.currency, g.currency, rates);
             }
-            if (transactionData.goalId === g.id && transactionData.type === TransactionType.EXPENSE) {
+            if (transactionData.goalid === g.id && transactionData.type === TransactionType.EXPENSE) {
                 newCurrentAmount += convertCurrency(transactionData.amount, transactionData.currency, g.currency, rates);
             }
             return { ...g, currentAmount: Math.max(0, newCurrentAmount) };
         }));
     }
 
-    // 3. Сохранение транзакции в БД
     if ('id' in transactionData) {
       const updatedTx = await api.updateTransaction(transactionData);
       setTransactions(prev => prev.map(t => t.id === updatedTx.id ? updatedTx : t));
@@ -280,7 +259,6 @@ const App: React.FC = () => {
       setTransactions(prev => [newTx, ...prev]);
     }
     
-    // 4. Сброс UI
     setPotentialTransaction(null);
     setEditingTransaction(null);
     setGoalForDeposit(null);
@@ -291,7 +269,6 @@ const App: React.FC = () => {
     setIsProcessingText(true);
     setError(null);
     try {
-        // Вызываем бэкенд-функцию
         const newTransaction = await api.parseTransactionFromText(
           inputText,
           displayCurrency,
@@ -314,7 +291,6 @@ const App: React.FC = () => {
     setIsGeneratingTips(true);
     setSavingsTips(null);
     try {
-        // Вызываем бэкенд-функцию
         const tips = await api.generateSavingsTips(transactions);
         setSavingsTips(tips);
     } catch (error: any) {
@@ -328,7 +304,6 @@ const App: React.FC = () => {
   const handleDeleteItem = async () => {
     if (!itemToDelete) return;
 
-    // Этот код почти не меняется, т.к. мы уже вызываем api.delete...
     try {
       if ('type' in itemToDelete) {
           const { type, value } = itemToDelete;
@@ -364,11 +339,8 @@ const App: React.FC = () => {
     setItemToDelete(null);
   };
 
-  // Все остальные handleSave... и handle...
-  // ОСТАЮТСЯ БЕЗ ИЗМЕНЕНИЙ, потому что они УЖЕ
-  // вызывают `api.addCategory`, `api.updateAccount` и т.д.
-  // Мы "подменили" начинку api.ts, а App.tsx этого даже не заметил.
   // ... (handleSaveCategory, handleSaveAccount, handleSaveGoal, handleSaveBudget) ...
+  // (Остаются без изменений, т.к. уже вызывают API)
   const handleSaveCategory = async (categoryData: Omit<Category, 'id'> | Category) => {
     let savedCategory: Category;
     if ('id' in categoryData) {
@@ -421,70 +393,89 @@ const App: React.FC = () => {
   };
 
 
-  // --- НОВАЯ ЛОГИКА ЗАПИСИ АУДИО ---
-  const handleToggleRecording = async () => {
-    if (isRecording) {
-      // --- Остановка записи ---
-      if (mediaRecorderRef.current) {
-        mediaRecorderRef.current.stop();
-        // (Обработка произойдет в событии 'onstop')
+  // ----------------------------------------------------------------
+  // 🚨 ИСПРАВЛЕНИЕ 3: Заменяем `handleToggleRecording` на 3 новых функции
+  // ----------------------------------------------------------------
+
+  // Вызывается при нажатии кнопки "Старт"
+  const handleStartRecording = async () => {
+    if (isRecording) return;
+    
+    try {
+      // 1. Создаем "аудио-движок" при ПЕРВОМ нажатии
+      if (!audioCtxRef.current) {
+        audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+        if (audioCtxRef.current.state === 'suspended') {
+          await audioCtxRef.current.resume();
+        }
       }
-      setIsRecording(false);
-      setIsProcessing(true); // Показываем индикатор обработки
-    } else {
-      // --- Начало записи ---
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      const mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      setStream(mediaStream); // 2. Сохраняем поток в state (для оверлея)
+      setIsRecording(true);
+      
+      const mimeType = [
+          'audio/webm;codecs=opus',
+          'audio/ogg;codecs=opus',
+          'audio/webm',
+          'audio/mp4',
+        ].find(type => MediaRecorder.isTypeSupported(type)) || 'audio/webm';
         
-        // Определяем лучший mimeType
-        const mimeType = [
-            'audio/webm;codecs=opus',
-            'audio/ogg;codecs=opus',
-            'audio/webm',
-            'audio/mp4',
-          ].find(type => MediaRecorder.isTypeSupported(type)) || 'audio/webm';
-          
-        const recorder = new MediaRecorder(stream, { mimeType });
-        mediaRecorderRef.current = recorder;
-        audioChunksRef.current = []; // Очищаем старые куски
+      const recorder = new MediaRecorder(mediaStream, { mimeType });
+      mediaRecorderRef.current = recorder;
+      audioChunksRef.current = []; // Очищаем старые куски
 
-        recorder.ondataavailable = (event) => {
-          audioChunksRef.current.push(event.data);
-        };
+      recorder.ondataavailable = (event) => {
+        audioChunksRef.current.push(event.data);
+      };
 
-        recorder.onstop = async () => {
-          // Запись остановлена, создаем единый файл (Blob)
-          const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
-          
-          // Очищаем поток
-          stream.getTracks().forEach(track => track.stop());
-          
-          // Отправляем Blob на бэкенд
-          try {
-            const newTransaction = await api.processAudioTransaction(
-              audioBlob,
-              categories,
-              savingsGoals,
-              language
-            );
-            // Успех! Показываем форму
-            setPotentialTransaction(newTransaction);
-          } catch (err: any) {
-            console.error('Failed to process audio:', err);
-            setError(err.message || t('connectionError'));
-          } finally {
-            setIsProcessing(false);
-          }
-        };
+      // 3. Устанавливаем отдельный обработчик для `onstop`
+      recorder.onstop = handleRecordingStop; 
 
-        recorder.start();
-        setIsRecording(true);
-      } catch (err) {
-        console.error('Failed to start recording:', err);
-        setError(t('micError'));
-      }
+      recorder.start();
+    } catch (err) {
+      console.error('Failed to start recording:', err);
+      setError(t('micError'));
     }
   };
+
+  // Вызывается при нажатии кнопки "Стоп"
+  const handleStopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+    }
+    setIsRecording(false);
+    setIsProcessing(true); // Показываем индикатор обработки
+  };
+
+  // Вызывается автоматически, когда запись физически остановилась
+  const handleRecordingStop = async () => {
+    // 4. Останавливаем треки, но НЕ audioCtx
+    stream?.getTracks().forEach(track => track.stop());
+    setStream(null); // Очищаем state
+
+    const mimeType = mediaRecorderRef.current?.mimeType || 'audio/webm';
+    const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+    audioChunksRef.current = [];
+    
+    // Отправляем Blob на бэкенд
+    try {
+      const newTransaction = await api.processAudioTransaction(
+        audioBlob,
+        categories,
+        savingsGoals,
+        language
+      );
+      // Успех! Показываем форму
+      setPotentialTransaction(newTransaction);
+    } catch (err: any) {
+      console.error('Failed to process audio:', err);
+      setError(err.message || t('connectionError'));
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   
   // --- UI Handlers (без изменений) ---
   const handleCancelTransaction = () => {
@@ -498,7 +489,6 @@ const App: React.FC = () => {
   // --- Render Logic (без изменений) ---
   const renderContent = () => {
     // Весь ваш `switch (activeScreen) { ... }` остается здесь
-    // ...
     switch (activeScreen) {
       case 'savings': return <SavingsScreen goals={savingsGoals} onAddGoal={() => setIsGoalFormOpen(true)} onAddToGoal={(goal) => { setGoalForDeposit(goal); setPotentialTransaction({ accountId: accounts[0].id, name: `Deposit to "${goal.name}"`, amount: 0, currency: displayCurrency, category: 'Savings', date: new Date().toISOString(), type: TransactionType.EXPENSE, goalId: goal.id }); }} onViewGoalHistory={setGoalForHistory} onEditGoal={(goal) => { setEditingGoal(goal); setIsGoalFormOpen(true); }} onDeleteGoal={(goal) => setItemToDelete({ type: 'savingsGoal', value: goal })} />;
       case 'analytics': return <AnalyticsScreen transactions={transactions} savingsGoals={savingsGoals} defaultCurrency={displayCurrency} rates={rates} />;
@@ -526,20 +516,20 @@ const App: React.FC = () => {
     <div className="min-h-screen bg-gray-900">
       {renderContent()}
 
-      {/* Оверлей записи. 
-        Мы УБРАЛИ `stream={audioStream}` и `isReviewing`, т.к. новая логика в них не нуждается.
-        [cite: App.tsx (original)]
-      */}
+      {/* ---------------------------------------------------------------- */}
+      {/* 🚨 ИСПРАВЛЕНИЕ 4: Обновляем props для RecordingOverlay */}
+      {/* ---------------------------------------------------------------- */}
       {isRecording && (
         <RecordingOverlay 
-          transcription={transcription} // Можно оставить, если хотите показывать live-транскрипцию (но это сложно)
-          onStop={handleToggleRecording}
+          transcription={transcription}
+          stream={stream} // Передаем поток из state
+          onStop={handleStopRecording} // Передаем новую функцию "Стоп"
           isRecording={isRecording}
+          audioContext={audioCtxRef.current} // Передаем "аудио-движок"
         />
       )}
 
       {/* Вся остальная часть return (формы, модальные окна) остается БЕЗ ИЗМЕНЕНИЙ */}
-      {/* ... (ваш код <TransactionForm ...>, <AccountForm ...> и т.д.) ... */}
       {(potentialTransaction || editingTransaction) && (
         <TransactionForm
           transaction={potentialTransaction || editingTransaction!}
@@ -570,7 +560,17 @@ const App: React.FC = () => {
       {goalForHistory && <GoalTransactionsModal isOpen={!!goalForHistory} onClose={() => setGoalForHistory(null)} goal={goalForHistory} transactions={transactions} accounts={accounts} onSelectTransaction={setEditingTransaction} onDeleteTransaction={(tx) => setItemToDelete(tx)} rates={rates} />}
       {budgetForHistory && <BudgetTransactionsModal isOpen={!!budgetForHistory} onClose={() => setBudgetForHistory(null)} budget={budgetForHistory} transactions={transactions} accounts={accounts} onSelectTransaction={setEditingTransaction} onDeleteTransaction={(tx) => setItemToDelete(tx)} rates={rates} />}
       
-      <BottomNavBar activeScreen={activeScreen} onNavigate={setActiveScreen} isRecording={isRecording} isProcessing={isProcessing} onToggleRecording={handleToggleRecording} onLongPressAdd={() => setIsTextInputOpen(true)} />
+      {/* ---------------------------------------------------------------- */}
+      {/* 🚨 ИСПРАВЛЕНИЕ 5: Обновляем onToggleRecording в BottomNavBar */}
+      {/* ---------------------------------------------------------------- */}
+      <BottomNavBar 
+        activeScreen={activeScreen} 
+        onNavigate={setActiveScreen} 
+        isRecording={isRecording} 
+        isProcessing={isProcessing} 
+        onToggleRecording={isRecording ? handleStopRecording : handleStartRecording} 
+        onLongPressAdd={() => setIsTextInputOpen(true)} 
+      />
     </div>
   );
 };

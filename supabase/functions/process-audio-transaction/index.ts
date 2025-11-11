@@ -1,17 +1,27 @@
 // supabase/functions/process-audio-transaction/index.ts
+// ВЕРСИЯ С ИСПРАВЛЕНИЕМ: Удален ненужный Supabase клиент, который вызывал сбой.
+
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { CORS_HEADERS, handleCors } from "../_shared/cors.ts";
 import { GoogleGenerativeAI } from "npm:@google/generative-ai";
 import { getSystemInstruction } from "../_shared/prompts.ts";
 import { addTransactionFunctionDeclaration } from "../_shared/types.ts";
-import { createClient } from "npm:@supabase/supabase-js";
+// import { createClient } from "npm:@supabase/supabase-js"; // <-- ЭТО УДАЛЕНО
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return handleCors();
   }
 
+  // 1. 🚨 БЛОК КЛИЕНТА SUPABASE УДАЛЕН 🚨
+  // Он не был нужен в этой функции и вызывал ошибку "Load Failed",
+  // так как секрет SUPABASE_SERVICE_ROLE_KEY не был установлен.
+  // const authHeader = req.headers.get('Authorization');
+  // const token = authHeader?.replace('Bearer ', '');
+  // const supabase = createClient(...);
+
   try {
+    // Этот ключ по-прежнему нужен
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
     if (!GEMINI_API_KEY) {
       throw new Error("GEMINI_API_KEY not set in Edge Function secrets.");
@@ -75,20 +85,8 @@ serve(async (req) => {
       delete transaction.savingsGoalName;
     }
     
-    // 🚨 ВАЖНО: Добавляем `telegram_user_id` из JWT.
-    // Если мы используем RLS, то можем просто вызывать Supabase API
-    // Для этого нам нужен токен пользователя, который мы получили выше!
-    
-    // В этом Edge Function мы не будем добавлять транзакцию в БД,
-    // а просто вернем распарсенный объект, чтобы клиентское приложение 
-    // его подтвердило (TransactionForm) и затем добавило.
-    
-    // Если бы мы добавляли в БД прямо здесь:
-    // const { data: transactionData, error: dbError } = await supabase
-    //  .from('transactions')
-    //  .insert([transaction])
-    //  .select()
-    //  .single();
+    // Эта функция просто возвращает JSON.
+    // Клиентское приложение (React) само добавит транзакцию в БД.
     
     return new Response(JSON.stringify(transaction), {
       headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
