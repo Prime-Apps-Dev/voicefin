@@ -2,8 +2,8 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { CORS_HEADERS, handleCors } from "../_shared/cors.ts";
-// ✅ ИСПРАВЛЕНИЕ: Используем named import для конструктора (наиболее надежный вариант для esm.sh)
-import { GoogleGenerativeAI } from "https://esm.sh/@google/genai@1.28.0"; 
+// ✅ ИСПОЛЬЗУЕМ: Импорт всего модуля (* as GenAIModule)
+import * as GenAIModule from "https://esm.sh/@google/genai@1.28.0"; 
 import { getSystemInstruction } from "../_shared/prompts.ts";
 import { addTransactionFunctionDeclaration } from "../_shared/types.ts";
 
@@ -26,8 +26,17 @@ serve(async (req) => {
       throw new Error("GEMINI_API_KEY not set in Edge Function secrets.");
     }
     
-    // ✅ ИСПРАВЛЕНИЕ: Используем конструктор напрямую из импорта
-    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+    // ✅ ИСПРАВЛЕНИЕ: Универсальное получение конструктора.
+    // Deno/ESM часто экспортируют главный класс как 'default' или 'GoogleGenerativeAI'.
+    // Мы пробуем оба варианта.
+    const GoogleGenerativeAIConstructor = 
+      (GenAIModule as any).GoogleGenerativeAI || (GenAIModule as any).default;
+      
+    if (typeof GoogleGenerativeAIConstructor !== 'function') {
+        throw new Error("GenAIModule is loaded but the GoogleGenerativeAI constructor is missing or not a function.");
+    }
+    
+    const genAI = new GoogleGenerativeAIConstructor(GEMINI_API_KEY);
 
     // ------------------------------------------------
     // 2. ОБРАБОТКА FormData (только для POST)
