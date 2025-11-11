@@ -1,5 +1,3 @@
-// src/components/TransactionForm.tsx
-
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Transaction, TransactionType, Account, SavingsGoal, Category, Budget, ExchangeRates } from '../types';
@@ -7,11 +5,10 @@ import { COMMON_CURRENCIES } from '../constants';
 import { useLocalization } from '../context/LocalizationContext';
 import { DatePicker } from './DatePicker';
 import { TimePicker } from './TimePicker';
-import { Calendar, Clock, ChevronDown, PlusCircle, Mic, MicOff, Loader2Icon } from 'lucide-react';
+import { Calendar, Clock, ChevronDown, PlusCircle } from 'lucide-react';
 import { ICONS } from './icons';
 import { convertCurrency } from '../services/currency';
-import { useVoiceTranscription } from '../utils/audio'; // Импортируем обновленный хук
-import { TranscriptionReview } from './TranscriptionReview'; // Импортируем новый компонент
+
 
 interface TransactionFormProps {
   transaction: Omit<Transaction, 'id'> | Transaction;
@@ -28,8 +25,6 @@ interface TransactionFormProps {
   onCreateBudget: (category: string, monthKey: string) => void;
   rates: ExchangeRates;
   defaultCurrency: string;
-  // НОВОЕ: URL для голосового ввода
-  edgeFunctionUrl: string; 
 }
 
 const InputField = ({ label, name, value, onChange, type = 'text', required = false, inputMode, disabled = false }: { label: string, name: keyof Transaction, value: any, onChange: any, type?: string, required?: boolean, inputMode?: 'none' | 'text' | 'tel' | 'url' | 'email' | 'numeric' | 'decimal' | 'search', disabled?: boolean }) => (
@@ -58,12 +53,9 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
   const { 
     transaction, categories, accounts, onConfirm, onCancel, 
     isSavingsDeposit, isCategoryLocked, goalName, 
-    budgets, transactions, onCreateBudget, rates, defaultCurrency, savingsGoals,
-    edgeFunctionUrl // НОВОЕ
+    budgets, transactions, onCreateBudget, rates, defaultCurrency, savingsGoals
   } = props;
   const { t, language } = useLocalization();
-  
-  // --- Состояние для Ручного Ввода (Оригинальное) ---
   const [formData, setFormData] = React.useState(transaction);
   const [amountStr, setAmountStr] = React.useState(String(transaction.amount || ''));
   const [isDatePickerOpen, setIsDatePickerOpen] = React.useState(false);
@@ -75,68 +67,8 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
     }
     return Array.from(options).sort();
   });
-  
-  // --- Состояние для Голосового Ввода (Новое) ---
-  const [isVoiceMode, setIsVoiceMode] = React.useState(false);
-  const {
-      isRecording,
-      isProcessing,
-      transcription,
-      processedTransaction,
-      toggleRecording,
-      resetState, // Функция сброса голосового состояния
-  } = useVoiceTranscription({
-      categories,
-      savingsGoals,
-      language,
-      edgeFunctionUrl,
-      // Мы не используем эти колбэки здесь, так как все управляется через компоненты
-      onTranscriptionUpdate: (text) => console.log('Live transcript updated:', text),
-      onTransactionComplete: (transaction) => console.log('Final transaction received:', transaction),
-      onError: (error) => console.error('Voice error:', error),
-  });
-
   const isEditing = 'id' in transaction;
   const isSavingsTransaction = formData.category === 'Savings';
-  
-  // Условие для отображения модального окна TranscriptionReview
-  const showReviewScreen = isVoiceMode && (isProcessing || !!processedTransaction);
-
-  React.useEffect(() => {
-    // Если мы переключились на Голосовой ввод, сбрасываем состояние ручной формы
-    if (isVoiceMode) {
-        // Мы не сбрасываем formData, потому что в случае отмены редактирования 
-        // ручной ввод должен вернуться к исходным данным.
-        // setFormData(transaction);
-        // setAmountStr(String(transaction.amount || ''));
-    }
-  }, [isVoiceMode]);
-
-  // Сброс и закрытие формы после успешной обработки или отмены обзора
-  const handleReviewCancel = React.useCallback(() => {
-    resetState();
-    setIsVoiceMode(false);
-    // onCancel(); // Мы не закрываем модальное окно полностью, только сбрасываем голосовой режим
-  }, [resetState]);
-  
-  const handleReviewConfirm = React.useCallback((transactionToConfirm: Transaction) => {
-    // 1. Применяем данные распознанной транзакции к стейту формы
-    setFormData(prev => ({
-        ...prev, 
-        ...transactionToConfirm, 
-        date: transactionToConfirm.date || new Date().toISOString(), // Убедиться, что дата установлена
-        accountId: prev.accountId // Сохраняем выбранный в форме аккаунт
-    }));
-    setAmountStr(String(transactionToConfirm.amount || ''));
-    
-    // 2. Выходим из голосового режима, но не закрываем модальное окно
-    resetState();
-    setIsVoiceMode(false);
-    
-    // 3. Можно сразу отправить на подтверждение ручной формы
-    // onConfirm(transactionToConfirm);
-    // Или оставить пользователя в ручной форме, чтобы он проверил детали
-  }, [resetState]);
 
   React.useEffect(() => {
     setFormData(transaction);
@@ -253,53 +185,14 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
       maximumFractionDigits: 2,
     }).format(amount);
   };
-  
-  // --- ЛОГИКА ГОЛОСОВОГО ВВОДА ---
-
-  const handleVoiceToggle = () => {
-      // Если мы переключаемся на Голосовой режим
-      if (!isVoiceMode) {
-          setIsVoiceMode(true);
-          // Начать запись, если она не началась
-          if (!isRecording) {
-              toggleRecording();
-          }
-      } else {
-          // Если мы в Голосовом режиме, то эта кнопка служит для остановки/начала
-          if (isRecording) {
-              toggleRecording(); // Остановит запись и начнет обработку
-          } else {
-              // Если запись не идет и не идет обработка (т.е. сброшено), выходим из режима
-              setIsVoiceMode(false);
-              resetState();
-          }
-      }
-  };
-
 
   return (
     <>
-      <AnimatePresence>
-        {/* Модальное окно TranscriptionReview (появляется поверх формы) */}
-        {showReviewScreen && (
-            <TranscriptionReview
-                isProcessing={isProcessing}
-                transcription={transcription}
-                transaction={processedTransaction}
-                onSave={handleReviewConfirm} // Обработка распознанной транзакции
-                onCancel={handleReviewCancel} // Отмена голосового процесса
-                rates={rates}
-                defaultCurrency={defaultCurrency}
-                language={language}
-            />
-        )}
-      </AnimatePresence>
-      
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className={`fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center z-50 p-4 ${showReviewScreen ? 'pointer-events-none' : ''}`}
+        className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center z-50 p-4"
         onClick={onCancel}
       >
         <motion.div
@@ -311,296 +204,254 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
           onClick={(e) => e.stopPropagation()}
         >
           <div className="sticky top-0 bg-zinc-900/95 backdrop-blur-xl px-6 py-5 border-b border-zinc-800/60 z-10 flex-shrink-0">
-            <h2 className="text-xl font-semibold text-white tracking-tight">{isSavingsDeposit ? t('addGoalTitle', { goalName: goalName }) : isEditing ? t('editTransaction') : t('confirmTransaction')}</h2>
+            <h2 className="text-xl font-semibold text-white tracking-tight">{isSavingsDeposit ? `Add to "${goalName}"` : isEditing ? t('editTransaction') : t('confirmTransaction')}</h2>
           </div>
 
           <form onSubmit={handleSubmit} className="overflow-y-auto">
             <div className="px-6 py-6 space-y-4">
-            
-              {/* Кнопка переключения Ручной/Голосовой ввод */}
-              <div className="flex justify-center mb-4">
-                  <button
-                      type="button"
-                      onClick={handleVoiceToggle}
-                      disabled={isProcessing}
-                      className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold transition-all duration-300 shadow-md w-full justify-center
-                          ${!isVoiceMode 
-                              ? 'bg-blue-600 text-white hover:bg-blue-700 active:scale-[0.98]' 
-                              : isRecording 
-                                ? 'bg-red-600 text-white animate-pulse'
-                                : 'bg-zinc-700 text-zinc-300 hover:bg-zinc-600'
-                          } 
-                          ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`
-                      }
-                  >
-                      {isProcessing ? (
-                          <>
-                              <Loader2Icon size={20} className="animate-spin" />
-                              {t('analyzingAudio')}
-                          </>
-                      ) : (
-                          <>
-                              {isRecording ? <MicOff size={20} /> : <Mic size={20} />}
-                              {isVoiceMode 
-                                  ? (isRecording ? t('stopRecording') : t('exitVoiceMode'))
-                                  : t('startVoiceInput')
-                              }
-                          </>
-                      )}
-                  </button>
+              <div>
+                <label htmlFor="accountId" className="block text-sm font-medium text-zinc-300 mb-1.5">{t('account')}</label>
+                <div className="relative">
+                  <select id="accountId" name="accountId" value={formData.accountId} onChange={handleChange} required className="appearance-none w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 pr-10">
+                    {accounts.map((acc) => (
+                      <option key={acc.id} value={acc.id}>
+                        {acc.name} ({acc.currency})
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 pointer-events-none" />
+                </div>
+              </div>
+              <InputField label={t('name')} name="name" value={formData.name} onChange={handleChange} required disabled={isSavingsDeposit} />
+              <div className="grid grid-cols-2 gap-4">
+                <InputField label={t('amount')} name="amount" value={amountStr} onChange={handleChange} type="text" inputMode="decimal" required />
+                <div>
+                  <label htmlFor="currency" className="block text-sm font-medium text-zinc-300 mb-1.5">{t('currency')}</label>
+                  <div className="relative">
+                    <select
+                      id="currency"
+                      name="currency"
+                      value={formData.currency}
+                      onChange={handleChange}
+                      required
+                      className="appearance-none w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 pr-10"
+                    >
+                      {currencyOptions.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 pointer-events-none" />
+                  </div>
+                </div>
+              </div>
+              <div>
+                  <label htmlFor="category" className="block text-sm font-medium text-zinc-300 mb-1.5">{t('category')}</label>
+                  <div className="relative">
+                    <select
+                      id="category"
+                      name="category"
+                      value={formData.category}
+                      onChange={handleChange}
+                      required
+                      disabled={isSavingsDeposit || isCategoryLocked}
+                      className="appearance-none w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 pr-10 disabled:bg-zinc-700/50 disabled:cursor-not-allowed"
+                    >
+                      {allCategoryNames.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 pointer-events-none" />
+                  </div>
               </div>
 
-              {/* Ручная форма скрывается при активации Голосового режима */}
-              <motion.div
-                initial={{ opacity: 1 }}
-                animate={{ opacity: !isVoiceMode ? 1 : 0.5, pointerEvents: !isVoiceMode ? 'auto' : 'none' }}
-                transition={{ duration: 0.2 }}
-                className="space-y-4"
-              >
-                  <div>
-                    <label htmlFor="accountId" className="block text-sm font-medium text-zinc-300 mb-1.5">{t('account')}</label>
-                    <div className="relative">
-                      <select id="accountId" name="accountId" value={formData.accountId} onChange={handleChange} required className="appearance-none w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 pr-10">
-                        {accounts.map((acc) => (
-                          <option key={acc.id} value={acc.id}>
-                            {acc.name} ({acc.currency})
-                          </option>
-                        ))}
-                      </select>
-                      <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 pointer-events-none" />
-                    </div>
-                  </div>
-                  <InputField label={t('name')} name="name" value={formData.name} onChange={handleChange} required disabled={isSavingsDeposit} />
-                  <div className="grid grid-cols-2 gap-4">
-                    <InputField label={t('amount')} name="amount" value={amountStr} onChange={handleChange} type="text" inputMode="decimal" required />
-                    <div>
-                      <label htmlFor="currency" className="block text-sm font-medium text-zinc-300 mb-1.5">{t('currency')}</label>
-                      <div className="relative">
-                        <select
-                          id="currency"
-                          name="currency"
-                          value={formData.currency}
-                          onChange={handleChange}
-                          required
-                          className="appearance-none w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 pr-10"
-                        >
-                          {currencyOptions.map((c) => (
-                            <option key={c} value={c}>
-                              {c}
-                            </option>
-                          ))}
-                        </select>
-                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 pointer-events-none" />
-                      </div>
-                    </div>
-                  </div>
-                  <div>
-                      <label htmlFor="category" className="block text-sm font-medium text-zinc-300 mb-1.5">{t('category')}</label>
-                      <div className="relative">
-                        <select
-                          id="category"
-                          name="category"
-                          value={formData.category}
-                          onChange={handleChange}
-                          required
-                          disabled={isSavingsDeposit || isCategoryLocked}
-                          className="appearance-none w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 pr-10 disabled:bg-zinc-700/50 disabled:cursor-not-allowed"
-                        >
-                          {allCategoryNames.map((c) => (
-                            <option key={c} value={c}>
-                              {c}
-                            </option>
-                          ))}
-                        </select>
-                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 pointer-events-none" />
-                      </div>
-                  </div>
-
-                   <AnimatePresence>
-                    {isSavingsTransaction && (
-                        <motion.div
-                            initial={{ opacity: 0, height: 0, y: -10 }}
-                            animate={{ opacity: 1, height: 'auto', y: 0 }}
-                            exit={{ opacity: 0, height: 0, y: -10 }}
-                            className="overflow-hidden"
-                        >
-                            <div className="pt-2">
-                                <label htmlFor="goalId" className="block text-sm font-medium text-zinc-300 mb-1.5">{t('savingsGoal')}</label>
-                                <div className="relative">
-                                    <select
-                                        id="goalId"
-                                        name="goalId"
-                                        value={formData.goalId || ''}
-                                        onChange={handleChange}
-                                        required
-                                        disabled={isSavingsDeposit}
-                                        className="appearance-none w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-brand-purple focus:border-transparent transition-all duration-200 pr-10 disabled:bg-zinc-700/50 disabled:cursor-not-allowed"
-                                    >
-                                        <option value="" disabled>{t('selectGoal')}</option>
-                                        {savingsGoals.map((goal) => (
-                                            <option key={goal.id} value={goal.id}>
-                                                {goal.name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 pointer-events-none" />
-                                </div>
+               <AnimatePresence>
+                {isSavingsTransaction && (
+                    <motion.div
+                        initial={{ opacity: 0, height: 0, y: -10 }}
+                        animate={{ opacity: 1, height: 'auto', y: 0 }}
+                        exit={{ opacity: 0, height: 0, y: -10 }}
+                        className="overflow-hidden"
+                    >
+                        <div className="pt-2">
+                            <label htmlFor="goalId" className="block text-sm font-medium text-zinc-300 mb-1.5">{t('savingsGoal')}</label>
+                            <div className="relative">
+                                <select
+                                    id="goalId"
+                                    name="goalId"
+                                    value={formData.goalId || ''}
+                                    onChange={handleChange}
+                                    required
+                                    disabled={isSavingsDeposit}
+                                    className="appearance-none w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-brand-purple focus:border-transparent transition-all duration-200 pr-10 disabled:bg-zinc-700/50 disabled:cursor-not-allowed"
+                                >
+                                    <option value="" disabled>{t('selectGoal')}</option>
+                                    {savingsGoals.map((goal) => (
+                                        <option key={goal.id} value={goal.id}>
+                                            {goal.name}
+                                        </option>
+                                    ))}
+                                </select>
+                                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 pointer-events-none" />
                             </div>
-                            <AnimatePresence>
-                                {savingsGoalInfo && (
-                                    <motion.div
-                                        layout
-                                        initial={{ opacity: 0, height: 0, y: -10 }}
-                                        animate={{ opacity: 1, height: 'auto', y: 0 }}
-                                        exit={{ opacity: 0, height: 0, y: -10 }}
-                                        transition={{ duration: 0.3, ease: 'easeInOut' }}
-                                        className="overflow-hidden"
-                                    >
-                                        <div className="mt-2 bg-zinc-800 p-3 rounded-xl border border-zinc-700/50 space-y-2">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 flex-shrink-0 flex items-center justify-center bg-zinc-700 rounded-lg">
-                                                    <IconDisplay name={savingsGoalInfo.goal.icon} className="w-5 h-5 text-brand-purple" />
-                                                </div>
-                                                <div className="flex-grow min-w-0">
-                                                    <p className="text-sm font-medium text-white truncate">{savingsGoalInfo.goal.name} {t('progress')}</p>
-                                                    <p className="text-xs text-zinc-400">
-                                                        {formatCurrencyLocal(savingsGoalInfo.baseAmount, savingsGoalInfo.goal.currency)} of {formatCurrencyLocal(savingsGoalInfo.goal.targetAmount, savingsGoalInfo.goal.currency)}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <div className="w-full bg-zinc-700 rounded-full h-1.5">
-                                                <div
-                                                    className={`h-1.5 rounded-full bg-brand-purple`}
-                                                    style={{ width: `${Math.min(savingsGoalInfo.progress, 100)}%` }}
-                                                />
-                                            </div>
-                                            {formData.amount > 0 && (
-                                                <p className="text-xs text-center text-brand-purple">
-                                                    + {formatCurrencyLocal(convertCurrency(formData.amount, formData.currency, savingsGoalInfo.goal.currency, rates), savingsGoalInfo.goal.currency)} with this transaction
-                                                </p>
-                                            )}
-                                        </div>
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
-                        </motion.div>
-                    )}
-                   </AnimatePresence>
-                  
-                   <AnimatePresence>
-                        {budgetInfo && !isSavingsTransaction && (
-                            <motion.div
-                                layout
-                                initial={{ opacity: 0, height: 0, y: -10 }}
-                                animate={{ opacity: 1, height: 'auto', y: 0 }}
-                                exit={{ opacity: 0, height: 0, y: -10 }}
-                                transition={{ duration: 0.3, ease: 'easeInOut' }}
-                                className="overflow-hidden"
-                            >
-                                {budgetInfo.type === 'exists' && (
+                        </div>
+                        <AnimatePresence>
+                            {savingsGoalInfo && (
+                                <motion.div
+                                    layout
+                                    initial={{ opacity: 0, height: 0, y: -10 }}
+                                    animate={{ opacity: 1, height: 'auto', y: 0 }}
+                                    exit={{ opacity: 0, height: 0, y: -10 }}
+                                    transition={{ duration: 0.3, ease: 'easeInOut' }}
+                                    className="overflow-hidden"
+                                >
                                     <div className="mt-2 bg-zinc-800 p-3 rounded-xl border border-zinc-700/50 space-y-2">
                                         <div className="flex items-center gap-3">
                                             <div className="w-8 h-8 flex-shrink-0 flex items-center justify-center bg-zinc-700 rounded-lg">
-                                                <IconDisplay name={budgetInfo.budget.icon} className="w-5 h-5 text-white" />
+                                                <IconDisplay name={savingsGoalInfo.goal.icon} className="w-5 h-5 text-brand-purple" />
                                             </div>
                                             <div className="flex-grow min-w-0">
-                                                <p className="text-sm font-medium text-white truncate">{t('budgetFor', { category: budgetInfo.budget.category })}</p>
+                                                <p className="text-sm font-medium text-white truncate">{savingsGoalInfo.goal.name} {t('progress')}</p>
                                                 <p className="text-xs text-zinc-400">
-                                                    {formatCurrencyLocal(budgetInfo.spent, budgetInfo.budget.currency)} of {formatCurrencyLocal(budgetInfo.budget.limit, budgetInfo.budget.currency)}
+                                                    {formatCurrencyLocal(savingsGoalInfo.baseAmount, savingsGoalInfo.goal.currency)} of {formatCurrencyLocal(savingsGoalInfo.goal.targetAmount, savingsGoalInfo.goal.currency)}
                                                 </p>
                                             </div>
                                         </div>
                                         <div className="w-full bg-zinc-700 rounded-full h-1.5">
                                             <div
-                                                className={`h-1.5 rounded-full ${budgetInfo.progress > 85 ? 'bg-red-500' : 'bg-brand-blue'}`}
-                                                style={{ width: `${Math.min(budgetInfo.progress, 100)}%` }}
+                                                className={`h-1.5 rounded-full bg-brand-purple`}
+                                                style={{ width: `${Math.min(savingsGoalInfo.progress, 100)}%` }}
                                             />
                                         </div>
                                         {formData.amount > 0 && (
-                                            <p className="text-xs text-center text-brand-blue">
-                                                + {formatCurrencyLocal(convertCurrency(formData.amount, formData.currency, budgetInfo.budget.currency, rates), budgetInfo.budget.currency)} {t('withThisTransaction')}
+                                            <p className="text-xs text-center text-brand-purple">
+                                                + {formatCurrencyLocal(convertCurrency(formData.amount, formData.currency, savingsGoalInfo.goal.currency, rates), savingsGoalInfo.goal.currency)} with this transaction
                                             </p>
                                         )}
                                     </div>
-                                )}
-                                {budgetInfo.type === 'missing' && (
-                                   <div className="mt-2 bg-zinc-800 p-3 rounded-xl border border-zinc-700/50 flex items-center justify-between gap-3">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 flex-shrink-0 flex items-center justify-center bg-blue-500/10 rounded-lg">
-                                                <PlusCircle className="w-5 h-5 text-blue-400" />
-                                            </div>
-                                            <p className="text-sm text-zinc-300">
-                                                {t('noBudgetFor', { category: budgetInfo.category })}.
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </motion.div>
+                )}
+               </AnimatePresence>
+              
+               <AnimatePresence>
+                    {budgetInfo && !isSavingsTransaction && (
+                        <motion.div
+                            layout
+                            initial={{ opacity: 0, height: 0, y: -10 }}
+                            animate={{ opacity: 1, height: 'auto', y: 0 }}
+                            exit={{ opacity: 0, height: 0, y: -10 }}
+                            transition={{ duration: 0.3, ease: 'easeInOut' }}
+                            className="overflow-hidden"
+                        >
+                            {budgetInfo.type === 'exists' && (
+                                <div className="mt-2 bg-zinc-800 p-3 rounded-xl border border-zinc-700/50 space-y-2">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 flex-shrink-0 flex items-center justify-center bg-zinc-700 rounded-lg">
+                                            <IconDisplay name={budgetInfo.budget.icon} className="w-5 h-5 text-white" />
+                                        </div>
+                                        <div className="flex-grow min-w-0">
+                                            <p className="text-sm font-medium text-white truncate">{budgetInfo.budget.category} Budget</p>
+                                            <p className="text-xs text-zinc-400">
+                                                {formatCurrencyLocal(budgetInfo.spent, budgetInfo.budget.currency)} of {formatCurrencyLocal(budgetInfo.budget.limit, budgetInfo.budget.currency)}
                                             </p>
                                         </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => onCreateBudget(budgetInfo.category, budgetInfo.monthKey)}
-                                            className="px-3 py-1.5 bg-brand-blue text-white text-xs font-semibold rounded-lg hover:bg-blue-500 active:scale-95 transition-all"
-                                        >
-                                            {t('create')}
-                                        </button>
                                     </div>
-                                )}
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
+                                    <div className="w-full bg-zinc-700 rounded-full h-1.5">
+                                        <div
+                                            className={`h-1.5 rounded-full ${budgetInfo.progress > 85 ? 'bg-red-500' : 'bg-brand-blue'}`}
+                                            style={{ width: `${Math.min(budgetInfo.progress, 100)}%` }}
+                                        />
+                                    </div>
+                                    {formData.amount > 0 && (
+                                        <p className="text-xs text-center text-brand-blue">
+                                            + {formatCurrencyLocal(convertCurrency(formData.amount, formData.currency, budgetInfo.budget.currency, rates), budgetInfo.budget.currency)} with this transaction
+                                        </p>
+                                    )}
+                                </div>
+                            )}
+                            {budgetInfo.type === 'missing' && (
+                               <div className="mt-2 bg-zinc-800 p-3 rounded-xl border border-zinc-700/50 flex items-center justify-between gap-3">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 flex-shrink-0 flex items-center justify-center bg-blue-500/10 rounded-lg">
+                                            <PlusCircle className="w-5 h-5 text-blue-400" />
+                                        </div>
+                                        <p className="text-sm text-zinc-300">
+                                            No budget for <span className="font-semibold text-white">{budgetInfo.category}</span>.
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => onCreateBudget(budgetInfo.category, budgetInfo.monthKey)}
+                                        className="px-3 py-1.5 bg-brand-blue text-white text-xs font-semibold rounded-lg hover:bg-blue-500 active:scale-95 transition-all"
+                                    >
+                                        Create
+                                    </button>
+                                </div>
+                            )}
+                        </motion.div>
+                    )}
+                </AnimatePresence>
 
-                  <div className="grid grid-cols-5 gap-4">
-                    <div className="col-span-3">
-                      <label htmlFor="date-button" className="block text-sm font-medium text-zinc-300 mb-1.5">{t('date')}</label>
-                      <button
-                        type="button"
-                        id="date-button"
-                        onClick={() => setIsDatePickerOpen(true)}
-                        className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white text-left flex justify-between items-center focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200"
-                      >
-                        <span>{new Date(formData.date).toLocaleDateString(language === 'ru' ? 'ru-RU' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
-                        <Calendar className="w-5 h-5 text-zinc-400" />
-                      </button>
-                    </div>
-                    <div className="col-span-2">
-                      <label htmlFor="time-button" className="block text-sm font-medium text-zinc-300 mb-1.5">{t('time')}</label>
-                      <button
-                        type="button"
-                        id="time-button"
-                        onClick={() => setIsTimePickerOpen(true)}
-                        className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white text-left flex justify-between items-center focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200"
-                      >
-                        <span>{new Date(formData.date).toTimeString().slice(0, 5)}</span>
-                        <Clock className="w-5 h-5 text-zinc-400" />
-                      </button>
-                    </div>
-                  </div>
-                  <div>
-                    <label htmlFor="type" className="block text-sm font-medium text-zinc-300 mb-1.5">{t('type')}</label>
-                    <div className="relative">
-                      <select
-                        id="type"
-                        name="type"
-                        value={formData.type}
-                        onChange={handleChange}
-                        disabled={isSavingsDeposit || isCategoryLocked || isSavingsTransaction}
-                        className="appearance-none w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 pr-10 disabled:bg-zinc-700/50 disabled:cursor-not-allowed"
-                      >
-                        <option value={TransactionType.EXPENSE}>{t('expense')}</option>
-                        <option value={TransactionType.INCOME}>{t('income')}</option>
-                      </select>
-                      <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 pointer-events-none" />
-                    </div>
-                  </div>
-                  <div>
-                    <label htmlFor="description" className="block text-sm font-medium text-zinc-300 mb-1.5">{t('descriptionOptional')}</label>
-                    <textarea
-                      id="description"
-                      name="description"
-                      value={formData.description || ''}
-                      onChange={handleChange}
-                      rows={2}
-                      className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 resize-none"
-                    />
-                  </div>
-              </motion.div>
+              <div className="grid grid-cols-5 gap-4">
+                <div className="col-span-3">
+                  <label htmlFor="date-button" className="block text-sm font-medium text-zinc-300 mb-1.5">{t('date')}</label>
+                  <button
+                    type="button"
+                    id="date-button"
+                    onClick={() => setIsDatePickerOpen(true)}
+                    className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white text-left flex justify-between items-center focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200"
+                  >
+                    <span>{new Date(formData.date).toLocaleDateString(language === 'ru' ? 'ru-RU' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                    <Calendar className="w-5 h-5 text-zinc-400" />
+                  </button>
+                </div>
+                <div className="col-span-2">
+                  <label htmlFor="time-button" className="block text-sm font-medium text-zinc-300 mb-1.5">{t('time')}</label>
+                  <button
+                    type="button"
+                    id="time-button"
+                    onClick={() => setIsTimePickerOpen(true)}
+                    className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white text-left flex justify-between items-center focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200"
+                  >
+                    <span>{new Date(formData.date).toTimeString().slice(0, 5)}</span>
+                    <Clock className="w-5 h-5 text-zinc-400" />
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label htmlFor="type" className="block text-sm font-medium text-zinc-300 mb-1.5">{t('type')}</label>
+                <div className="relative">
+                  <select
+                    id="type"
+                    name="type"
+                    value={formData.type}
+                    onChange={handleChange}
+                    disabled={isSavingsDeposit || isCategoryLocked || isSavingsTransaction}
+                    className="appearance-none w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 pr-10 disabled:bg-zinc-700/50 disabled:cursor-not-allowed"
+                  >
+                    <option value={TransactionType.EXPENSE}>{t('expense')}</option>
+                    <option value={TransactionType.INCOME}>{t('income')}</option>
+                  </select>
+                  <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 pointer-events-none" />
+                </div>
+              </div>
+              <div>
+                <label htmlFor="description" className="block text-sm font-medium text-zinc-300 mb-1.5">{t('descriptionOptional')}</label>
+                <textarea
+                  id="description"
+                  name="description"
+                  value={formData.description || ''}
+                  onChange={handleChange}
+                  rows={2}
+                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 resize-none"
+                />
+              </div>
             </div>
 
             <div className="sticky bottom-0 bg-zinc-900/95 backdrop-blur-xl px-6 py-4 border-t border-zinc-800/60 flex items-center justify-end space-x-3 flex-shrink-0">
