@@ -12,7 +12,7 @@ import { ICON_NAMES } from '../components/icons'; // [cite: components/icons.ts]
  * Вызываем нашу бэкенд-функцию 'telegram-auth'.
  * Она проверяет данные Telegram и возвращает "пропуск" (JWT-токен).
  */
-export const authenticateWithTelegram = async (initData: string) => {
+eexport const authenticateWithTelegram = async (initData: string) => {
   const { data, error } = await supabase.functions.invoke('telegram-auth', {
     body: { initData },
   });
@@ -20,10 +20,10 @@ export const authenticateWithTelegram = async (initData: string) => {
   if (error) throw new Error(`Telegram Auth Error: ${error.message}`);
   if (!data.token) throw new Error("No token received from auth function");
 
-  // "Надеваем пропуск" — теперь Supabase знает, кто мы
+  // ИСПРАВЛЕНИЕ ОШИБКИ СЕССИИ: передаем access_token в качестве refresh_token.
   const { error: sessionError } = await supabase.auth.setSession({
     access_token: data.token,
-    refresh_token: '', // Нам не нужен refresh, т.к. мы получаем токен при каждом входе
+    refresh_token: data.token, // ✅ ИСПРАВЛЕНО
   });
 
   if (sessionError) throw new Error(`Session Error: ${sessionError.message}`);
@@ -136,6 +136,18 @@ const getUserId = async () => {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("User not authenticated");
   return user.id;
+};
+
+// Transactions
+export const addTransaction = async (transaction: Omit<Transaction, 'id'>): Promise<Transaction> => {
+  const userId = await getUserId();
+  const { data, error } = await supabase
+    .from('transactions')
+    .insert({ ...transaction, telegram_user_id: userId })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
 };
 
 // Transactions
@@ -264,12 +276,12 @@ export const parseTransactionFromText = async (
   language: string
 ): Promise<Omit<Transaction, 'id'>> => {
   
+  // Эта функция также может завершаться ошибкой, если не работает аутентификация (см. п.1)
   const { data, error } = await supabase.functions.invoke('parse-text-transaction', {
     body: { text, defaultCurrency, categories, savingsGoals, language }
   });
 
   if (error) throw error;
-  // `data` — это уже готовый JSON транзакции
   return data as Omit<Transaction, 'id'>;
 };
 
@@ -304,25 +316,29 @@ export const processAudioTransaction = async (
   audioBlob: Blob,
   categories: Category[],
   savingsGoals: SavingsGoal[],
-  language: string,
+  language: string
 ): Promise<Omit<Transaction, 'id'>> => {
+
   const formData = new FormData();
   formData.append('audio', audioBlob, 'transaction.webm');
   const context = { categories, savingsGoals, language };
   formData.append('context', JSON.stringify(context));
 
-  // ✅ НОВЫЙ КОД: Используем прямой fetch с заголовком авторизации
+  // Используем прямой fetch вместо supabase.functions.invoke
   const { data: { session } } = await supabase.auth.getSession();
-    
-  // VITE_SUPABASE_URL должен быть доступен
+  
+  // ИСПРАВЛЕНИЕ ОШИБКИ URL: используем import.meta.env для Vite
   const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+  
+  if (!SUPABASE_URL) {
+    throw new Error("VITE_SUPABASE_URL not defined in .env.local");
+  }
 
   const response = await fetch(
     `${SUPABASE_URL}/functions/v1/process-audio-transaction`,
     {
       method: 'POST',
       headers: {
-        // 🚨 ВАЖНО: Authorization заголовок для RLS
         'Authorization': `Bearer ${session?.access_token || ''}`,
       },
       body: formData,
@@ -330,10 +346,8 @@ export const processAudioTransaction = async (
   );
 
   if (!response.ok) {
-    // В консоли вы увидели 4xx ошибку. Она может быть 404 (нет функции) или 401/403 (CORS/RLS)
     const errorText = await response.text();
-    console.error('Edge Function response error:', errorText);
-    throw new Error(`Failed to send a request to the Edge Function. Status: ${response.status}. Details: ${errorText.substring(0, 100)}...`);
+    throw new Error(`Function call failed: ${errorText}`);
   }
 
   const data = await response.json();
