@@ -304,24 +304,38 @@ export const processAudioTransaction = async (
   audioBlob: Blob,
   categories: Category[],
   savingsGoals: SavingsGoal[],
-  language: string
+  language: string,
 ): Promise<Omit<Transaction, 'id'>> => {
-
-  // Мы не можем отправить JSON и Файл одновременно.
-  // Мы используем FormData для этого.
   const formData = new FormData();
-  
-  // 1. Добавляем аудио-файл
   formData.append('audio', audioBlob, 'transaction.webm');
-  
-  // 2. Добавляем "контекст" (всю информацию, нужную ИИ) в виде JSON-строки
   const context = { categories, savingsGoals, language };
   formData.append('context', JSON.stringify(context));
 
-  const { data, error } = await supabase.functions.invoke('process-audio-transaction', {
-    body: formData, // Отправляем FormData
-  });
+  // ✅ НОВЫЙ КОД: Используем прямой fetch с заголовком авторизации
+  const { data: { session } } = await supabase.auth.getSession();
+    
+  // VITE_SUPABASE_URL должен быть доступен
+  const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 
-  if (error) throw error;
+  const response = await fetch(
+    `${SUPABASE_URL}/functions/v1/process-audio-transaction`,
+    {
+      method: 'POST',
+      headers: {
+        // 🚨 ВАЖНО: Authorization заголовок для RLS
+        'Authorization': `Bearer ${session?.access_token || ''}`,
+      },
+      body: formData,
+    }
+  );
+
+  if (!response.ok) {
+    // В консоли вы увидели 4xx ошибку. Она может быть 404 (нет функции) или 401/403 (CORS/RLS)
+    const errorText = await response.text();
+    console.error('Edge Function response error:', errorText);
+    throw new Error(`Failed to send a request to the Edge Function. Status: ${response.status}. Details: ${errorText.substring(0, 100)}...`);
+  }
+
+  const data = await response.json();
   return data as Omit<Transaction, 'id'>;
 };

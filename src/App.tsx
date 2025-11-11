@@ -95,8 +95,21 @@ const App: React.FC = () => {
     const initializeApp = async (initData: string) => {
       try {
         // 1. Аутентификация
+        // user = { id: string; name: string; token: string; }
         const user = await api.authenticateWithTelegram(initData);
-        setTgUser(user); // Сохраняем пользователя
+        
+        // 🔴 ИСПРАВЛЕНИЕ ОШИБКИ СЕССИИ: Auth session missing!
+        // Передаем access_token в качестве refresh_token.
+        const { error: sessionError } = await api.supabase.auth.setSession({
+          access_token: user.token,
+          refresh_token: user.token, // ✅ ИСПОЛЬЗУЕМ ТОТ ЖЕ ТОКЕН
+        });
+
+        if (sessionError) {
+          throw new Error(sessionError.message);
+        }
+        
+        setTgUser(user);
         
         // 2. Загрузка данных
         const [exchangeRates, initialData] = await Promise.all([
