@@ -324,23 +324,31 @@ export const processAudioTransaction = async (
   language: string
 ): Promise<Omit<Transaction, 'id'>> => {
 
+  console.log('API: Starting processAudioTransaction...'); // LOG 1: Начало
+
   const formData = new FormData();
   formData.append('audio', audioBlob, 'transaction.webm');
+  
   const context = { categories, savingsGoals, language };
+  console.log('API: Context for AI:', context); // LOG 2: Контекст для ИИ
+  
   formData.append('context', JSON.stringify(context));
 
   // Используем прямой fetch вместо supabase.functions.invoke
   const { data: { session } } = await supabase.auth.getSession();
   
-  // ИСПРАВЛЕНИЕ 3: Замена Deno.env.get на import.meta.env для клиента Vite
   const SUPABASE_URL: string = import.meta.env.VITE_SUPABASE_URL || '';
 
   if (!SUPABASE_URL) {
     throw new Error("VITE_SUPABASE_URL environment variable is missing or empty.");
   }
 
+  const url = `${SUPABASE_URL}/functions/v1/process-audio-transaction`;
+  console.log('API: Fetching URL:', url); // LOG 3: URL запроса
+  console.log(`API: Audio Blob size: ${audioBlob.size} bytes, type: ${audioBlob.type}`); // LOG 4: Детали Blob
+
   const response = await fetch(
-    `${SUPABASE_URL}/functions/v1/process-audio-transaction`,
+    url,
     {
       method: 'POST',
       headers: {
@@ -350,11 +358,15 @@ export const processAudioTransaction = async (
     }
   );
 
+  console.log('API: Response status:', response.status); // LOG 5: Статус ответа
+
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`Function call failed: ${errorText}`);
+    console.error('API: Function call failed. Error response text:', errorText); // LOG 6: Текст ошибки
+    throw new Error(`Function call failed (Status: ${response.status}): ${errorText}`);
   }
 
   const data = await response.json();
+  console.log('API: Successfully received data:', data); // LOG 7: Успешный ответ
   return data as Omit<Transaction, 'id'>;
 };
