@@ -119,6 +119,7 @@ serve(async (req) => {
     // 4. Создание кастомного JWT
     const payload = {
       sub: userUuid, // ✅ Используем настоящий UUID пользователя
+      aud: 'authenticated',
       role: 'authenticated',
       iat: Math.floor(Date.now() / 1000),
       exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24), // 1 день
