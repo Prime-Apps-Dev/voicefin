@@ -76,14 +76,14 @@ export const initializeUser = async () => {
  */
 const createDefaultCategories = async (): Promise<Category[]> => {
   const DEFAULT_CATEGORIES = [
-    { name: 'Food & Drink', icon: 'UtensilsCrossed', type: TransactionType.EXPENSE, isDefault: true, isFavorite: false },
-    { name: 'Shopping', icon: 'ShoppingCart', type: TransactionType.EXPENSE, isDefault: true, isFavorite: false },
-    { name: 'Transport', icon: 'Bus', type: TransactionType.EXPENSE, isDefault: true, isFavorite: false },
-    { name: 'Home', icon: 'Home', type: TransactionType.EXPENSE, isDefault: true, isFavorite: false },
-    { name: 'Bills & Utilities', icon: 'Lightbulb', type: TransactionType.EXPENSE, isDefault: true, isFavorite: false },
-    { name: 'Savings', icon: 'PiggyBank', type: TransactionType.EXPENSE, isDefault: true, isFavorite: false },
-    { name: 'Salary', icon: 'Banknote', type: TransactionType.INCOME, isDefault: true, isFavorite: false },
-    { name: 'Gifts', icon: 'Gift', type: TransactionType.INCOME, isDefault: true, isFavorite: false },
+    { name: 'Food & Drink', icon: 'UtensilsCrossed', type: TransactionType.EXPENSE, isdefault: true, isfavorite: false },
+    { name: 'Shopping', icon: 'ShoppingCart', type: TransactionType.EXPENSE, isdefault: true, isfavorite: false },
+    { name: 'Transport', icon: 'Bus', type: TransactionType.EXPENSE, isdefault: true, isfavorite: false },
+    { name: 'Home', icon: 'Home', type: TransactionType.EXPENSE, isdefault: true, isfavorite: false },
+    { name: 'Bills & Utilities', icon: 'Lightbulb', type: TransactionType.EXPENSE, isdefault: true, isfavorite: false },
+    { name: 'Savings', icon: 'PiggyBank', type: TransactionType.EXPENSE, isdefault: true, isfavorite: false },
+    { name: 'Salary', icon: 'Banknote', type: TransactionType.INCOME, isdefault: true, isfavorite: false },
+    { name: 'Gifts', icon: 'Gift', type: TransactionType.INCOME, isdefault: true, isfavorite: false },
   ];
 
   // Получаем ID пользователя
