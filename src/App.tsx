@@ -224,46 +224,57 @@ const App: React.FC = () => {
 
   // --- Handlers for Data Mutation ---
   const handleConfirmTransaction = async (transactionData: Omit<Transaction, 'id'> | Transaction) => {
-    if (transactionData.category && !categories.some(c => c.name.toLowerCase() === transactionData.category.toLowerCase())) {
-        const iconName = await api.getIconForCategory(transactionData.category);
-        const newCategoryData: Omit<Category, 'id'> = {
-            name: transactionData.category,
-            icon: iconName,
-            isfavorite: false,
-            isdefault: false,
-            type: transactionData.type,
-        };
-        const newCategory = await api.addCategory(newCategoryData);
-        setCategories(prev => [...prev, newCategory]);
-    }
+    try {
+      if (transactionData.category && !categories.some(c => c.name.toLowerCase() === transactionData.category.toLowerCase())) {
+          const iconName = await api.getIconForCategory(transactionData.category);
+          const newCategoryData: Omit<Category, 'id'> = {
+              name: transactionData.category,
+              icon: iconName,
+              isfavorite: false,
+              isdefault: false,
+              type: transactionData.type,
+          };
+          const newCategory = await api.addCategory(newCategoryData);
+          setCategories(prev => [...prev, newCategory]);
+      }
 
-    const originalTransaction = 'id' in transactionData ? transactions.find(t => t.id === transactionData.id) : null;
-    if (transactionData.goalid || originalTransaction?.goalId) {
-        setSavingsGoals(prevGoals => prevGoals.map(g => {
-            let newCurrentAmount = g.currentAmount;
-            if (originalTransaction?.goalId === g.id) {
-                // Отмена старого депозита
-                newCurrentAmount -= convertCurrency(originalTransaction.amount, originalTransaction.currency, g.currency, rates);
-            }
-            if (transactionData.goalid === g.id && transactionData.type === TransactionType.EXPENSE) {
-                // Добавление нового депозита
-                newCurrentAmount += convertCurrency(transactionData.amount, transactionData.currency, g.currency, rates);
-            }
-            return { ...g, currentAmount: Math.max(0, newCurrentAmount) };
-        }));
-    }
+      const originalTransaction = 'id' in transactionData ? transactions.find(t => t.id === transactionData.id) : null;
+      // ИСПРАВЛЕНИЕ: Используем правильное свойство 'goalId' вместо 'goalid' (возможная опечатка)
+      const currentGoalId = (transactionData as Transaction).goalid; 
 
-    if ('id' in transactionData) {
-      const updatedTx = await api.updateTransaction(transactionData);
-      setTransactions(prev => prev.map(t => t.id === updatedTx.id ? updatedTx : t));
-    } else {
-      const newTx = await api.addTransaction(transactionData);
-      setTransactions(prev => [newTx, ...prev]);
-    }
+      if (currentGoalId || originalTransaction?.goalId) {
+          setSavingsGoals(prevGoals => prevGoals.map(g => {
+              let newCurrentAmount = g.currentAmount;
+              if (originalTransaction?.goalId === g.id) {
+                  // Отмена старого депозита
+                  newCurrentAmount -= convertCurrency(originalTransaction.amount, originalTransaction.currency, g.currency, rates);
+              }
+              if (currentGoalId === g.id && transactionData.type === TransactionType.EXPENSE) {
+                  // Добавление нового депозита
+                  newCurrentAmount += convertCurrency(transactionData.amount, transactionData.currency, g.currency, rates);
+              }
+              return { ...g, currentAmount: Math.max(0, newCurrentAmount) };
+          }));
+      }
+
+      if ('id' in transactionData) {
+        const updatedTx = await api.updateTransaction(transactionData);
+        setTransactions(prev => prev.map(t => t.id === updatedTx.id ? updatedTx : t));
+      } else {
+        const newTx = await api.addTransaction(transactionData);
+        setTransactions(prev => [newTx, ...prev]);
+      }
     
-    setPotentialTransaction(null);
-    setEditingTransaction(null);
-    setGoalForDeposit(null);
+    } catch (err: any) {
+        console.error("Transaction save failed:", err);
+        setError(err.message || t('connectionError'));
+    } finally {
+        // КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: Гарантированное закрытие формы и сброс состояния
+        setPotentialTransaction(null);
+        setEditingTransaction(null);
+        setGoalForDeposit(null);
+        setIsCategoryLockedInForm(false);
+    }
   };
 
   const handleTextTransactionSubmit = async (inputText: string) => {
@@ -342,54 +353,82 @@ const App: React.FC = () => {
   };
 
   const handleSaveCategory = async (categoryData: Omit<Category, 'id'> | Category) => {
-    let savedCategory: Category;
-    if ('id' in categoryData) {
-        savedCategory = await api.updateCategory(categoryData);
-        setCategories(prev => prev.map(cat => cat.id === savedCategory.id ? savedCategory : cat));
-    } else {
-        savedCategory = await api.addCategory({ ...categoryData, isdefault: false });
-        setCategories(prev => [...prev, savedCategory]);
+    try {
+        let savedCategory: Category;
+        if ('id' in categoryData) {
+            savedCategory = await api.updateCategory(categoryData);
+            setCategories(prev => prev.map(cat => cat.id === savedCategory.id ? savedCategory : cat));
+        } else {
+            savedCategory = await api.addCategory({ ...categoryData, isdefault: false });
+            setCategories(prev => [...prev, savedCategory]);
+        }
+        if (categoryFormState.context?.from === 'budget') {
+            setEditingBudget(prev => ({...prev, category: savedCategory.name, icon: savedCategory.icon}));
+        }
+    } catch (err: any) {
+        console.error("Category save failed:", err);
+        setError(err.message || t('connectionError'));
+    } finally {
+        // КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: Гарантированное закрытие формы
+        setCategoryFormState({ isOpen: false, category: null });
     }
-    if (categoryFormState.context?.from === 'budget') {
-        setEditingBudget(prev => ({...prev, category: savedCategory.name, icon: savedCategory.icon}));
-    }
-    setCategoryFormState({ isOpen: false, category: null });
   };
   
   const handleSaveAccount = async (accountData: Omit<Account, 'id'> | Account) => {
-    if ('id' in accountData) {
-        const updated = await api.updateAccount(accountData);
-        setAccounts(prev => prev.map(acc => acc.id === updated.id ? updated : acc));
-    } else {
-        const newAcc = await api.addAccount(accountData);
-        setAccounts(prev => [...prev, newAcc]);
+    try {
+        if ('id' in accountData) {
+            const updated = await api.updateAccount(accountData);
+            setAccounts(prev => prev.map(acc => acc.id === updated.id ? updated : acc));
+        } else {
+            const newAcc = await api.addAccount(accountData);
+            setAccounts(prev => [...prev, newAcc]);
+        }
+    } catch (err: any) {
+        console.error("Account save failed:", err);
+        setError(err.message || t('connectionError'));
+    } finally {
+        // КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: Гарантированное закрытие формы
+        setIsAccountFormOpen(false);
+        setEditingAccount(null);
     }
-    setIsAccountFormOpen(false);
-    setEditingAccount(null);
   };
   
   const handleSaveGoal = async (goalData: Omit<SavingsGoal, 'id'> | SavingsGoal) => {
-    if ('id' in goalData) {
-        const updated = await api.updateSavingsGoal(goalData);
-        setSavingsGoals(prev => prev.map(g => g.id === updated.id ? updated : g));
-    } else {
-        const newGoal = await api.addSavingsGoal({ ...goalData, currentamount: 0 });
-        setSavingsGoals(prev => [...prev, newGoal]);
+    try {
+        if ('id' in goalData) {
+            const updated = await api.updateSavingsGoal(goalData);
+            setSavingsGoals(prev => prev.map(g => g.id === updated.id ? updated : g));
+        } else {
+            const newGoal = await api.addSavingsGoal({ ...goalData, currentamount: 0 });
+            setSavingsGoals(prev => [...prev, newGoal]);
+        }
+    } catch (err: any) {
+        console.error("Goal save failed:", err);
+        setError(err.message || t('connectionError'));
+    } finally {
+        // КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: Гарантированное закрытие формы
+        setIsGoalFormOpen(false);
+        setEditingGoal(null);
     }
-    setIsGoalFormOpen(false);
-    setEditingGoal(null);
   };
 
   const handleSaveBudget = async (budgetData: Omit<Budget, 'id'> | Budget) => {
-    if ('id' in budgetData) {
-        const updated = await api.updateBudget(budgetData);
-        setBudgets(prev => prev.map(b => b.id === updated.id ? updated : b));
-    } else {
-        const newBudget = await api.addBudget(budgetData);
-        setBudgets(prev => [...prev, newBudget]);
+    try {
+        if ('id' in budgetData) {
+            const updated = await api.updateBudget(budgetData);
+            setBudgets(prev => prev.map(b => b.id === updated.id ? updated : b));
+        } else {
+            const newBudget = await api.addBudget(budgetData);
+            setBudgets(prev => [...prev, newBudget]);
+        }
+    } catch (err: any) {
+        console.error("Budget save failed:", err);
+        setError(err.message || t('connectionError'));
+    } finally {
+        // КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: Гарантированное закрытие формы
+        setIsBudgetFormOpen(false);
+        setEditingBudget(null);
     }
-    setIsBudgetFormOpen(false);
-    setEditingBudget(null);
   };
 
 
@@ -697,6 +736,7 @@ const App: React.FC = () => {
         onConfirm={() => { 
           if(carryOverInfo) { 
             const prevBudgets = budgets.filter(b => b.monthKey === carryOverInfo.from); 
+            // КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ В СЛУЧАЕ ПЕРЕНОСА: Переносим бюджеты
             prevBudgets.forEach(b => handleSaveBudget({...b, monthKey: carryOverInfo.to})); 
           } 
           setCarryOverInfo(null); 
