@@ -1,4 +1,4 @@
-// supabase/functions/process-audio-transaction/index.ts
+// supabase/functions/process-audio-realtime/index.ts
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { CORS_HEADERS, handleCors } from "../_shared/cors.ts";
@@ -6,7 +6,6 @@ import { GoogleGenerativeAI } from "https://esm.sh/@google/generative-ai@0.21.0"
 import { getSystemInstruction } from "../_shared/prompts.ts";
 import { addTransactionFunctionDeclaration } from "../_shared/types.ts";
 
-// ✅ ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ: Безопасная конвертация больших файлов в base64
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
   const chunkSize = 8192;
@@ -21,53 +20,37 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
 }
 
 serve(async (req) => {
-  
-  console.log("EDGE FUNCTION: process-audio-transaction started."); 
+  console.log("EDGE FUNCTION: process-audio-realtime started."); 
 
   if (req.method === 'OPTIONS') {
-    console.log("EDGE FUNCTION: Handling OPTIONS request.");
     return handleCors();
   }
 
   try {
-    // ------------------------------------------------
-    // 1. ИНИЦИАЛИЗАЦИЯ И ПЕРЕМЕННЫЕ ОКРУЖЕНИЯ
-    // ------------------------------------------------
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
     if (!GEMINI_API_KEY) {
-      console.error("EDGE FUNCTION ERROR: GEMINI_API_KEY not set.");
       throw new Error("GEMINI_API_KEY not set in Edge Function secrets.");
     }
     
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-    console.log("EDGE FUNCTION: GoogleGenerativeAI initialized successfully.");
 
-    // ------------------------------------------------
-    // 2. ОБРАБОТКА FormData (только для POST)
-    // ------------------------------------------------
     const formData = await req.formData();
     const audioFile = formData.get('audio') as File;
     const contextStr = formData.get('context') as string;
+    const streamMode = formData.get('stream') === 'true'; // Новый параметр
 
     if (!audioFile || !contextStr) {
-      console.error("EDGE FUNCTION: Missing audio or context."); 
       throw new Error("Missing audio or context.");
     }
     
-    console.log(`EDGE FUNCTION: Received audio file. Name: ${audioFile.name}, Type: ${audioFile.type}, Size: ${audioFile.size} bytes.`); 
+    console.log(`EDGE FUNCTION: Received audio. Size: ${audioFile.size} bytes. Stream mode: ${streamMode}`); 
     
     const context = JSON.parse(contextStr);
     const { categories, savingsGoals, language } = context;
-    console.log("EDGE FUNCTION: Parsed context:", { language, categoriesCount: categories.length, goalsCount: savingsGoals.length }); 
 
-
-    // ------------------------------------------------
-    // 3. КОНВЕРТАЦИЯ АУДИО И ВЫЗОВ GEMINI
-    // ------------------------------------------------
     const audioBuffer = await audioFile.arrayBuffer();
     const audioBase64 = arrayBufferToBase64(audioBuffer);
     const mimeType = audioFile.type || 'audio/webm';
-    console.log(`EDGE FUNCTION: Audio converted to base64. Original size: ${audioFile.size} bytes, Base64 length: ${audioBase64.length} chars`); 
 
     const model = genAI.getGenerativeModel({
       model: "gemini-2.0-flash-exp",
@@ -75,8 +58,93 @@ serve(async (req) => {
       tools: [{ functionDeclarations: [addTransactionFunctionDeclaration] }],
     });
 
-    console.log("EDGE FUNCTION: Calling Gemini model..."); 
+    // ✅ STREAMING MODE: Отправляем данные по мере их поступления
+    if (streamMode) {
+      console.log("EDGE FUNCTION: Starting streaming response...");
+      
+      const stream = new ReadableStream({
+        async start(controller) {
+          try {
+            const result = await model.generateContentStream([
+              {
+                inlineData: {
+                  mimeType,
+                  data: audioBase64,
+                },
+              },
+            ]);
 
+            // Отправляем промежуточные результаты
+            for await (const chunk of result.stream) {
+              const text = chunk.text();
+              if (text) {
+                const data = JSON.stringify({ 
+                  type: 'transcription',
+                  text: text,
+                  isPartial: true 
+                });
+                controller.enqueue(new TextEncoder().encode(`data: ${data}\n\n`));
+                console.log(`EDGE FUNCTION: Streamed chunk: "${text.substring(0, 50)}..."`);
+              }
+            }
+
+            // Финальный результат с function call
+            const finalResult = await result.response;
+            const functionCall = finalResult.functionCalls()?.[0];
+            
+            if (functionCall && functionCall.name === 'addTransaction') {
+              const transaction = functionCall.args;
+              
+              // Маппинг savings goal
+              if (transaction.savingsGoalName && savingsGoals) {
+                const goal = savingsGoals.find(
+                  (g: any) => g.name.toLowerCase() === transaction.savingsGoalName.toLowerCase()
+                );
+                if (goal) {
+                  transaction.goalId = goal.id;
+                }
+                delete transaction.savingsGoalName;
+              }
+              
+              const data = JSON.stringify({
+                type: 'transaction',
+                transaction: transaction,
+                isPartial: false
+              });
+              controller.enqueue(new TextEncoder().encode(`data: ${data}\n\n`));
+              console.log("EDGE FUNCTION: Streamed final transaction");
+            } else {
+              const data = JSON.stringify({
+                type: 'transcription',
+                text: finalResult.text(),
+                isPartial: false
+              });
+              controller.enqueue(new TextEncoder().encode(`data: ${data}\n\n`));
+            }
+
+            controller.close();
+          } catch (error: any) {
+            console.error("EDGE FUNCTION STREAM ERROR:", error.message);
+            const errorData = JSON.stringify({ type: 'error', error: error.message });
+            controller.enqueue(new TextEncoder().encode(`data: ${errorData}\n\n`));
+            controller.close();
+          }
+        },
+      });
+
+      return new Response(stream, {
+        headers: {
+          ...CORS_HEADERS,
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          'Connection': 'keep-alive',
+        },
+      });
+    }
+
+    // ✅ REGULAR MODE: Обычный ответ (как раньше)
+    console.log("EDGE FUNCTION: Regular mode - waiting for complete response...");
+    
     const result = await model.generateContent([
       {
         inlineData: {
@@ -86,22 +154,9 @@ serve(async (req) => {
       },
     ]);
 
-    console.log("EDGE FUNCTION: Gemini response received."); 
-
     const functionCall = result.response.functionCalls()?.[0];
     const geminiText = result.response.text();
     
-    if (functionCall) {
-        console.log("EDGE FUNCTION: Gemini returned a Function Call:", functionCall.name); 
-    } else if (geminiText) {
-        console.log(`EDGE FUNCTION: Gemini returned Text Transcription: "${geminiText.substring(0, Math.min(geminiText.length, 100))}..."`); 
-    } else {
-        console.log("EDGE FUNCTION: Gemini returned neither a Function Call nor Text."); 
-    }
-    
-    // ------------------------------------------------
-    // 4. ОБРАБОТКА ОТВЕТА
-    // ------------------------------------------------
     if (!functionCall || functionCall.name !== 'addTransaction') {
       return new Response(JSON.stringify({ transcription: geminiText }), {
         headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
@@ -110,31 +165,23 @@ serve(async (req) => {
     }
 
     const transaction = functionCall.args;
-    console.log("EDGE FUNCTION: Transaction args before goalId mapping:", transaction); 
-
+    
     if (transaction.savingsGoalName && savingsGoals) {
       const goal = savingsGoals.find(
         (g: any) => g.name.toLowerCase() === transaction.savingsGoalName.toLowerCase()
       );
       if (goal) {
         transaction.goalId = goal.id;
-        console.log(`EDGE FUNCTION: Mapped savingsGoalName "${transaction.savingsGoalName}" to goalId: ${goal.id}`); 
-      } else {
-        console.log(`EDGE FUNCTION: Could not find savings goal for name: ${transaction.savingsGoalName}`);
       }
       delete transaction.savingsGoalName;
     }
-    
-    console.log("EDGE FUNCTION: Returning successful transaction payload:", transaction); 
     
     return new Response(JSON.stringify(transaction), {
       headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
       status: 200,
     });
+    
   } catch (error: any) {
-    // ------------------------------------------------
-    // 5. ЕДИНАЯ ОБРАБОТКА ОШИБОК
-    // ------------------------------------------------
     console.error("EDGE FUNCTION CRITICAL ERROR:", error.message);
     console.error("EDGE FUNCTION ERROR STACK:", error.stack); 
     return new Response(JSON.stringify({ error: error.message }), {
