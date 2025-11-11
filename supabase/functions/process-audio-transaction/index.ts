@@ -11,17 +11,6 @@ serve(async (req) => {
     return handleCors();
   }
 
-  // 1. Извлекаем JWT из заголовка для Supabase RLS
-  const authHeader = req.headers.get('Authorization');
-  const token = authHeader?.replace('Bearer ', '');
-  
-  // Создаем Supabase клиент для операций в БД
-  const supabase = createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, // Используем SERVICE_ROLE_KEY для внутренних операций
-    { global: { headers: { 'Authorization': `Bearer ${token}` } } }
-  );
-
   try {
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
     if (!GEMINI_API_KEY) {
