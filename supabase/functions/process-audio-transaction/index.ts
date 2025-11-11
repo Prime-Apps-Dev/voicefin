@@ -2,7 +2,8 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { CORS_HEADERS, handleCors } from "../_shared/cors.ts";
-import { GoogleGenerativeAI } from "npm:@google/generative-ai";
+// ✅ ИСПРАВЛЕНИЕ: Заменяем "npm:" import на "https://esm.sh/@google/genai@1.28.0" для стабильности в Deno/Supabase
+import { GoogleGenerativeAI } from "https://esm.sh/@google/genai@1.28.0";
 import { getSystemInstruction } from "../_shared/prompts.ts";
 import { addTransactionFunctionDeclaration } from "../_shared/types.ts";
 
@@ -15,9 +16,6 @@ serve(async (req) => {
     return handleCors();
   }
   
-  // 1. 🚨 БЛОК КЛИЕНТА SUPABASE УДАЛЕН 🚨
-  // ... (комментарии)
-
   try {
     // ------------------------------------------------
     // 1. ИНИЦИАЛИЗАЦИЯ И ПЕРЕМЕННЫЕ ОКРУЖЕНИЯ
@@ -30,7 +28,7 @@ serve(async (req) => {
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
     // ------------------------------------------------
-    // 2. ОБРАБОТКА FormData
+    // 2. ОБРАБОТКА FormData (только для POST)
     // ------------------------------------------------
     const formData = await req.formData();
     const audioFile = formData.get('audio') as File;
