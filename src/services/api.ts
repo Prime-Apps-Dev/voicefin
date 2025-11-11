@@ -12,7 +12,7 @@ import { ICON_NAMES } from '../components/icons'; // [cite: components/icons.ts]
  * Вызываем нашу бэкенд-функцию 'telegram-auth'.
  * Она проверяет данные Telegram и возвращает "пропуск" (JWT-токен).
  */
-eexport const authenticateWithTelegram = async (initData: string) => {
+export const authenticateWithTelegram = async (initData: string) => {
   const { data, error } = await supabase.functions.invoke('telegram-auth', {
     body: { initData },
   });
