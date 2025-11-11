@@ -38,8 +38,8 @@ import { useLocalization } from './context/LocalizationContext';
 
 
 // --- КОНСТАНТА ДЛЯ ОТСТУПА TELEGRAM MINI APP ---
-// Устанавливает отступ сверху 130px для всех основных экранов
-const TG_HEADER_OFFSET_CLASS = 'pt-[130px]'; 
+// Устанавливает отступ сверху 70px для всех основных экранов
+const TG_HEADER_OFFSET_CLASS = 'pt-[70px]'; 
 
 // --- App State & Backend Interaction ---
 const App: React.FC = () => {
