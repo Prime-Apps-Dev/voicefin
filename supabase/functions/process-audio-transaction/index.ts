@@ -2,12 +2,23 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { CORS_HEADERS, handleCors } from "../_shared/cors.ts";
-
-// ✅ РЕКОМЕНДУЕМОЕ РЕШЕНИЕ: Используем официальный пакет Google
 import { GoogleGenerativeAI } from "https://esm.sh/@google/generative-ai@0.21.0";
-
 import { getSystemInstruction } from "../_shared/prompts.ts";
 import { addTransactionFunctionDeclaration } from "../_shared/types.ts";
+
+// ✅ ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ: Безопасная конвертация больших файлов в base64
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  const chunkSize = 8192;
+  let binary = '';
+  
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.slice(i, Math.min(i + chunkSize, bytes.length));
+    binary += String.fromCharCode(...chunk);
+  }
+  
+  return btoa(binary);
+}
 
 serve(async (req) => {
   
@@ -28,7 +39,6 @@ serve(async (req) => {
       throw new Error("GEMINI_API_KEY not set in Edge Function secrets.");
     }
     
-    // ✅ ИСПРАВЛЕНО: Прямое использование импортированного класса
     const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
     console.log("EDGE FUNCTION: GoogleGenerativeAI initialized successfully.");
 
@@ -55,12 +65,12 @@ serve(async (req) => {
     // 3. КОНВЕРТАЦИЯ АУДИО И ВЫЗОВ GEMINI
     // ------------------------------------------------
     const audioBuffer = await audioFile.arrayBuffer();
-    const audioBase64 = btoa(String.fromCharCode(...new Uint8Array(audioBuffer)));
+    const audioBase64 = arrayBufferToBase64(audioBuffer);
     const mimeType = audioFile.type || 'audio/webm';
-    console.log(`EDGE FUNCTION: Audio converted to base64. Base64 length: ${audioBase64.length}`); 
+    console.log(`EDGE FUNCTION: Audio converted to base64. Original size: ${audioFile.size} bytes, Base64 length: ${audioBase64.length} chars`); 
 
     const model = genAI.getGenerativeModel({
-      model: "gemini-2.0-flash-exp", // Обновлённая модель
+      model: "gemini-2.0-flash-exp",
       systemInstruction: getSystemInstruction(categories, savingsGoals, language),
       tools: [{ functionDeclarations: [addTransactionFunctionDeclaration] }],
     });
