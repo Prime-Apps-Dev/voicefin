@@ -1,5 +1,4 @@
 // src/components/RecordingOverlay.tsx
-// ИСПРАВЛЕННАЯ ВЕРСИЯ
 import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Square } from 'lucide-react';
@@ -10,14 +9,11 @@ interface RecordingOverlayProps {
   stream: MediaStream | null;
   onStop: () => void;
   isRecording: boolean;
-  // ----------------------------------------------------------------
-  // 🚨 ИСПРАВЛЕНИЕ 1: Добавляем 'audioContext' в props
-  // ----------------------------------------------------------------
   audioContext: AudioContext | null;
 }
 
 const generateWavePath = (time: number, amplitude: number, frequency: number) => {
-    // ... (эта функция без изменений) ...
+    // Эта функция остается без изменений
     const points = 100;
     const width = 800;
     const height = 150;
@@ -50,87 +46,112 @@ export const RecordingOverlay: React.FC<RecordingOverlayProps> = ({
   stream, 
   onStop, 
   isRecording,
-  // ----------------------------------------------------------------
-  // 🚨 ИСПРАВЛЕНИЕ 2: Получаем 'audioContext' из props
-  // ----------------------------------------------------------------
   audioContext
 }) => {
   const { t } = useLocalization();
-  const [audioLevel, setAudioLevel] = useState(0);
-  const [time, setTime] = useState(0);
+  
+  // ----------------------------------------------------------------
+  // ✅ ИСПРАВЛЕНИЕ 1: Refs для прямого доступа к элементам (БЕЗ РЕ-РЕНДЕРА)
+  // ----------------------------------------------------------------
+  const [slowAudioLevel, setSlowAudioLevel] = useState(0); // Используется только для медленных анимаций (Glow, Transcription)
+  const pathRef1 = useRef<SVGPathElement>(null);
+  const pathRef2 = useRef<SVGPathElement>(null);
+  const pathRef3 = useRef<SVGPathElement>(null);
+  const levelBarRefs = useRef<(HTMLDivElement | null)[]>([]); // Ref для индикаторов уровня
+  
+  const currentLevelRef = useRef(0); // Текущий (быстрый) уровень звука
+  const timeRef = useRef(0);         // Текущее (быстрое) время для волны
   const animationFrameId = useRef<number>(0);
+  const startTimeRef = useRef(performance.now());
   const smoothedLevelRef = useRef(0);
+  let frameCount = 0; // Счетчик кадров для "медленного" обновления состояния
 
   useEffect(() => {
-      const interval = setInterval(() => {
-        setTime(t => t + 0.05);
-      }, 50);
-      return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-      // ----------------------------------------------------------------
-      // 🚨 ИСПРАВЛЕНИЕ 3: Проверяем не только stream, но и audioContext
-      // ----------------------------------------------------------------
       if (!stream || !audioContext) {
-        setAudioLevel(0);
+        currentLevelRef.current = 0;
         smoothedLevelRef.current = 0;
+        setSlowAudioLevel(0);
         if(animationFrameId.current) cancelAnimationFrame(animationFrameId.current);
         return;
       };
-  
-      // ----------------------------------------------------------------
-      // 🚨 ИСПРАВЛЕНИЕ 4: УДАЛЯЕМ создание 'new AudioContext()'
-      // ----------------------------------------------------------------
-      // const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+
+      // Проверяем наличие Refs перед запуском цикла
+      if (!pathRef1.current || !pathRef2.current || !pathRef3.current || levelBarRefs.current.length === 0) {
+          console.error("SVG Path or Level Bar Refs not initialized.");
+          return;
+      }
       
-      // Теперь 'audioContext' используется из props
       const source = audioContext.createMediaStreamSource(stream);
       const analyser = audioContext.createAnalyser();
       
       analyser.smoothingTimeConstant = 0.8;
       analyser.fftSize = 512;
-  
       source.connect(analyser);
-  
       const dataArray = new Uint8Array(analyser.frequencyBinCount);
   
-      const updateAudioLevel = () => {
-        analyser.getByteFrequencyData(dataArray);
+      const updateLoop = (timestamp: number) => {
         
+        // 1. ОБНОВЛЕНИЕ ВРЕМЕНИ И УРОВНЯ ЗВУКА
+        const elapsed = (timestamp - startTimeRef.current) / 1000;
+        timeRef.current = elapsed * 2;
+        
+        analyser.getByteFrequencyData(dataArray);
         const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
         const normalized = Math.min(average / 128, 1);
-        
         smoothedLevelRef.current += (normalized - smoothedLevelRef.current) * 0.15;
-        setAudioLevel(smoothedLevelRef.current);
-        
-        animationFrameId.current = requestAnimationFrame(updateAudioLevel);
+        currentLevelRef.current = smoothedLevelRef.current;
+
+
+        // 2. 🚀 ПРЯМОЕ МАНИПУЛИРОВАНИЕ DOM ДЛЯ БЫСТРЫХ АНИМАЦИЙ (БЕЗ РЕ-РЕНДЕРА)
+        const amp = 8 + currentLevelRef.current * 50;
+        const time = timeRef.current;
+
+        // Обновление SVG-волн
+        pathRef1.current!.setAttribute('d', generateWavePath(time * 0.5, amp * 0.6, 2));
+        pathRef2.current!.setAttribute('d', generateWavePath(time * 0.7, amp * 0.8, 2.5));
+        pathRef3.current!.setAttribute('d', generateWavePath(time, amp, 3));
+
+        // Обновление индикаторов уровня
+        for (let i = 0; i < 5; i++) {
+            const bar = levelBarRefs.current[i];
+            if (bar) {
+                const level = currentLevelRef.current;
+                // Используем transform: scaleY для плавного и быстрого изменения
+                bar.style.transform = `scaleY(${1 + (level > i * 0.2 ? level * 3 : 0)})`;
+                bar.style.opacity = level > i * 0.2 ? '1' : '0.3';
+            }
+        }
+
+
+        // 3. 🐢 МЕДЛЕННОЕ ОБНОВЛЕНИЕ СОСТОЯНИЯ REACT (ТОЛЬКО ДЛЯ GLOW И TEXT)
+        frameCount++;
+        if (frameCount % 5 === 0) { // Обновляем состояние только каждый 5-й кадр (~12 FPS)
+            setSlowAudioLevel(currentLevelRef.current);
+            frameCount = 0;
+        }
+
+        animationFrameId.current = requestAnimationFrame(updateLoop);
       };
-      updateAudioLevel();
+
+      startTimeRef.current = performance.now();
+      updateLoop(startTimeRef.current);
   
       return () => {
         cancelAnimationFrame(animationFrameId.current);
         source.disconnect();
         analyser.disconnect();
-        // ----------------------------------------------------------------
-        // 🚨 ИСПРАВЛЕНИЕ 5: УДАЛЯЕМ 'audioContext.close()'
-        // ----------------------------------------------------------------
-        // audioContext.close().catch(console.error);
         smoothedLevelRef.current = 0;
-        setAudioLevel(0);
+        currentLevelRef.current = 0;
+        setSlowAudioLevel(0);
       };
-  // ----------------------------------------------------------------
-  // 🚨 ИСПРАВЛЕНИЕ 6: Добавляем 'audioContext' в зависимости
-  // ----------------------------------------------------------------
   }, [stream, audioContext]);
 
+  // Используем медленное состояние для анимации, которая не должна быть 60 FPS
   const words = useMemo(() => transcription.split(' ').filter(w => w !== ''), [transcription]);
-
-  const currentAmplitude = 8 + audioLevel * 50;
+  const glowLevel = slowAudioLevel;
 
   return (
       <motion.div
-          // ... (весь ваш JSX без изменений) ...
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -141,7 +162,8 @@ export const RecordingOverlay: React.FC<RecordingOverlayProps> = ({
               <div 
                   className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] rounded-full blur-3xl transition-all duration-1000"
                   style={{
-                      background: `radial-gradient(circle, rgba(59, 130, 246, ${0.2 + audioLevel * 0.3}) 0%, rgba(236, 72, 153, ${0.1 + audioLevel * 0.2}) 50%, transparent 70%)`
+                      // Используем медленный glowLevel
+                      background: `radial-gradient(circle, rgba(59, 130, 246, ${0.2 + glowLevel * 0.3}) 0%, rgba(236, 72, 153, ${0.1 + glowLevel * 0.2}) 50%, transparent 70%)`
                   }}
               />
           </div>
@@ -157,7 +179,7 @@ export const RecordingOverlay: React.FC<RecordingOverlayProps> = ({
                           initial={{ opacity: 0, y: 10, filter: 'blur(5px)' }}
                           animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
                           exit={{ opacity: 0, y: -10, filter: 'blur(5px)' }}
-                          transition={{ duration: 0.35, ease: 'easeOut' }}
+                          transition={{ duration: 0.2, ease: 'easeOut' }} 
                           className="inline-block mr-3"
                           style={{ textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}
                           >
@@ -181,7 +203,8 @@ export const RecordingOverlay: React.FC<RecordingOverlayProps> = ({
                     >
                         <div 
                             className="absolute inset-0 rounded-full bg-red-400 opacity-30 transition-transform duration-300"
-                            style={{ transform: `scale(${1 + audioLevel * 0.3})` }}
+                            // Используем медленный glowLevel для плавности
+                            style={{ transform: `scale(${1 + glowLevel * 0.3})` }}
                         />
                         <Square className="w-9 h-9 text-white" fill="white" />
                     </button>
@@ -197,11 +220,14 @@ export const RecordingOverlay: React.FC<RecordingOverlayProps> = ({
               <svg 
                   viewBox="0 0 800 150" 
                   className="absolute bottom-0 left-1/2 -translate-x-1/2 w-full h-full"
-                  style={{ minWidth: '800px' }}
+                  style={{ 
+                      minWidth: '800px', 
+                      filter: 'blur(3px)' 
+                  }}
                   preserveAspectRatio="none"
               >
-                  {/* ... (defs без изменений) ... */}
                   <defs>
+                      {/* Градиенты остаются */}
                       <linearGradient id="waveGradient1" x1="0%" y1="0%" x2="0%" y2="100%">
                           <stop offset="0%" stopColor="rgba(255, 255, 255, 0.9)" />
                           <stop offset="30%" stopColor="rgba(191, 219, 254, 0.7)" />
@@ -218,28 +244,23 @@ export const RecordingOverlay: React.FC<RecordingOverlayProps> = ({
                           <stop offset="50%" stopColor="rgba(244, 114, 182, 0.2)" />
                           <stop offset="100%" stopColor="rgba(249, 168, 212, 0.05)" />
                       </linearGradient>
-                      <filter id="blur1"><feGaussianBlur in="SourceGraphic" stdDeviation="3" /></filter>
-                      <filter id="blur2"><feGaussianBlur in="SourceGraphic" stdDeviation="2" /></filter>
-                      <filter id="blur3"><feGaussianBlur in="SourceGraphic" stdDeviation="1.5" /></filter>
                   </defs>
+                  {/* ✅ ИСПРАВЛЕНИЕ 2: Привязываем Refs к SVG path */}
                   <path
-                      d={generateWavePath(time * 0.5, currentAmplitude * 0.6, 2)}
+                      ref={pathRef1}
                       fill="url(#waveGradient3)"
-                      filter="url(#blur1)"
                       opacity="0.6"
                       shapeRendering="geometricPrecision"
                   />
                   <path
-                      d={generateWavePath(time * 0.7, currentAmplitude * 0.8, 2.5)}
+                      ref={pathRef2}
                       fill="url(#waveGradient2)"
-                      filter="url(#blur2)"
                       opacity="0.7"
                       shapeRendering="geometricPrecision"
                   />
                   <path
-                      d={generateWavePath(time, currentAmplitude, 3)}
+                      ref={pathRef3}
                       fill="url(#waveGradient1)"
-                      filter="url(#blur3)"
                       opacity="0.8"
                       shapeRendering="geometricPrecision"
                   />
@@ -252,10 +273,15 @@ export const RecordingOverlay: React.FC<RecordingOverlayProps> = ({
                 {[...Array(5)].map((_, i) => (
                     <div
                     key={i}
-                    className="w-1 bg-cyan-400 rounded-full transition-all duration-150"
+                    // ✅ ИСПРАВЛЕНИЕ 3: Собираем Refs для прямого обновления стиля
+                    ref={el => levelBarRefs.current[i] = el}
+                    className="w-1 bg-cyan-400 rounded-full transition-none" // Убираем transition! Обновление в RAF должно быть мгновенным
                     style={{
-                        height: `${8 + (audioLevel > i * 0.2 ? audioLevel * 30 : 0)}px`,
-                        opacity: audioLevel > i * 0.2 ? 1 : 0.3
+                        height: '8px', 
+                        transformOrigin: 'bottom',
+                        // Начальные значения, которые будут перезаписаны в RAF
+                        transform: 'scaleY(1)',
+                        opacity: 0.3
                     }}
                     />
                 ))}
