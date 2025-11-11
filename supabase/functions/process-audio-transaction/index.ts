@@ -2,14 +2,14 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { CORS_HEADERS, handleCors } from "../_shared/cors.ts";
-// Используем импорт всего модуля (* as GenAIModule)
-import * as GenAIModule from "https://esm.sh/@google/genai@1.28.0"; 
+// ✅ ИСПРАВЛЕНИЕ: Используем named import для конструктора (наиболее надежный вариант для esm.sh)
+import { GoogleGenerativeAI } from "https://esm.sh/@google/genai@1.28.0"; 
 import { getSystemInstruction } from "../_shared/prompts.ts";
 import { addTransactionFunctionDeclaration } from "../_shared/types.ts";
 
 serve(async (req) => {
   
-  console.log("EDGE FUNCTION: process-audio-transaction started.");
+  console.log("EDGE FUNCTION: process-audio-transaction started."); 
 
   if (req.method === 'OPTIONS') {
     console.log("EDGE FUNCTION: Handling OPTIONS request.");
@@ -18,7 +18,7 @@ serve(async (req) => {
 
   try {
     // ------------------------------------------------
-    // 1. ИНИЦИАЛИЗАЦИЯ (ИСПРАВЛЕНИЕ КОНСТРУКТОРА)
+    // 1. ИНИЦИАЛИЗАЦИЯ И ПЕРЕМЕННЫЕ ОКРУЖЕНИЯ
     // ------------------------------------------------
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
     if (!GEMINI_API_KEY) {
@@ -26,17 +26,8 @@ serve(async (req) => {
       throw new Error("GEMINI_API_KEY not set in Edge Function secrets.");
     }
     
-    // ✅ ИСПРАВЛЕНИЕ: Получаем конструктор. 
-    // Предполагаем, что конструктор находится в GenAIModule.default, 
-    // или как запасной вариант - GenAIModule (если это свернутый модуль).
-    const GoogleGenerativeAIConstructor = 
-      (GenAIModule as any).default || (GenAIModule as any).GoogleGenerativeAI;
-      
-    if (typeof GoogleGenerativeAIConstructor !== 'function') {
-        throw new Error("GenAIModule is loaded but the GoogleGenerativeAI constructor is missing or not a function.");
-    }
-    
-    const genAI = new GoogleGenerativeAIConstructor(GEMINI_API_KEY);
+    // ✅ ИСПРАВЛЕНИЕ: Используем конструктор напрямую из импорта
+    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
     // ------------------------------------------------
     // 2. ОБРАБОТКА FormData (только для POST)
@@ -55,6 +46,7 @@ serve(async (req) => {
     const context = JSON.parse(contextStr);
     const { categories, savingsGoals, language } = context;
     console.log("EDGE FUNCTION: Parsed context:", { language, categoriesCount: categories.length, goalsCount: savingsGoals.length }); 
+
 
     // ------------------------------------------------
     // 3. КОНВЕРТАЦИЯ АУДИО И ВЫЗОВ GEMINI
