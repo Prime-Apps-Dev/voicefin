@@ -2,8 +2,10 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { CORS_HEADERS, handleCors } from "../_shared/cors.ts";
-// ✅ ИСПОЛЬЗУЕМ: Импорт всего модуля (* as GenAIModule)
-import * as GenAIModule from "https://esm.sh/@google/genai@1.28.0"; 
+
+// ✅ РЕКОМЕНДУЕМОЕ РЕШЕНИЕ: Используем официальный пакет Google
+import { GoogleGenerativeAI } from "https://esm.sh/@google/generative-ai@0.21.0";
+
 import { getSystemInstruction } from "../_shared/prompts.ts";
 import { addTransactionFunctionDeclaration } from "../_shared/types.ts";
 
@@ -26,17 +28,9 @@ serve(async (req) => {
       throw new Error("GEMINI_API_KEY not set in Edge Function secrets.");
     }
     
-    // ✅ ИСПРАВЛЕНИЕ: Универсальное получение конструктора.
-    // Deno/ESM часто экспортируют главный класс как 'default' или 'GoogleGenerativeAI'.
-    // Мы пробуем оба варианта.
-    const GoogleGenerativeAIConstructor = 
-      (GenAIModule as any).GoogleGenerativeAI || (GenAIModule as any).default;
-      
-    if (typeof GoogleGenerativeAIConstructor !== 'function') {
-        throw new Error("GenAIModule is loaded but the GoogleGenerativeAI constructor is missing or not a function.");
-    }
-    
-    const genAI = new GoogleGenerativeAIConstructor(GEMINI_API_KEY);
+    // ✅ ИСПРАВЛЕНО: Прямое использование импортированного класса
+    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+    console.log("EDGE FUNCTION: GoogleGenerativeAI initialized successfully.");
 
     // ------------------------------------------------
     // 2. ОБРАБОТКА FormData (только для POST)
@@ -66,7 +60,7 @@ serve(async (req) => {
     console.log(`EDGE FUNCTION: Audio converted to base64. Base64 length: ${audioBase64.length}`); 
 
     const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash", 
+      model: "gemini-2.0-flash-exp", // Обновлённая модель
       systemInstruction: getSystemInstruction(categories, savingsGoals, language),
       tools: [{ functionDeclarations: [addTransactionFunctionDeclaration] }],
     });
@@ -85,7 +79,7 @@ serve(async (req) => {
     console.log("EDGE FUNCTION: Gemini response received."); 
 
     const functionCall = result.response.functionCalls()?.[0];
-    const geminiText = result.text.trim();
+    const geminiText = result.response.text();
     
     if (functionCall) {
         console.log("EDGE FUNCTION: Gemini returned a Function Call:", functionCall.name); 
@@ -99,7 +93,7 @@ serve(async (req) => {
     // 4. ОБРАБОТКА ОТВЕТА
     // ------------------------------------------------
     if (!functionCall || functionCall.name !== 'addTransaction') {
-      return new Response(JSON.stringify({ transcription: result.text }), {
+      return new Response(JSON.stringify({ transcription: geminiText }), {
         headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
         status: 200,
       });
@@ -131,7 +125,8 @@ serve(async (req) => {
     // ------------------------------------------------
     // 5. ЕДИНАЯ ОБРАБОТКА ОШИБОК
     // ------------------------------------------------
-    console.error("EDGE FUNCTION CRITICAL ERROR:", error.message); 
+    console.error("EDGE FUNCTION CRITICAL ERROR:", error.message);
+    console.error("EDGE FUNCTION ERROR STACK:", error.stack); 
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
       status: 500,
