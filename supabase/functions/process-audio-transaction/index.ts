@@ -2,8 +2,9 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { CORS_HEADERS, handleCors } from "../_shared/cors.ts";
-// ✅ ИСПРАВЛЕНИЕ: Заменяем "npm:" import на "https://esm.sh/@google/genai@1.28.0" для стабильности в Deno/Supabase
-import { GoogleGenerativeAI } from "https://esm.sh/@google/genai@1.28.0";
+// ✅ ИСПРАВЛЕНИЕ: Используем импорт всего модуля (* as GenAIModule)
+// Это гарантирует, что мы получим GoogleGenerativeAI независимо от того, как его экспортирует esm.sh
+import * as GenAIModule from "https://esm.sh/@google/genai@1.28.0"; 
 import { getSystemInstruction } from "../_shared/prompts.ts";
 import { addTransactionFunctionDeclaration } from "../_shared/types.ts";
 
@@ -15,7 +16,7 @@ serve(async (req) => {
     console.log("EDGE FUNCTION: Handling OPTIONS request.");
     return handleCors();
   }
-  
+
   try {
     // ------------------------------------------------
     // 1. ИНИЦИАЛИЗАЦИЯ И ПЕРЕМЕННЫЕ ОКРУЖЕНИЯ
@@ -25,7 +26,8 @@ serve(async (req) => {
       console.error("EDGE FUNCTION ERROR: GEMINI_API_KEY not set.");
       throw new Error("GEMINI_API_KEY not set in Edge Function secrets.");
     }
-    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+    // ✅ ИСПРАВЛЕНИЕ: Инициализация клиента через GenAIModule.GoogleGenerativeAI
+    const genAI = new GenAIModule.GoogleGenerativeAI(GEMINI_API_KEY);
 
     // ------------------------------------------------
     // 2. ОБРАБОТКА FormData (только для POST)
