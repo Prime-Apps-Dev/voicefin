@@ -239,7 +239,6 @@ const App: React.FC = () => {
       }
 
       const originalTransaction = 'id' in transactionData ? transactions.find(t => t.id === transactionData.id) : null;
-      // ИСПРАВЛЕНИЕ: Используем правильное свойство 'goalId' вместо 'goalid' (возможная опечатка)
       const currentGoalId = (transactionData as Transaction).goalid; 
 
       if (currentGoalId || originalTransaction?.goalId) {
@@ -269,7 +268,6 @@ const App: React.FC = () => {
         console.error("Transaction save failed:", err);
         setError(err.message || t('connectionError'));
     } finally {
-        // КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: Гарантированное закрытие формы и сброс состояния
         setPotentialTransaction(null);
         setEditingTransaction(null);
         setGoalForDeposit(null);
@@ -289,7 +287,11 @@ const App: React.FC = () => {
           savingsGoals,
           language
         );
-        setPotentialTransaction(newTransaction);
+        // --- ИСПРАВЛЕНИЕ 1: Добавляем accountId по умолчанию, если его нет
+        setPotentialTransaction({
+            ...newTransaction,
+            accountId: newTransaction.accountid || accounts[0].id,
+        });
         setTextInputValue('');
     } catch (err: any) {
         console.error('Failed to process text transaction:', err);
@@ -369,7 +371,6 @@ const App: React.FC = () => {
         console.error("Category save failed:", err);
         setError(err.message || t('connectionError'));
     } finally {
-        // КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: Гарантированное закрытие формы
         setCategoryFormState({ isOpen: false, category: null });
     }
   };
@@ -387,7 +388,6 @@ const App: React.FC = () => {
         console.error("Account save failed:", err);
         setError(err.message || t('connectionError'));
     } finally {
-        // КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: Гарантированное закрытие формы
         setIsAccountFormOpen(false);
         setEditingAccount(null);
     }
@@ -406,7 +406,6 @@ const App: React.FC = () => {
         console.error("Goal save failed:", err);
         setError(err.message || t('connectionError'));
     } finally {
-        // КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: Гарантированное закрытие формы
         setIsGoalFormOpen(false);
         setEditingGoal(null);
     }
@@ -425,7 +424,6 @@ const App: React.FC = () => {
         console.error("Budget save failed:", err);
         setError(err.message || t('connectionError'));
     } finally {
-        // КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: Гарантированное закрытие формы
         setIsBudgetFormOpen(false);
         setEditingBudget(null);
     }
@@ -503,7 +501,11 @@ const App: React.FC = () => {
         language
       );
       // Успех! Показываем форму
-      setPotentialTransaction(newTransaction);
+      // --- ИСПРАВЛЕНИЕ 2: Добавляем accountId по умолчанию, если его нет
+      setPotentialTransaction({
+          ...newTransaction,
+          accountId: newTransaction.accountid || accounts[0].id,
+      });
     } catch (err: any) {
       console.error('Failed to process audio:', err);
       setError(err.message || t('connectionError'));
@@ -736,7 +738,6 @@ const App: React.FC = () => {
         onConfirm={() => { 
           if(carryOverInfo) { 
             const prevBudgets = budgets.filter(b => b.monthKey === carryOverInfo.from); 
-            // КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ В СЛУЧАЕ ПЕРЕНОСА: Переносим бюджеты
             prevBudgets.forEach(b => handleSaveBudget({...b, monthKey: carryOverInfo.to})); 
           } 
           setCarryOverInfo(null); 
