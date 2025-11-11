@@ -7,6 +7,7 @@ import { convertCurrency } from '../services/currency';
 import { DatePicker } from './DatePicker';
 import * as api from '../services/api';
 
+
 interface AnalyticsScreenProps {
   transactions: Transaction[];
   savingsGoals: SavingsGoal[];
@@ -234,8 +235,8 @@ export const AnalyticsScreen: React.FC<AnalyticsScreenProps> = ({ transactions, 
             totalInSavingsGoals: formatCurrency(savingsGoals.reduce((sum, g) => sum + convertCurrency(g.currentAmount, g.currency, defaultCurrency, rates), 0), defaultCurrency)
         };
         
-        const insights = await api.generateFinancialAnalysis(payload);
-        setAiInsights(insights);
+        const analysis = await api.generateFinancialAnalysis(transactions, language);
+        setAiInsights(aiInsights);
     } catch (error) {
         console.error("Failed to generate financial analysis:", error);
         setAiInsights("Sorry, I couldn't generate an analysis at this moment. Please try again later.");

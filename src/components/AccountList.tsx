@@ -18,7 +18,7 @@ interface AccountListProps {
 
 const calculateAccountBalance = (accountId: string, transactions: Transaction[], rates: ExchangeRates, accountCurrency: string) => {
     return transactions
-        .filter(t => t.accountId === accountId)
+        .filter(t => t.accountid === accountId)
         .reduce((sum, tx) => {
             const amountInAccountCurrency = convertCurrency(tx.amount, tx.currency, accountCurrency, rates);
             return sum + (tx.type === 'INCOME' ? amountInAccountCurrency : -amountInAccountCurrency);

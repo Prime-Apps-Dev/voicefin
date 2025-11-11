@@ -132,6 +132,33 @@ const getUserId = async () => {
   return user.id;
 };
 
+/**
+ * Вызывает Edge Function для генерации финансового анализа
+ */
+export async function generateFinancialAnalysis(
+  transactions: Transaction[], 
+  language: string
+): Promise<string> {
+  
+  const { data, error } = await supabase.functions.invoke('generate-financial-analysis', {
+    body: { 
+      transactions, 
+      language 
+    },
+  });
+
+  if (error) {
+    throw new Error(`Failed to generate financial analysis: ${error.message}`);
+  }
+
+  // Бэкенд, вероятно, возвращает объект { analysis: "..." }
+  if (!data || !data.analysis) {
+    throw new Error('Invalid response from analysis function');
+  }
+
+  return data.analysis;
+}
+
 // Transactions
 // ИСПРАВЛЕНИЕ 2: Это ЕДИНСТВЕННАЯ декларация addTransaction
 export const addTransaction = async (transaction: Omit<Transaction, 'id'>): Promise<Transaction> => {

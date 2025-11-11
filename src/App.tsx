@@ -246,8 +246,8 @@ const App: React.FC = () => {
         const newCategoryData: Omit<Category, 'id'> = {
             name: transactionData.category,
             icon: iconName,
-            isFavorite: false,
-            isDefault: false,
+            isfavorite: false,
+            isdefault: false,
             type: transactionData.type,
         };
         // Сохраняем категорию в БД
@@ -375,7 +375,7 @@ const App: React.FC = () => {
         savedCategory = await api.updateCategory(categoryData);
         setCategories(prev => prev.map(cat => cat.id === savedCategory.id ? savedCategory : cat));
     } else {
-        savedCategory = await api.addCategory({ ...categoryData, isDefault: false });
+        savedCategory = await api.addCategory({ ...categoryData, isdefault: false });
         setCategories(prev => [...prev, savedCategory]);
     }
     if (categoryFormState.context?.from === 'budget') {
@@ -401,7 +401,7 @@ const App: React.FC = () => {
         const updated = await api.updateSavingsGoal(goalData);
         setSavingsGoals(prev => prev.map(g => g.id === updated.id ? updated : g));
     } else {
-        const newGoal = await api.addSavingsGoal({ ...goalData, currentAmount: 0 });
+        const newGoal = await api.addSavingsGoal({ ...goalData, currentamount: 0 });
         setSavingsGoals(prev => [...prev, newGoal]);
     }
     setIsGoalFormOpen(false);

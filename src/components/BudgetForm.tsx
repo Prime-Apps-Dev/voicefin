@@ -7,7 +7,7 @@ import { ChevronDown } from 'lucide-react';
 import { COMMON_CURRENCIES } from '../constants';
 
 const defaultState: Omit<Budget, 'id'> = {
-  monthKey: '',
+  monthkey: '',
   category: '',
   limit: 0,
   icon: 'LayoutGrid',
