@@ -55,9 +55,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = (props) => {
     const avatarColor = stringToColor(user.name);
     
     return (
-        <div ref={scrollRef} className="h-screen overflow-y-auto bg-gray-900 pb-32 scrollbar-hide">
-            {/* Sticky header container */}
-            <div className="sticky top-0 h-[220px] bg-gradient-to-br from-gray-800 via-gray-800 to-gray-700 z-0 flex items-center justify-center px-6">
+        <div ref={scrollRef} className="h-screen overflow-y-auto bg-gradient-to-b from-gray-900 to-gray-800 pb-32 scrollbar-hide">
+            {/* Sticky header container: Установлен bg-gray-800, чтобы цвет совпадал с отступом TG в App.tsx */}
+            {/* Высота уменьшена, чтобы соответствовать новому дизайну без карточки */}
+            <div className="sticky top-0 h-[180px] bg-gradient-to-b from-gray-900 to-gray-800 z-0 flex items-center justify-center px-6">
                 <motion.div
                     className="w-full max-w-md"
                     style={{
@@ -66,23 +67,24 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = (props) => {
                         y: headerContentY,
                     }}
                 >
-                    <div className="bg-gray-800/70 backdrop-blur-sm rounded-3xl p-6 border border-gray-700/50 shadow-lg">
-                        <div className="flex items-center">
-                            <div
-                                className="w-20 h-20 rounded-3xl flex items-center justify-center text-white text-3xl font-bold mr-6"
-                                style={{ backgroundColor: avatarColor }}
-                            >
-                                {userAvatar}
+                    {/* 1. Блок информации о пользователе - ПОЛНОШИРИННЫЙ, БЕЗ КАРТОЧКИ */}
+                    {/* Используем p-4 для внутреннего отступа, чтобы соответствовать кнопкам ниже */}
+                    <div className="flex items-center p-4">
+                        {/* Аватар: Исправлен на квадратный, фиксированный размер, скругленные углы */}
+                        <div
+                            className="w-16 h-16 flex-shrink-0 rounded-2xl flex items-center justify-center text-white text-3xl font-bold mr-4"
+                            style={{ backgroundColor: avatarColor }}
+                        >
+                            {userAvatar}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <div className="flex flex-col gap-1">
+                                <h1 className="text-xl leading-5 font-bold text-gray-100 truncate">{user.name}</h1>
+                                <p className="text-sm text-gray-400 truncate">{user.email}</p>
                             </div>
-                            <div className="flex-1">
-                                <div className="flex flex-col gap-1">
-                                    <h1 className="text-2xl leading-5 font-bold text-gray-100">{user.name}</h1>
-                                    <p className="text-gray-400">{user.email}</p>
-                                </div>
-                                <div className="flex items-center text-sm text-gray-400 mt-2">
-                                    <div className="w-2 h-2 bg-green-500 rounded-full mr-2" />
-                                    {t('activeDays', { days: daysActive })}
-                                </div>
+                            <div className="flex items-center text-xs text-gray-400 mt-2">
+                                <div className="w-2 h-2 bg-green-500 rounded-full mr-2" />
+                                {t('activeDays', { days: daysActive })}
                             </div>
                         </div>
                     </div>

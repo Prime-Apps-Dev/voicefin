@@ -61,7 +61,7 @@ export const Header: React.FC<HeaderProps> = ({ user, transactions }) => {
                 </div>
             </div>
 
-            <div className="bg-gray-800/70 backdrop-blur-sm rounded-2xl p-4 border border-gray-700/50">
+            <div className="bg-gradient-to-b from-gray-900 to-gray-800 backdrop-blur-sm rounded-2xl p-4 border border-gray-700/50">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-4">
                         <div>
