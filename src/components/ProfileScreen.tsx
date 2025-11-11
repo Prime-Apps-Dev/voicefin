@@ -1,13 +1,13 @@
 import React, { useRef } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
-import { UserProfile } from '../types';
+import { User } from '../types';
 import {
     Target, Wallet, Handshake, Banknote, CalendarDays, CreditCard, LayoutGrid, Settings, ChevronRight
 } from 'lucide-react';
 import { useLocalization } from '../context/LocalizationContext';
 
 interface ProfileScreenProps {
-    user: UserProfile;
+    user: User;
     daysActive: number;
     onNavigate: (screen: 'home' | 'savings' | 'profile' | 'accounts' | 'budgetPlanning' | 'categories' | 'settings' | 'comingSoon' | 'history') => void;
 }

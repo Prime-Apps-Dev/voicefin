@@ -1,196 +1,170 @@
 import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Category, TransactionType } from '../types';
-import { CheckCircleIcon } from './icons/CheckCircleIcon'; // Предполагается, что существует
+import { useLocalization } from '../context/LocalizationContext';
+import { ICON_NAMES, ICONS } from './icons';
+import { Trash2, Star } from 'lucide-react';
 
-type CategoryFormMode = 'create' | 'edit';
-
-interface CategoryFormProps {
-    isOpen: boolean;
-    onClose: () => void;
-    // FormData включает isfavorite/isdefault, которые могут быть изменены в форме
-    onSubmit: (formData: Omit<Category, 'id'>) => Promise<void>;
-    initialData: Partial<Category>;
-    mode: CategoryFormMode;
-}
-
-/**
- * ФОРМА КАТЕГОРИИ (CategoryForm)
- * Используется для создания и редактирования объектов Category.
- */
-const CategoryForm: React.FC<CategoryFormProps> = ({ isOpen, onClose, onSubmit, initialData, mode }) => {
-    // Состояние формы
-    const [name, setName] = useState(initialData.name || '');
-    const [icon, setIcon] = useState(initialData.icon || '🛍️');
-    const [type, setType] = useState(initialData.type || TransactionType.EXPENSE);
-    const [isFavorite, setIsFavorite] = useState(initialData.isfavorite || false);
-    const [isDefault, setIsDefault] = useState(initialData.isdefault || false);
-    const [isSubmitting, setIsSubmitting] = useState(false);
-
-    // Сброс состояния при открытии формы
-    useEffect(() => {
-        if (isOpen) {
-            setName(initialData.name || '');
-            setIcon(initialData.icon || '🛍️');
-            setType(initialData.type || TransactionType.EXPENSE);
-            setIsFavorite(initialData.isfavorite || false);
-            setIsDefault(initialData.isdefault || false);
-            setIsSubmitting(false);
-        }
-    }, [isOpen, initialData]);
-
-    const availableIcons = ['🛍️', '🏠', '🚗', '☕', '🍜', '🏥', '💸', '🎁', '💡', '💰'];
-
-    const handleFormSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-
-        if (!name || !icon) {
-            console.warn('Пожалуйста, заполните название и выберите иконку.');
-            return;
-        }
-
-        setIsSubmitting(true);
-
-        const formData: Omit<Category, 'id'> = {
-            name,
-            icon,
-            type,
-            isfavorite: isFavorite,
-            isdefault: isDefault,
-        };
-
-        try {
-            await onSubmit(formData);
-        } catch (error) {
-            console.error('Ошибка при сохранении категории:', error);
-            setIsSubmitting(false);
-        }
-    };
-
-    if (!isOpen) return null;
-
-    return (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-70 flex items-end justify-center z-50 transition-opacity duration-300">
-            <div className="bg-white p-6 rounded-t-3xl shadow-2xl w-full max-w-lg transform transition-transform duration-300 translate-y-0"
-                 role="dialog"
-                 aria-modal="true"
-            >
-                <div className="flex justify-between items-center border-b pb-3 mb-4">
-                    <h2 className="text-2xl font-bold text-gray-800">
-                        {mode === 'create' ? 'Новая Категория' : 'Редактировать Категорию'}
-                    </h2>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-2 transition rounded-full">
-                        ✕
-                    </button>
-                </div>
-
-                <form onSubmit={handleFormSubmit} className="space-y-4">
-                    
-                    {/* 1. Название */}
-                    <div>
-                        <label htmlFor="name" className="block text-sm font-medium text-gray-700">Название категории</label>
-                        <input
-                            id="name"
-                            type="text"
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-3"
-                            placeholder="Например, Продукты, Зарплата"
-                            required
-                        />
-                    </div>
-                    
-                    {/* 2. Тип */}
-                    <div>
-                        <label htmlFor="type" className="block text-sm font-medium text-gray-700">Тип транзакции</label>
-                        <div className="flex space-x-2 mt-1 bg-gray-100 p-1 rounded-xl">
-                            <button
-                                type="button"
-                                onClick={() => setType(TransactionType.EXPENSE)}
-                                className={`flex-1 py-2 rounded-lg font-semibold transition ${
-                                    type === TransactionType.EXPENSE 
-                                        ? 'bg-red-500 text-white shadow-md' 
-                                        : 'text-gray-600 hover:bg-white'
-                                }`}
-                            >
-                                Расход
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setType(TransactionType.INCOME)}
-                                className={`flex-1 py-2 rounded-lg font-semibold transition ${
-                                    type === TransactionType.INCOME 
-                                        ? 'bg-green-500 text-white shadow-md' 
-                                        : 'text-gray-600 hover:bg-white'
-                                }`}
-                            >
-                                Доход
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* 3. Иконка */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Иконка</label>
-                        <div className="flex flex-wrap gap-3">
-                            {availableIcons.map(i => (
-                                <button
-                                    type="button"
-                                    key={i}
-                                    onClick={() => setIcon(i)}
-                                    className={`w-10 h-10 text-xl rounded-full border-2 p-1 transition duration-150 ease-in-out flex items-center justify-center ${
-                                        icon === i ? 'border-indigo-600 bg-indigo-50' : 'border-gray-200 hover:bg-gray-100'
-                                    }`}
-                                >
-                                    {i}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* 4. Чекбоксы (Избранное / По умолчанию) */}
-                    <div className="space-y-3 pt-2">
-                        <div className="flex items-center">
-                            <input
-                                id="isFavorite"
-                                type="checkbox"
-                                checked={isFavorite}
-                                onChange={(e) => setIsFavorite(e.target.checked)}
-                                className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                            />
-                            <label htmlFor="isFavorite" className="ml-3 block text-sm font-medium text-gray-700">
-                                Добавить в избранное
-                            </label>
-                        </div>
-                        <div className="flex items-center">
-                            <input
-                                id="isDefault"
-                                type="checkbox"
-                                checked={isDefault}
-                                onChange={(e) => setIsDefault(e.target.checked)}
-                                className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                            />
-                            <label htmlFor="isDefault" className="ml-3 block text-sm font-medium text-gray-700">
-                                Категория по умолчанию (для авто-парсинга)
-                            </label>
-                        </div>
-                    </div>
-
-
-                    {/* Кнопка Отправки */}
-                    <div className="pt-4">
-                        <button
-                            type="submit"
-                            disabled={isSubmitting || !name}
-                            className="w-full py-3 px-4 border border-transparent rounded-xl shadow-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition disabled:opacity-50"
-                        >
-                            {isSubmitting ? 'Сохранение...' : (mode === 'create' ? 'Создать Категорию' : 'Сохранить Изменения')}
-                        </button>
-                    </div>
-
-                </form>
-            </div>
-        </div>
-    );
+const defaultState: Omit<Category, 'id' | 'isDefault'> = {
+  name: '',
+  icon: 'LayoutGrid',
+  isdefault: false,
+  isfavorite: false,
+  type: TransactionType.EXPENSE,
 };
 
-export default CategoryForm;
+interface CategoryFormProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (category: Omit<Category, 'id'> | Category) => void;
+  onDelete: (category: Category) => void;
+  category?: Category | null;
+  isFavoriteDisabled: boolean;
+  categories: Category[];
+}
+
+const IconDisplay: React.FC<{ name: string; className?: string; }> = ({ name, className }) => {
+    const IconComponent = ICONS[name] || ICONS.LayoutGrid;
+    return <IconComponent className={className} />;
+};
+
+export const CategoryForm: React.FC<CategoryFormProps> = ({ isOpen, onClose, onSave, onDelete, category, isFavoriteDisabled, categories }) => {
+  const { t } = useLocalization();
+  const [formData, setFormData] = useState<Omit<Category, 'id' | 'isDefault'> | Category>(defaultState);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      if (category) {
+        setFormData(category);
+      } else {
+        setFormData(defaultState);
+      }
+      setError(null);
+    }
+  }, [category, isOpen]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    if (error) {
+      setError(null);
+    }
+  };
+  
+  const handleToggleFavorite = () => {
+    setFormData(prev => ({ ...prev, isFavorite: !prev.isFavorite }));
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmedName = formData.name.trim();
+
+    if (!trimmedName) {
+      return;
+    }
+
+    const isDuplicate = categories.some(
+      c => c.name.toLowerCase() === trimmedName.toLowerCase() && c.id !== category?.id
+    );
+
+    if (isDuplicate) {
+      setError(t('categoryNameExists'));
+      return;
+    }
+    
+    setError(null);
+    onSave({ ...formData, name: trimmedName });
+  };
+  
+  const handleDeleteClick = () => {
+    if (category) {
+        onDelete(category);
+        onClose();
+    }
+  };
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center z-50 p-4"
+          onClick={onClose}
+        >
+          <motion.div
+            initial={{ opacity: 0, y: 10, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.98 }}
+            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            className="relative bg-zinc-900 rounded-3xl shadow-2xl w-full max-w-md max-h-[85vh] overflow-hidden flex flex-col border border-zinc-800/60"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="sticky top-0 bg-zinc-900/95 backdrop-blur-xl px-6 py-5 border-b border-zinc-800/60 z-10 flex-shrink-0">
+                <h2 className="text-xl font-semibold text-white tracking-tight">{category ? t('editCategory') : t('createCategory')}</h2>
+            </div>
+            <form onSubmit={handleSubmit} className="overflow-y-auto">
+              <div className="px-6 py-6 space-y-4">
+                <div>
+                  <label htmlFor="name" className="block text-sm font-medium text-zinc-300 mb-1.5">{t('categoryName')}</label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleChange}
+                    required
+                    disabled={category?.isDefault}
+                    className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 disabled:bg-zinc-700/50 disabled:cursor-not-allowed"
+                  />
+                  {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-2">{t('categoryIcon')}</label>
+                  <div className="h-48 overflow-y-auto grid grid-cols-6 gap-3 p-2 bg-zinc-800/50 rounded-xl border border-zinc-700/50">
+                    {ICON_NAMES.map(iconName => {
+                      const isSelected = formData.icon === iconName;
+                      return (
+                        <button type="button" key={iconName} onClick={() => setFormData(prev => ({ ...prev, icon: iconName }))}
+                          className={`w-12 h-12 flex items-center justify-center rounded-xl transition-all ${isSelected ? 'bg-brand-blue text-white ring-2 ring-brand-blue' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'}`}>
+                          <IconDisplay name={iconName} className="w-6 h-6" />
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+                <div className="flex items-center justify-between bg-zinc-800 p-3 rounded-2xl border border-gray-700/50">
+                    <span className="text-white font-medium">{t('favorite')}</span>
+                    <button
+                        type="button"
+                        onClick={handleToggleFavorite}
+                        disabled={isFavoriteDisabled && !formData.isFavorite}
+                        className="p-2 rounded-full hover:bg-zinc-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        aria-label="Toggle favorite"
+                    >
+                        <Star className={`w-6 h-6 transition-colors ${formData.isFavorite ? 'text-yellow-400 fill-yellow-400' : 'text-gray-500'}`} />
+                    </button>
+                </div>
+              </div>
+
+              <div className="sticky bottom-0 bg-zinc-900/95 backdrop-blur-xl px-6 py-4 border-t border-zinc-800/60 flex items-center justify-between space-x-3 flex-shrink-0">
+                <div>
+                    {category && !category.isDefault && (
+                        <button type="button" onClick={handleDeleteClick} className="p-2.5 text-red-400 text-sm font-medium rounded-xl hover:bg-red-500/10 active:scale-95 transition-all duration-200">
+                           <Trash2 className="w-5 h-5"/>
+                        </button>
+                    )}
+                </div>
+                <div className="flex items-center space-x-3">
+                    <button type="button" onClick={onClose} className="px-5 py-2.5 text-zinc-300 hover:text-white text-sm font-medium rounded-xl hover:bg-zinc-800 active:scale-95 transition-all duration-200">{t('cancel')}</button>
+                    <button type="submit" className="px-5 py-2.5 bg-brand-green text-white text-sm font-medium rounded-xl hover:bg-green-600 active:scale-95 transition-all duration-200">{t('save')}</button>
+                </div>
+              </div>
+            </form>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+};

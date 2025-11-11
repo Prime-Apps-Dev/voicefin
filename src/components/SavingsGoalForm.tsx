@@ -1,200 +1,157 @@
 import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { SavingsGoal } from '../types';
-import CheckCircleIcon from './icons/CheckCircleIcon'; // Предполагается, что существует
+import { useLocalization } from '../context/LocalizationContext';
+import { COMMON_CURRENCIES } from '../constants';
+import { ICON_NAMES, ICONS } from './icons';
+import { ChevronDown } from 'lucide-react';
 
-type GoalFormMode = 'create' | 'edit';
-
-interface SavingsGoalFormProps {
-    isOpen: boolean;
-    onClose: () => void;
-    // FormData включает currentamount, который может быть изменен при создании
-    onSubmit: (formData: Omit<SavingsGoal, 'id'>) => Promise<void>; 
-    initialData: Partial<SavingsGoal>;
-    mode: GoalFormMode;
-}
-
-/**
- * ФОРМА ЦЕЛИ СБЕРЕЖЕНИЙ (SavingsGoalForm)
- * Используется для создания и редактирования объектов SavingsGoal.
- */
-const SavingsGoalForm: React.FC<SavingsGoalFormProps> = ({ isOpen, onClose, onSubmit, initialData, mode }) => {
-    // Состояние формы
-    const [name, setName] = useState(initialData.name || '');
-    const [targetAmount, setTargetAmount] = useState(initialData.targetamount || 0);
-    const [currentAmount, setCurrentAmount] = useState(initialData.currentamount || 0);
-    const [icon, setIcon] = useState(initialData.icon || '🎯');
-    const [currency, setCurrency] = useState(initialData.currency || 'RUB');
-    const [isSubmitting, setIsSubmitting] = useState(false);
-
-    // Сброс состояния при открытии формы
-    useEffect(() => {
-        if (isOpen) {
-            setName(initialData.name || '');
-            setTargetAmount(initialData.targetamount || 0);
-            setCurrentAmount(initialData.currentamount || 0);
-            setIcon(initialData.icon || '🎯');
-            setCurrency(initialData.currency || 'RUB');
-            setIsSubmitting(false);
-        }
-    }, [isOpen, initialData]);
-
-    const availableIcons = ['🎯', '🏡', '🚗', '🎓', '🏖️', '💻', '💍', '👶', '🐶', '✈️'];
-    const availableCurrencies = ['RUB', 'USD', 'EUR', 'KZT', 'GBP'];
-
-    const handleFormSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-
-        if (!name || targetAmount <= 0) {
-            console.warn('Пожалуйста, заполните название и целевую сумму.');
-            return;
-        }
-
-        setIsSubmitting(true);
-
-        const formData: Omit<SavingsGoal, 'id'> = {
-            name,
-            targetamount: targetAmount,
-            // currentAmount можно установить только при создании или использовать существующее значение при редактировании
-            currentamount: mode === 'create' ? currentAmount : initialData.currentamount || 0,
-            icon,
-            currency,
-        };
-
-        try {
-            await onSubmit(formData);
-        } catch (error) {
-            console.error('Ошибка при сохранении цели:', error);
-            setIsSubmitting(false);
-        }
-    };
-
-    if (!isOpen) return null;
-
-    return (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-70 flex items-end justify-center z-50 transition-opacity duration-300">
-            <div className="bg-white p-6 rounded-t-3xl shadow-2xl w-full max-w-lg transform transition-transform duration-300 translate-y-0"
-                 role="dialog"
-                 aria-modal="true"
-            >
-                <div className="flex justify-between items-center border-b pb-3 mb-4">
-                    <h2 className="text-2xl font-bold text-gray-800">
-                        {mode === 'create' ? 'Новая Цель Сбережений' : 'Редактировать Цель'}
-                    </h2>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-2 transition rounded-full">
-                        ✕
-                    </button>
-                </div>
-
-                <form onSubmit={handleFormSubmit} className="space-y-4">
-                    
-                    {/* 1. Название */}
-                    <div>
-                        <label htmlFor="name" className="block text-sm font-medium text-gray-700">Название цели</label>
-                        <input
-                            id="name"
-                            type="text"
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-3"
-                            placeholder="Например, Отпуск на Бали"
-                            required
-                        />
-                    </div>
-                    
-                    {/* 2. Иконка */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Иконка</label>
-                        <div className="flex flex-wrap gap-3">
-                            {availableIcons.map(i => (
-                                <button
-                                    type="button"
-                                    key={i}
-                                    onClick={() => setIcon(i)}
-                                    className={`w-10 h-10 text-xl rounded-full border-2 p-1 transition duration-150 ease-in-out flex items-center justify-center ${
-                                        icon === i ? 'border-indigo-600 bg-indigo-50' : 'border-gray-200 hover:bg-gray-100'
-                                    }`}
-                                >
-                                    {i}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* 3. Целевая Сумма */}
-                    <div>
-                        <label htmlFor="targetAmount" className="block text-sm font-medium text-gray-700">Целевая сумма</label>
-                        <div className="mt-1 flex rounded-lg shadow-sm">
-                            <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 text-gray-500 sm:text-sm">
-                                {currency}
-                            </span>
-                            <input
-                                id="targetAmount"
-                                type="number"
-                                step="0.01"
-                                value={targetAmount || ''}
-                                onChange={(e) => setTargetAmount(parseFloat(e.target.value) || 0)}
-                                className="flex-1 block w-full rounded-r-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 p-3 font-bold"
-                                placeholder="100000.00"
-                                required
-                            />
-                        </div>
-                    </div>
-                    
-                    {/* 4. Текущая Сумма (Только при создании) */}
-                    {mode === 'create' && (
-                        <div>
-                            <label htmlFor="currentAmount" className="block text-sm font-medium text-gray-700">Начальная сумма накопления</label>
-                             <div className="mt-1 flex rounded-lg shadow-sm">
-                                <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 text-gray-500 sm:text-sm">
-                                    {currency}
-                                </span>
-                                <input
-                                    id="currentAmount"
-                                    type="number"
-                                    step="0.01"
-                                    value={currentAmount || ''}
-                                    onChange={(e) => setCurrentAmount(parseFloat(e.target.value) || 0)}
-                                    className="flex-1 block w-full rounded-r-lg border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 p-3 font-bold"
-                                    placeholder="0.00"
-                                />
-                            </div>
-                            <p className="text-xs text-gray-500 mt-1">
-                                Примечание: Текущая сумма при редактировании меняется только через транзакции.
-                            </p>
-                        </div>
-                    )}
-                    
-                    {/* 5. Валюта */}
-                    <div>
-                        <label htmlFor="currency" className="block text-sm font-medium text-gray-700">Валюта</label>
-                        <select
-                            id="currency"
-                            value={currency}
-                            onChange={(e) => setCurrency(e.target.value)}
-                            className="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 p-3 bg-white"
-                            required
-                        >
-                            {availableCurrencies.map(c => (
-                                <option key={c} value={c}>{c}</option>
-                            ))}
-                        </select>
-                    </div>
-
-                    {/* Кнопка Отправки */}
-                    <div className="pt-4">
-                        <button
-                            type="submit"
-                            disabled={isSubmitting || !name || targetAmount <= 0}
-                            className="w-full py-3 px-4 border border-transparent rounded-xl shadow-md text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition disabled:opacity-50"
-                        >
-                            {isSubmitting ? 'Сохранение...' : (mode === 'create' ? 'Создать Цель' : 'Сохранить Изменения')}
-                        </button>
-                    </div>
-
-                </form>
-            </div>
-        </div>
-    );
+const defaultState: Omit<SavingsGoal, 'id' | 'currentAmount'> = {
+  name: '',
+  icon: 'Target',
+  currentamount: 0,
+  targetamount: 0,
+  currency: 'USD',
 };
 
-export default SavingsGoalForm;
+export const SavingsGoalForm: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (goal: Omit<SavingsGoal, 'id' | 'currentAmount'> | SavingsGoal) => void;
+  goal?: SavingsGoal | null;
+  defaultCurrency: string;
+}> = ({ isOpen, onClose, onSave, goal, defaultCurrency }) => {
+  const { t } = useLocalization();
+  const [formData, setFormData] = useState({ ...defaultState, currency: defaultCurrency });
+  const [targetAmountStr, setTargetAmountStr] = useState('');
+
+  useEffect(() => {
+    if (isOpen) {
+      if (goal) {
+        setFormData({
+          name: goal.name,
+          icon: goal.icon,
+          targetAmount: goal.targetAmount,
+          currency: goal.currency || defaultCurrency,
+        });
+        setTargetAmountStr(String(goal.targetAmount));
+      } else {
+        setFormData({ ...defaultState, currency: defaultCurrency });
+        setTargetAmountStr('');
+      }
+    }
+  }, [goal, isOpen, defaultCurrency]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    if (name === 'targetAmount') {
+      const sanitizedValue = value.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1');
+      setTargetAmountStr(sanitizedValue);
+      setFormData(prev => ({
+        ...prev,
+        targetAmount: parseFloat(sanitizedValue) || 0,
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value,
+      }));
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (formData.name && formData.targetAmount > 0) {
+      if (goal && 'id' in goal) {
+        onSave({ ...goal, ...formData });
+      } else {
+        onSave(formData);
+      }
+    }
+  };
+  
+  const IconDisplay: React.FC<{ name: string; className?: string; }> = ({ name, className }) => {
+    const IconComponent = ICONS[name] || ICONS.Target;
+    return <IconComponent className={className} />;
+  };
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center z-50 p-4"
+          onClick={onClose}
+        >
+          <motion.div
+            initial={{ opacity: 0, y: 10, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.98 }}
+            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+            className="relative bg-zinc-900 rounded-3xl shadow-2xl w-full max-w-md max-h-[85vh] overflow-hidden flex flex-col border border-zinc-800/60"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="sticky top-0 bg-zinc-900/95 backdrop-blur-xl px-6 py-5 border-b border-zinc-800/60 z-10 flex-shrink-0">
+                <h2 className="text-xl font-semibold text-white tracking-tight">{goal ? t('editGoal') : t('createGoal')}</h2>
+            </div>
+            <form onSubmit={handleSubmit} className="overflow-y-auto">
+              <div className="px-6 py-6 space-y-4">
+                <div>
+                  <div className="flex justify-between items-center">
+                    <label htmlFor="name" className="block text-sm font-medium text-zinc-300 mb-1.5">{t('goalName')}</label>
+                    <span className="text-xs text-zinc-500">{formData.name.length} / 50</span>
+                  </div>
+                  <input
+                    type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleChange}
+                    required
+                    maxLength={50}
+                    className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="targetAmount" className="block text-sm font-medium text-zinc-300 mb-1.5">{t('targetAmount')}</label>
+                    <input type="text" inputMode="decimal" name="targetAmount" value={targetAmountStr} onChange={handleChange} required className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white" />
+                  </div>
+                  <div>
+                    <label htmlFor="currency" className="block text-sm font-medium text-zinc-300 mb-1.5">{t('currency')}</label>
+                    <div className="relative">
+                        <select name="currency" value={formData.currency} onChange={handleChange} className="w-full appearance-none px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-600 transition-all duration-200 pr-10">
+                          {COMMON_CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 pointer-events-none" />
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-2">{t('goalIcon')}</label>
+                  <div className="h-48 overflow-y-auto grid grid-cols-6 gap-3 p-1 bg-zinc-800/50 rounded-xl border border-zinc-700/50">
+                    {ICON_NAMES.map(iconName => {
+                      const isSelected = formData.icon === iconName;
+                      return (
+                        <button type="button" key={iconName} onClick={() => setFormData(prev => ({ ...prev, icon: iconName }))}
+                          className={`w-12 h-12 flex items-center justify-center rounded-xl transition-all ${isSelected ? 'bg-brand-purple text-white ring-2 ring-brand-purple' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'}`}>
+                          <IconDisplay name={iconName} className="w-6 h-6" />
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              <div className="sticky bottom-0 bg-zinc-900/95 backdrop-blur-xl px-6 py-4 border-t border-zinc-800/60 flex items-center justify-end space-x-3 flex-shrink-0">
+                <button type="button" onClick={onClose} className="px-5 py-2.5 text-zinc-300 hover:text-white text-sm font-medium rounded-xl hover:bg-zinc-800 active:scale-95 transition-all duration-200">{t('cancel')}</button>
+                <button type="submit" className="px-5 py-2.5 bg-brand-purple text-white text-sm font-medium rounded-xl hover:bg-purple-500 active:scale-95 transition-all duration-200">{t('save')}</button>
+              </div>
+            </form>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+};
