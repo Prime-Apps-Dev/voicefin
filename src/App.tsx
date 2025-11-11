@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import * as api from './services/api';
+import { supabase } from './services/supabase'; 
 // ... (все ваши импорты компонентов) ...
 import { Transaction, TransactionType, Account, ExchangeRates, AccountType, User, SavingsGoal, Budget, Category } from './types';
 import { TransactionList } from './components/TransactionList';
@@ -96,13 +97,15 @@ const App: React.FC = () => {
       try {
         // 1. Аутентификация
         // user = { id: string; name: string; token: string; }
-        const user = await api.authenticateWithTelegram(initData);
-        
-        // 🔴 ИСПРАВЛЕНИЕ ОШИБКИ СЕССИИ: Auth session missing!
-        // Передаем access_token в качестве refresh_token.
-        const { error: sessionError } = await api.supabase.auth.setSession({
+        const user = await api.authenticateWithTelegram(initData); 
+        setTgUser(user);
+
+        // ИСПРАВЛЕНИЕ: Используем прямой импорт 'supabase' из 'src/services/supabase'
+        // Эта часть кода должна быть в api.ts, но пока она здесь,
+        // убедитесь, что вы используете импортированный 'supabase'
+        const { error: sessionError } = await supabase.auth.setSession({ 
           access_token: user.token,
-          refresh_token: user.token, // ✅ ИСПОЛЬЗУЕМ ТОТ ЖЕ ТОКЕН
+          refresh_token: user.token,
         });
 
         if (sessionError) {

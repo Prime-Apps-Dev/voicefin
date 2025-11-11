@@ -1,10 +1,10 @@
-// services/api.ts
+// src/services/api.ts
 // ВАШЕ "МЕНЮ" ДЛЯ СВЯЗИ С РЕАЛЬНЫМ БЭКЕНДОМ
 // Мы заменяем все "заглушки" (MOCK_DB) на реальные вызовы Supabase.
 
 import { supabase } from './supabase';
 import { Transaction, Account, SavingsGoal, Budget, Category, TransactionType, AccountType } from '../types';
-import { ICON_NAMES } from '../components/icons'; // [cite: components/icons.ts]
+import { ICON_NAMES } from '../components/icons';
 
 // --- Auth ---
 /**
@@ -20,10 +20,11 @@ export const authenticateWithTelegram = async (initData: string) => {
   if (error) throw new Error(`Telegram Auth Error: ${error.message}`);
   if (!data.token) throw new Error("No token received from auth function");
 
-  // ИСПРАВЛЕНИЕ ОШИБКИ СЕССИИ: передаем access_token в качестве refresh_token.
+  // ИСПРАВЛЕНИЕ 1: Session Error
+  // "Надеваем пропуск" — теперь Supabase знает, кто мы
   const { error: sessionError } = await supabase.auth.setSession({
     access_token: data.token,
-    refresh_token: data.token, // ✅ ИСПРАВЛЕНО
+    refresh_token: data.token, // ✅ ИСПРАВЛЕНО: используем access_token как refresh_token
   });
 
   if (sessionError) throw new Error(`Session Error: ${sessionError.message}`);
@@ -78,7 +79,6 @@ export const initializeUser = async () => {
  * Вспомогательная функция: создание категорий по умолчанию
  */
 const createDefaultCategories = async (): Promise<Category[]> => {
-  // [cite: constants.ts]
   const DEFAULT_CATEGORIES = [
     { name: 'Food & Drink', icon: 'UtensilsCrossed', type: TransactionType.EXPENSE, isDefault: true, isFavorite: false },
     { name: 'Shopping', icon: 'ShoppingCart', type: TransactionType.EXPENSE, isDefault: true, isFavorite: false },
@@ -128,8 +128,6 @@ const createDefaultAccount = async (): Promise<Account> => {
 
 
 // --- CRUD Operations ---
-// Все эти функции теперь - это просто "переводчики"
-// команд из App.tsx в команды для Supabase.
 
 // Получаем ID пользователя ОДИН раз, чтобы добавлять его во все запросы
 const getUserId = async () => {
@@ -139,6 +137,7 @@ const getUserId = async () => {
 };
 
 // Transactions
+// ИСПРАВЛЕНИЕ 2: Это ЕДИНСТВЕННАЯ декларация addTransaction
 export const addTransaction = async (transaction: Omit<Transaction, 'id'>): Promise<Transaction> => {
   const userId = await getUserId();
   const { data, error } = await supabase
@@ -146,18 +145,6 @@ export const addTransaction = async (transaction: Omit<Transaction, 'id'>): Prom
     .insert({ ...transaction, telegram_user_id: userId })
     .select()
     .single();
-  if (error) throw error;
-  return data;
-};
-
-// Transactions
-export const addTransaction = async (transaction: Omit<Transaction, 'id'>): Promise<Transaction> => {
-  const userId = await getUserId();
-  const { data, error } = await supabase
-    .from('transactions')
-    .insert({ ...transaction, telegram_user_id: userId })
-    .select()
-    .single(); // .single() - ждем одну запись в ответ
   if (error) throw error;
   return data;
 };
@@ -197,13 +184,11 @@ export const updateAccount = async (account: Account): Promise<Account> => {
 };
 
 export const deleteAccount = async (accountId: string): Promise<void> => {
-  // Наша SQL-база (ON DELETE CASCADE) сама удалит все транзакции,
-  // связанные с этим счетом.
   const { error } = await supabase.from('accounts').delete().eq('id', accountId);
   if (error) throw error;
 };
 
-// Categories (аналогично)
+// Categories
 export const addCategory = async (category: Omit<Category, 'id'>): Promise<Category> => {
   const userId = await getUserId();
   const { data, error } = await supabase.from('categories').insert({ ...category, telegram_user_id: userId }).select().single();
@@ -222,7 +207,7 @@ export const deleteCategory = async (categoryId: string): Promise<void> => {
   if (error) throw error;
 };
 
-// Savings Goals (аналогично)
+// Savings Goals
 export const addSavingsGoal = async (goal: Omit<SavingsGoal, 'id'>): Promise<SavingsGoal> => {
   const userId = await getUserId();
   const { data, error } = await supabase.from('savings_goals').insert({ ...goal, telegram_user_id: userId }).select().single();
@@ -241,7 +226,7 @@ export const deleteSavingsGoal = async (goalId: string): Promise<void> => {
   if (error) throw error;
 };
 
-// Budgets (аналогично)
+// Budgets
 export const addBudget = async (budget: Omit<Budget, 'id'>): Promise<Budget> => {
   const userId = await getUserId();
   const { data, error } = await supabase.from('budgets').insert({ ...budget, telegram_user_id: userId }).select().single();
@@ -262,8 +247,6 @@ export const deleteBudget = async (budgetId: string): Promise<void> => {
 
 
 // --- Gemini Edge Function Calls ---
-// Здесь мы вызываем наши "рецепты" (бэкенд-функции), которые
-// безопасно работают с ИИ.
 
 /**
  * Парсит транзакцию из текста
@@ -276,7 +259,6 @@ export const parseTransactionFromText = async (
   language: string
 ): Promise<Omit<Transaction, 'id'>> => {
   
-  // Эта функция также может завершаться ошибкой, если не работает аутентификация (см. п.1)
   const { data, error } = await supabase.functions.invoke('parse-text-transaction', {
     body: { text, defaultCurrency, categories, savingsGoals, language }
   });
@@ -327,11 +309,11 @@ export const processAudioTransaction = async (
   // Используем прямой fetch вместо supabase.functions.invoke
   const { data: { session } } = await supabase.auth.getSession();
   
-  // ИСПРАВЛЕНИЕ ОШИБКИ URL: используем import.meta.env для Vite
-  const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-  
+  // ИСПРАВЛЕНИЕ 3: Замена Deno.env.get на import.meta.env для клиента Vite
+  const SUPABASE_URL: string = import.meta.env.VITE_SUPABASE_URL || '';
+
   if (!SUPABASE_URL) {
-    throw new Error("VITE_SUPABASE_URL not defined in .env.local");
+    throw new Error("VITE_SUPABASE_URL environment variable is missing or empty.");
   }
 
   const response = await fetch(
