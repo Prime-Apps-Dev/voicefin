@@ -1,22 +1,20 @@
 // supabase/functions/_shared/types.ts
-// Мы храним здесь типы данных и "инструменты" (tools) для Gemini.
 
-// ❌ БЫЛО: import { FunctionDeclaration, Type } from "npm:@google/generative-ai";
-// ✅ СТАЛО: Используем стабильный URL esm.sh и импортируем как пространство имен
+// ❌ УДАЛИТЬ: import { FunctionDeclaration, Type } from "npm:@google/generative-ai";
+// ✅ ИСПОЛЬЗОВАТЬ: Стабильный URL и импорт всего модуля
 import * as GoogleGenerativeAI from "https://esm.sh/@google/genai@1.28.0";
-import { GoogleGenerativeAI } from "https://esm.sh/@google/genai@1.28.0";
 
 export enum TransactionType {
   INCOME = 'INCOME',
   EXPENSE = 'EXPENSE',
 }
 
-// Декларация функции, которую Gemini будет вызывать
+// Используем GoogleGenerativeAI.FunctionDeclaration
 export const addTransactionFunctionDeclaration: GoogleGenerativeAI.FunctionDeclaration = {
   name: 'addTransaction',
   description: 'Adds a new income or expense transaction to the user\'s financial records. Infer the type (income/expense) from the context.',
   parameters: {
-    // ✅ ИСПРАВЛЕНИЕ: Используем GoogleGenerativeAI.Type
+    // Используем GoogleGenerativeAI.Type
     type: GoogleGenerativeAI.Type.OBJECT,
     properties: {
       name: { type: GoogleGenerativeAI.Type.STRING, description: 'A brief, clear name for the transaction, e.g., "Groceries" or "Monthly Salary".' },
