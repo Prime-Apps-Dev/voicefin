@@ -1,11 +1,12 @@
 // src/App.tsx
-// ИСПРАВЛЕННАЯ ВЕРСИЯ (на основе вашего старого кода)
-import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import * as api from './services/api';
 import { supabase } from './services/supabase'; 
-// ... (все ваши импорты компонентов) ...
-import { Transaction, TransactionType, Account, ExchangeRates, AccountType, User, SavingsGoal, Budget, Category } from './types';
+// Импорты типов
+import { Transaction, TransactionType, Account, ExchangeRates, User, SavingsGoal, Budget, Category } from './types';
+// Импорты компонентов
 import { TransactionList } from './components/TransactionList';
 import { TransactionForm } from './components/TransactionForm';
 import { ProfileScreen } from './components/ProfileScreen';
@@ -31,9 +32,14 @@ import { CategoryForm } from './components/CategoryForm';
 import { ComingSoonScreen } from './components/ComingSoonScreen';
 import { TransactionHistoryScreen } from './components/TransactionHistoryScreen';
 
+// Импорты утилит и сервисов
 import { getExchangeRates, convertCurrency } from './services/currency';
 import { useLocalization } from './context/LocalizationContext';
 
+
+// --- КОНСТАНТА ДЛЯ ОТСТУПА TELEGRAM MINI APP ---
+// Устанавливает отступ сверху 130px для всех основных экранов
+const TG_HEADER_OFFSET_CLASS = 'pt-[130px]'; 
 
 // --- App State & Backend Interaction ---
 const App: React.FC = () => {
@@ -49,15 +55,12 @@ const App: React.FC = () => {
   const [defaultCurrency, setDefaultCurrency] = useState<string>('DEFAULT');
   const [rates, setRates] = useState<ExchangeRates>({});
   
-  // --- НОВОЕ: Состояние пользователя и Telegram ---
+  // Состояние пользователя Telegram
   const [tgUser, setTgUser] = useState<User | null>(null);
 
   // UI State
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  // ----------------------------------------------------------------
-  // 🚨 ИСПРАВЛЕНИЕ 1: Добавляем state для `stream` (потока)
-  // ----------------------------------------------------------------
   const [stream, setStream] = useState<MediaStream | null>(null);
   
   const [transcription, setTranscription] = useState(''); 
@@ -86,16 +89,13 @@ const App: React.FC = () => {
   const [carryOverInfo, setCarryOverInfo] = useState<{ from: string, to: string } | null>(null);
   const [categoryFormState, setCategoryFormState] = useState<{ isOpen: boolean; category: Category | null; context?: { type: TransactionType; from?: 'budget' } }>({ isOpen: false, category: null });
 
-  // --- Refs для записи аудио ---
+  // Refs для записи аудио
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-  // ----------------------------------------------------------------
-  // 🚨 ИСПРАВЛЕНИЕ 2: Добавляем Ref для "аудио-движка"
-  // ----------------------------------------------------------------
   const audioCtxRef = useRef<AudioContext | null>(null);
 
 
-  // --- НОВОЕ: Data Fetching и Аутентификация ---
+  // --- Data Fetching и Аутентификация ---
   useEffect(() => {
     // @ts-ignore
     const tg = window.Telegram.WebApp;
@@ -163,7 +163,7 @@ const App: React.FC = () => {
     }
   }, [t]); 
   
-  // --- Memoized Calculations (без изменений) ---
+  // --- Memoized Calculations ---
   const displayCurrency = useMemo(() => defaultCurrency === 'DEFAULT' ? 'USD' : defaultCurrency, [defaultCurrency]);
 
   const filteredTransactions = useMemo(() => {
@@ -222,7 +222,7 @@ const App: React.FC = () => {
   }, [transactions]);
   
 
-  // --- Handlers for Data Mutation (ОБНОВЛЕНЫ) ---
+  // --- Handlers for Data Mutation ---
   const handleConfirmTransaction = async (transactionData: Omit<Transaction, 'id'> | Transaction) => {
     if (transactionData.category && !categories.some(c => c.name.toLowerCase() === transactionData.category.toLowerCase())) {
         const iconName = await api.getIconForCategory(transactionData.category);
@@ -242,9 +242,11 @@ const App: React.FC = () => {
         setSavingsGoals(prevGoals => prevGoals.map(g => {
             let newCurrentAmount = g.currentAmount;
             if (originalTransaction?.goalId === g.id) {
+                // Отмена старого депозита
                 newCurrentAmount -= convertCurrency(originalTransaction.amount, originalTransaction.currency, g.currency, rates);
             }
             if (transactionData.goalid === g.id && transactionData.type === TransactionType.EXPENSE) {
+                // Добавление нового депозита
                 newCurrentAmount += convertCurrency(transactionData.amount, transactionData.currency, g.currency, rates);
             }
             return { ...g, currentAmount: Math.max(0, newCurrentAmount) };
@@ -339,8 +341,6 @@ const App: React.FC = () => {
     setItemToDelete(null);
   };
 
-  // ... (handleSaveCategory, handleSaveAccount, handleSaveGoal, handleSaveBudget) ...
-  // (Остаются без изменений, т.к. уже вызывают API)
   const handleSaveCategory = async (categoryData: Omit<Category, 'id'> | Category) => {
     let savedCategory: Category;
     if ('id' in categoryData) {
@@ -393,16 +393,12 @@ const App: React.FC = () => {
   };
 
 
-  // ----------------------------------------------------------------
-  // 🚨 ИСПРАВЛЕНИЕ 3: Заменяем `handleToggleRecording` на 3 новых функции
-  // ----------------------------------------------------------------
-
-  // Вызывается при нажатии кнопки "Старт"
+  // --- Audio Recording Handlers ---
   const handleStartRecording = async () => {
     if (isRecording) return;
     
     try {
-      // 1. Создаем "аудио-движок" при ПЕРВОМ нажатии
+      // 1. Создаем AudioContext
       if (!audioCtxRef.current) {
         audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
         if (audioCtxRef.current.state === 'suspended') {
@@ -411,9 +407,10 @@ const App: React.FC = () => {
       }
 
       const mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      setStream(mediaStream); // 2. Сохраняем поток в state (для оверлея)
+      setStream(mediaStream); // 2. Сохраняем поток в state
       setIsRecording(true);
       
+      // Выбираем поддерживаемый MIME-тип
       const mimeType = [
           'audio/webm;codecs=opus',
           'audio/ogg;codecs=opus',
@@ -429,7 +426,7 @@ const App: React.FC = () => {
         audioChunksRef.current.push(event.data);
       };
 
-      // 3. Устанавливаем отдельный обработчик для `onstop`
+      // 3. Устанавливаем обработчик для onstop
       recorder.onstop = handleRecordingStop; 
 
       recorder.start();
@@ -450,7 +447,7 @@ const App: React.FC = () => {
 
   // Вызывается автоматически, когда запись физически остановилась
   const handleRecordingStop = async () => {
-    // 4. Останавливаем треки, но НЕ audioCtx
+    // 4. Останавливаем треки
     stream?.getTracks().forEach(track => track.stop());
     setStream(null); // Очищаем state
 
@@ -458,7 +455,7 @@ const App: React.FC = () => {
     const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
     audioChunksRef.current = [];
     
-    // Отправляем Blob на бэкенд
+    // Отправляем Blob на бэкенд для обработки
     try {
       const newTransaction = await api.processAudioTransaction(
         audioBlob,
@@ -477,7 +474,7 @@ const App: React.FC = () => {
   };
 
   
-  // --- UI Handlers (без изменений) ---
+  // --- UI Handlers ---
   const handleCancelTransaction = () => {
     setPotentialTransaction(null);
     setEditingTransaction(null);
@@ -486,20 +483,151 @@ const App: React.FC = () => {
   };
   
 
-  // --- Render Logic (без изменений) ---
+  // --- Render Logic (ОБНОВЛЕНО: ДОБАВЛЕН TG_HEADER_OFFSET_CLASS) ---
   const renderContent = () => {
-    // Весь ваш `switch (activeScreen) { ... }` остается здесь
     switch (activeScreen) {
-      case 'savings': return <SavingsScreen goals={savingsGoals} onAddGoal={() => setIsGoalFormOpen(true)} onAddToGoal={(goal) => { setGoalForDeposit(goal); setPotentialTransaction({ accountId: accounts[0].id, name: `Deposit to "${goal.name}"`, amount: 0, currency: displayCurrency, category: 'Savings', date: new Date().toISOString(), type: TransactionType.EXPENSE, goalId: goal.id }); }} onViewGoalHistory={setGoalForHistory} onEditGoal={(goal) => { setEditingGoal(goal); setIsGoalFormOpen(true); }} onDeleteGoal={(goal) => setItemToDelete({ type: 'savingsGoal', value: goal })} />;
-      case 'analytics': return <AnalyticsScreen transactions={transactions} savingsGoals={savingsGoals} defaultCurrency={displayCurrency} rates={rates} />;
-      case 'profile': return <ProfileScreen user={tgUser || { name: 'User', email: '...' }} daysActive={daysActive} onNavigate={setActiveScreen} />;
-      case 'accounts': return <AccountsScreen accounts={accounts} transactions={transactions} rates={rates} onBack={() => setActiveScreen('profile')} onOpenAddForm={() => { setEditingAccount(null); setIsAccountFormOpen(true); }} onOpenActions={setAccountForActions} />;
-      case 'categories': return <CategoriesScreen categories={categories} onBack={() => setActiveScreen('profile')} onCreateCategory={(type) => setCategoryFormState({ isOpen: true, category: null, context: { type } })} onEditCategory={(cat) => setCategoryFormState({ isOpen: true, category: cat })} onDeleteCategory={(cat) => setItemToDelete({ type: 'category', value: cat })} onToggleFavorite={(cat) => handleSaveCategory({ ...cat, isFavorite: !cat.isFavorite })} />;
-      case 'settings': return <SettingsScreen onBack={() => setActiveScreen('profile')} defaultCurrency={defaultCurrency} onSetDefaultCurrency={setDefaultCurrency} />;
-      case 'budgetPlanning': return <BudgetPlanningScreen budgets={budgets} transactions={transactions} categories={categories} onBack={() => setActiveScreen('profile')} onAddBudget={(monthKey) => { setEditingBudget({ monthKey, currency: displayCurrency }); setIsBudgetFormOpen(true); }} onEditBudget={(budget) => { setEditingBudget(budget); setIsBudgetFormOpen(true); }} onDeleteBudget={(budget) => setItemToDelete({ type: 'budget', value: budget })} onAddTransaction={(budget) => { setIsCategoryLockedInForm(true); setPotentialTransaction({ accountId: accounts[0].id, name: '', amount: 0, currency: displayCurrency, category: budget.category, date: new Date().toISOString(), type: TransactionType.EXPENSE }); }} onViewHistory={setBudgetForHistory} onCarryOver={(from, to) => setCarryOverInfo({ from, to })} rates={rates} defaultCurrency={displayCurrency} />;
-      case 'history': return <TransactionHistoryScreen transactions={transactions} accounts={accounts} categories={categories} rates={rates} defaultCurrency={displayCurrency} onSelectTransaction={setEditingTransaction} onDeleteTransaction={(tx) => setItemToDelete(tx)} onBack={() => setActiveScreen('home')} />;
-      case 'comingSoon': return <ComingSoonScreen onBack={() => setActiveScreen('profile')} />;
-      case 'home': default: return (<> <main className="max-w-4xl mx-auto flex flex-col gap-4 pb-32 pt-6"> <AccountList accounts={accounts} transactions={transactions} rates={rates} selectedAccountId={selectedAccountId} onSelectAccount={setSelectedAccountId} totalBalance={totalBalance} defaultCurrency={displayCurrency} /> <FinancialOverview monthlyIncome={summary.monthlyIncome} monthlyExpense={summary.monthlyExpense} totalBalance={summary.selectedBalance} totalSavings={totalSavings} defaultCurrency={displayCurrency} onNavigate={setActiveScreen} onGenerateTips={handleGenerateSavingsTips} /> <div className="px-6"> <TransactionList transactions={filteredTransactions} accounts={accounts} onSelectTransaction={setEditingTransaction} onDeleteTransaction={(tx) => setItemToDelete(tx)} onViewAll={() => setActiveScreen('history')} rates={rates} /> </div> {error && <p className="text-center text-red-500 mt-2 px-6" onClick={() => setError(null)}>{error}</p>} </main> </>);
+      case 'savings': return (
+        <div className={TG_HEADER_OFFSET_CLASS}>
+          <SavingsScreen 
+            goals={savingsGoals} 
+            onAddGoal={() => setIsGoalFormOpen(true)} 
+            onAddToGoal={(goal) => { 
+              setGoalForDeposit(goal); 
+              setPotentialTransaction({ accountId: accounts[0].id, name: `Deposit to "${goal.name}"`, amount: 0, currency: displayCurrency, category: 'Savings', date: new Date().toISOString(), type: TransactionType.EXPENSE, goalId: goal.id }); 
+            }} 
+            onViewGoalHistory={setGoalForHistory} 
+            onEditGoal={(goal) => { setEditingGoal(goal); setIsGoalFormOpen(true); }} 
+            onDeleteGoal={(goal) => setItemToDelete({ type: 'savingsGoal', value: goal })} 
+          />
+        </div>
+      );
+      case 'analytics': return (
+        <div className={TG_HEADER_OFFSET_CLASS}>
+          <AnalyticsScreen 
+            transactions={transactions} 
+            savingsGoals={savingsGoals} 
+            defaultCurrency={displayCurrency} 
+            rates={rates} 
+          />
+        </div>
+      );
+      case 'profile': return (
+        <div className={TG_HEADER_OFFSET_CLASS}>
+          <ProfileScreen 
+            user={tgUser || { name: 'User', email: '...' }} 
+            daysActive={daysActive} 
+            onNavigate={setActiveScreen} 
+          />
+        </div>
+      );
+      case 'accounts': return (
+        <div className={TG_HEADER_OFFSET_CLASS}>
+          <AccountsScreen 
+            accounts={accounts} 
+            transactions={transactions} 
+            rates={rates} 
+            onBack={() => setActiveScreen('profile')} 
+            onOpenAddForm={() => { setEditingAccount(null); setIsAccountFormOpen(true); }} 
+            onOpenActions={setAccountForActions} 
+          />
+        </div>
+      );
+      case 'categories': return (
+        <div className={TG_HEADER_OFFSET_CLASS}>
+          <CategoriesScreen 
+            categories={categories} 
+            onBack={() => setActiveScreen('profile')} 
+            onCreateCategory={(type) => setCategoryFormState({ isOpen: true, category: null, context: { type } })} 
+            onEditCategory={(cat) => setCategoryFormState({ isOpen: true, category: cat })} 
+            onDeleteCategory={(cat) => setItemToDelete({ type: 'category', value: cat })} 
+            onToggleFavorite={(cat) => handleSaveCategory({ ...cat, isFavorite: !cat.isFavorite })} 
+          />
+        </div>
+      );
+      case 'settings': return (
+        <div className={TG_HEADER_OFFSET_CLASS}>
+          <SettingsScreen 
+            onBack={() => setActiveScreen('profile')} 
+            defaultCurrency={defaultCurrency} 
+            onSetDefaultCurrency={setDefaultCurrency} 
+          />
+        </div>
+      );
+      case 'budgetPlanning': return (
+        <div className={TG_HEADER_OFFSET_CLASS}>
+          <BudgetPlanningScreen 
+            budgets={budgets} 
+            transactions={transactions} 
+            categories={categories} 
+            onBack={() => setActiveScreen('profile')} 
+            onAddBudget={(monthKey) => { setEditingBudget({ monthKey, currency: displayCurrency }); setIsBudgetFormOpen(true); }} 
+            onEditBudget={(budget) => { setEditingBudget(budget); setIsBudgetFormOpen(true); }} 
+            onDeleteBudget={(budget) => setItemToDelete({ type: 'budget', value: budget })} 
+            onAddTransaction={(budget) => { 
+              setIsCategoryLockedInForm(true); 
+              setPotentialTransaction({ accountId: accounts[0].id, name: '', amount: 0, currency: displayCurrency, category: budget.category, date: new Date().toISOString(), type: TransactionType.EXPENSE }); 
+            }} 
+            onViewHistory={setBudgetForHistory} 
+            onCarryOver={(from, to) => setCarryOverInfo({ from, to })} 
+            rates={rates} 
+            defaultCurrency={displayCurrency} 
+          />
+        </div>
+      );
+      case 'history': return (
+        <div className={TG_HEADER_OFFSET_CLASS}>
+          <TransactionHistoryScreen 
+            transactions={transactions} 
+            accounts={accounts} 
+            categories={categories} 
+            rates={rates} 
+            defaultCurrency={displayCurrency} 
+            onSelectTransaction={setEditingTransaction} 
+            onDeleteTransaction={(tx) => setItemToDelete(tx)} 
+            onBack={() => setActiveScreen('home')} 
+          />
+        </div>
+      );
+      case 'comingSoon': return (
+        <div className={TG_HEADER_OFFSET_CLASS}>
+          <ComingSoonScreen onBack={() => setActiveScreen('profile')} />
+        </div>
+      );
+      case 'home': default: return (
+        <div className={TG_HEADER_OFFSET_CLASS}> 
+          <main className="max-w-4xl mx-auto flex flex-col gap-4 pb-32"> 
+            <AccountList 
+              accounts={accounts} 
+              transactions={transactions} 
+              rates={rates} 
+              selectedAccountId={selectedAccountId} 
+              onSelectAccount={setSelectedAccountId} 
+              totalBalance={totalBalance} 
+              defaultCurrency={displayCurrency} 
+            /> 
+            <FinancialOverview 
+              monthlyIncome={summary.monthlyIncome} 
+              monthlyExpense={summary.monthlyExpense} 
+              totalBalance={summary.selectedBalance} 
+              totalSavings={totalSavings} 
+              defaultCurrency={displayCurrency} 
+              onNavigate={setActiveScreen} 
+              onGenerateTips={handleGenerateSavingsTips} 
+            /> 
+            <div className="px-6"> 
+              <TransactionList 
+                transactions={filteredTransactions} 
+                accounts={accounts} 
+                onSelectTransaction={setEditingTransaction} 
+                onDeleteTransaction={(tx) => setItemToDelete(tx)} 
+                onViewAll={() => setActiveScreen('history')} 
+                rates={rates} 
+              /> 
+            </div> 
+            {error && <p className="text-center text-red-500 mt-2 px-6" onClick={() => setError(null)}>{error}</p>} 
+          </main> 
+        </div>
+      );
     }
   }
 
@@ -514,22 +642,21 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-900">
+      {/* Основное содержимое приложения */}
       {renderContent()}
 
-      {/* ---------------------------------------------------------------- */}
-      {/* 🚨 ИСПРАВЛЕНИЕ 4: Обновляем props для RecordingOverlay */}
-      {/* ---------------------------------------------------------------- */}
+      {/* Оверлей записи аудио */}
       {isRecording && (
         <RecordingOverlay 
           transcription={transcription}
-          stream={stream} // Передаем поток из state
-          onStop={handleStopRecording} // Передаем новую функцию "Стоп"
+          stream={stream} 
+          onStop={handleStopRecording} 
           isRecording={isRecording}
-          audioContext={audioCtxRef.current} // Передаем "аудио-движок"
+          audioContext={audioCtxRef.current} 
         />
       )}
 
-      {/* Вся остальная часть return (формы, модальные окна) остается БЕЗ ИЗМЕНЕНИЙ */}
+      {/* Модальное окно/Форма транзакции */}
       {(potentialTransaction || editingTransaction) && (
         <TransactionForm
           transaction={potentialTransaction || editingTransaction!}
@@ -549,20 +676,41 @@ const App: React.FC = () => {
         />
       )}
       
+      {/* Модальные формы */}
       <AccountForm isOpen={isAccountFormOpen} onClose={() => setIsAccountFormOpen(false)} onSave={handleSaveAccount} account={editingAccount} />
       <SavingsGoalForm isOpen={isGoalFormOpen} onClose={() => { setIsGoalFormOpen(false); setEditingGoal(null); }} onSave={handleSaveGoal} goal={editingGoal} defaultCurrency={displayCurrency} />
       <BudgetForm isOpen={isBudgetFormOpen} onClose={() => { setIsBudgetFormOpen(false); setEditingBudget(null); }} onSave={handleSaveBudget} budget={editingBudget} allCategories={categories} budgetsForMonth={budgets.filter(b => b.monthKey === editingBudget?.monthKey)} onCreateNewCategory={() => setCategoryFormState({ isOpen: true, category: null, context: {type: TransactionType.EXPENSE, from: 'budget'} })} defaultCurrency={displayCurrency} />
       <CategoryForm isOpen={categoryFormState.isOpen} onClose={() => setCategoryFormState({isOpen: false, category: null})} onSave={handleSaveCategory} onDelete={(cat) => setItemToDelete({type: 'category', value: cat})} category={categoryFormState.category} isFavoriteDisabled={!categoryFormState.category?.isFavorite && categories.filter(c => c.isFavorite).length >= 10} categories={categories} />
       <AccountActionsModal isOpen={!!accountForActions} account={accountForActions} onClose={() => setAccountForActions(null)} onAddTransaction={(acc) => { setPotentialTransaction({ accountId: acc.id, name: '', amount: 0, currency: displayCurrency, category: '', date: new Date().toISOString(), type: TransactionType.EXPENSE }); setActiveScreen('home'); setAccountForActions(null); }} onEdit={(acc) => { setEditingAccount(acc); setIsAccountFormOpen(true); setAccountForActions(null); }} onDelete={(acc) => { setItemToDelete({ type: 'account', value: acc }); setAccountForActions(null); }} />
-      <ConfirmationModal isOpen={!!itemToDelete} onCancel={() => setItemToDelete(null)} onConfirm={handleDeleteItem} title={ itemToDelete ? ('id' in itemToDelete ? t('confirmDeleteTitle') : itemToDelete.type === 'account' ? t('confirmDeleteAccountTitle') : itemToDelete.type === 'savingsGoal' ? t('confirmDeleteGoalTitle') : itemToDelete.type === 'budget' ? t('confirmDeleteBudgetTitle') : t('confirmDeleteCategoryTitle')) : '' } message={ itemToDelete ? ('id' in itemToDelete ? t('confirmDelete', { name: itemToDelete.name }) : itemToDelete.type === 'category' ? t('confirmDeleteCategoryMessage', { name: itemToDelete.value.name }) : itemToDelete.type === 'account' ? t('confirmDeleteAccountMessage', { name: itemToDelete.value.name }) : itemToDelete.type === 'savingsGoal' ? t('confirmDeleteGoalMessage', { name: itemToDelete.value.name }) : itemToDelete.type === 'budget' ? t('confirmDeleteBudgetMessage', { name: itemToDelete.value.category }) : '') : '' } />
-      <ConfirmationModal isOpen={!!carryOverInfo} onCancel={() => setCarryOverInfo(null)} onConfirm={() => { if(carryOverInfo) { const prevBudgets = budgets.filter(b => b.monthKey === carryOverInfo.from); prevBudgets.forEach(b => handleSaveBudget({...b, monthKey: carryOverInfo.to})); } setCarryOverInfo(null); }} title={t('carryOverBudgetsTitle')} message={t('carryOverBudgetsMessage')} />
+      
+      {/* Модальные окна подтверждения */}
+      <ConfirmationModal 
+        isOpen={!!itemToDelete} 
+        onCancel={() => setItemToDelete(null)} 
+        onConfirm={handleDeleteItem} 
+        title={ itemToDelete ? ('id' in itemToDelete ? t('confirmDeleteTitle') : itemToDelete.type === 'account' ? t('confirmDeleteAccountTitle') : itemToDelete.type === 'savingsGoal' ? t('confirmDeleteGoalTitle') : itemToDelete.type === 'budget' ? t('confirmDeleteBudgetTitle') : t('confirmDeleteCategoryTitle')) : '' } 
+        message={ itemToDelete ? ('id' in itemToDelete ? t('confirmDelete', { name: itemToDelete.name }) : itemToDelete.type === 'category' ? t('confirmDeleteCategoryMessage', { name: itemToDelete.value.name }) : itemToDelete.type === 'account' ? t('confirmDeleteAccountMessage', { name: itemToDelete.value.name }) : itemToDelete.type === 'savingsGoal' ? t('confirmDeleteGoalMessage', { name: itemToDelete.value.name }) : itemToDelete.type === 'budget' ? t('confirmDeleteBudgetMessage', { name: itemToDelete.value.category }) : '') : '' } 
+      />
+      <ConfirmationModal 
+        isOpen={!!carryOverInfo} 
+        onCancel={() => setCarryOverInfo(null)} 
+        onConfirm={() => { 
+          if(carryOverInfo) { 
+            const prevBudgets = budgets.filter(b => b.monthKey === carryOverInfo.from); 
+            prevBudgets.forEach(b => handleSaveBudget({...b, monthKey: carryOverInfo.to})); 
+          } 
+          setCarryOverInfo(null); 
+        }} 
+        title={t('carryOverBudgetsTitle')} 
+        message={t('carryOverBudgetsMessage')} 
+      />
+      
+      {/* Модальное окно ввода текста и истории */}
       <TextInputModal isOpen={isTextInputOpen} isProcessing={isProcessingText} onClose={() => setIsTextInputOpen(false)} onSubmit={handleTextTransactionSubmit} text={textInputValue} onTextChange={setTextInputValue} />
       {goalForHistory && <GoalTransactionsModal isOpen={!!goalForHistory} onClose={() => setGoalForHistory(null)} goal={goalForHistory} transactions={transactions} accounts={accounts} onSelectTransaction={setEditingTransaction} onDeleteTransaction={(tx) => setItemToDelete(tx)} rates={rates} />}
       {budgetForHistory && <BudgetTransactionsModal isOpen={!!budgetForHistory} onClose={() => setBudgetForHistory(null)} budget={budgetForHistory} transactions={transactions} accounts={accounts} onSelectTransaction={setEditingTransaction} onDeleteTransaction={(tx) => setItemToDelete(tx)} rates={rates} />}
       
-      {/* ---------------------------------------------------------------- */}
-      {/* 🚨 ИСПРАВЛЕНИЕ 5: Обновляем onToggleRecording в BottomNavBar */}
-      {/* ---------------------------------------------------------------- */}
+      {/* Нижняя навигационная панель */}
       <BottomNavBar 
         activeScreen={activeScreen} 
         onNavigate={setActiveScreen} 
