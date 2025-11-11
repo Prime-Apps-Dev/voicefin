@@ -95,26 +95,49 @@ const App: React.FC = () => {
 
     const initializeApp = async (initData: string) => {
       try {
-        // 1. Аутентификация
-        // user = { id: string; name: string; token: string; }
-        const user = await api.authenticateWithTelegram(initData); 
-        setTgUser(user);
+        // 1. Аутентификация: получаем токен и данные TG
+        // authResponse = { token: "...", user: { (объект пользователя Telegram) } }
+        const authResponse = await api.authenticateWithTelegram(initData);
+        
+        if (!authResponse || !authResponse.token || !authResponse.user) {
+            throw new Error("Invalid auth response from server");
+        }
 
-        // ИСПРАВЛЕНИЕ: Используем прямой импорт 'supabase' из 'src/services/supabase'
-        // Эта часть кода должна быть в api.ts, но пока она здесь,
-        // убедитесь, что вы используете импортированный 'supabase'
-        const { error: sessionError } = await supabase.auth.setSession({ 
-          access_token: user.token,
-          refresh_token: user.token,
+        // 2. Устанавливаем сессию в Supabase И ЖДЕМ РЕЗУЛЬТАТ
+        const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+          access_token: authResponse.token,
+          refresh_token: authResponse.token,
         });
 
         if (sessionError) {
-          throw new Error(sessionError.message);
+          throw new Error(`Failed to set session: ${sessionError.message}`);
         }
         
-        setTgUser(user);
+        // 3. Убеждаемся, что сессия и пользователь установлены
+        if (!sessionData || !sessionData.user) {
+          // Если setSession вернул null, значит токен невалидный
+          // (хотя наша функция telegram-auth должна была это поймать)
+          throw new Error("Auth session missing after setSession!");
+        }
+
+        // 4. Формируем объект пользователя для ProfileScreen
+        // (sessionData.user - это пользователь Supabase)
+        // (authResponse.user - это пользователь Telegram)
+        const teleUser = authResponse.user; // { id, first_name, ... }
+        const supUser = sessionData.user;   // { id (UUID), email, ... }
+
+        const appUser: User = {
+            id: supUser.id, // Используем настоящий UUID из Supabase
+            name: teleUser.first_name || teleUser.username || supUser.email || 'User',
+            email: supUser.email
+        };
         
-        // 2. Загрузка данных
+        // Сохраняем пользователя в стейт
+        setTgUser(appUser);
+        
+        // 5. Загрузка данных
+        // Теперь api.initializeUser() будет вызван ПОСЛЕ
+        // того, как клиент Supabase 100% получил сессию.
         const [exchangeRates, initialData] = await Promise.all([
           getExchangeRates(),
           api.initializeUser(), // Вызываем API (уже с токеном)
@@ -126,6 +149,9 @@ const App: React.FC = () => {
         setCategories(initialData.categories);
         setSavingsGoals(initialData.savingsGoals);
         setBudgets(initialData.budgets);
+        
+        // (Опционально) Устанавливаем валюту пользователя
+        // setDefaultCurrency(initialData.settings.defaultCurrency);
 
       } catch (err: any) {
         console.error("Initialization failed:", err);
@@ -135,7 +161,7 @@ const App: React.FC = () => {
       }
     };
 
-    // --- Логика "Охранника" ---
+    // --- Логика "Охранника" (без изменений) ---
     tg.ready();
     tg.expand();
 
@@ -148,7 +174,7 @@ const App: React.FC = () => {
       setIsLoading(false);
     }
   }, [t]); // t - зависимость от языка
-
+  
   // --- Memoized Calculations (без изменений) ---
   // ... (весь ваш код useMemo для totalBalance, summary и т.д. остается здесь) ...
   const displayCurrency = useMemo(() => defaultCurrency === 'DEFAULT' ? 'USD' : defaultCurrency, [defaultCurrency]);

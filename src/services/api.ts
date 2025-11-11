@@ -12,25 +12,21 @@ import { ICON_NAMES } from '../components/icons';
  * Вызываем нашу бэкенд-функцию 'telegram-auth'.
  * Она проверяет данные Telegram и возвращает "пропуск" (JWT-токен).
  */
-export const authenticateWithTelegram = async (initData: string) => {
+export async function authenticateWithTelegram(initData: string) {
   const { data, error } = await supabase.functions.invoke('telegram-auth', {
     body: { initData },
   });
 
-  if (error) throw new Error(`Telegram Auth Error: ${error.message}`);
-  if (!data.token) throw new Error("No token received from auth function");
+  if (error) {
+    throw new Error(`Auth function error: ${error.message}`);
+  }
 
-  // ИСПРАВЛЕНИЕ 1: Session Error
-  // "Надеваем пропуск" — теперь Supabase знает, кто мы
-  const { error: sessionError } = await supabase.auth.setSession({
-    access_token: data.token,
-    refresh_token: data.token, // ✅ ИСПРАВЛЕНО: используем access_token как refresh_token
-  });
+  if (!data || !data.token) {
+    throw new Error('No token returned from auth function');
+  }
 
-  if (sessionError) throw new Error(`Session Error: ${sessionError.message}`);
-  
-  return data.user;
-};
+  return data; // Возвращаем { token: '...', user: {...} }
+}
 
 /**
  * Шаг 2: Загрузка всех данных пользователя

@@ -34,6 +34,7 @@ export interface ExchangeRates {
 }
 
 export interface User {
+  id: string;
   name: string;
   email: string;
 }
