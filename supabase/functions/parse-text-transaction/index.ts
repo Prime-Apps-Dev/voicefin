@@ -1,7 +1,7 @@
 // supabase/functions/parse-text-transaction/index.ts
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { CORS_HEADERS, handleCors } from "../_shared/cors.ts";
-import { GoogleGenerativeAI } from "npm:@google/generative-ai";
+import { GoogleGenerativeAI } from "https://esm.sh/@google/generative-ai@0.21.0";
 import { getSystemInstruction } from "../_shared/prompts.ts";
 import { addTransactionFunctionDeclaration } from "../_shared/types.ts";
 
