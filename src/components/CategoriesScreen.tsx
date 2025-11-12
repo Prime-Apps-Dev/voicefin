@@ -112,8 +112,11 @@ export const CategoriesScreen: React.FC<CategoriesScreenProps> = (props) => {
   );
 
   return (
-    <div className="min-h-screen bg-gray-900 flex flex-col pb-24">
-      <header className="px-4 pt-8 pb-4 flex items-center justify-between sticky top-0 bg-gray-900/80 backdrop-blur-sm z-10">
+    // Корневой div с отступом для маски
+    <div className="min-h-screen bg-gray-900 flex flex-col pb-24 pt-[85px]">
+      
+      {/* "Липкий" header */}
+      <header className="px-4 pb-4 flex items-center justify-between sticky top-0 bg-gray-900/80 backdrop-blur-sm z-10">
         <button onClick={onBack} className="p-2 rounded-full hover:bg-gray-700">
           <ChevronLeft className="w-6 h-6 text-white" />
         </button>
@@ -123,6 +126,7 @@ export const CategoriesScreen: React.FC<CategoriesScreenProps> = (props) => {
         </button>
       </header>
 
+      {/* Основной контент */}
       <main className="flex-grow px-4 space-y-6">
         <div className="flex justify-center p-1 bg-gray-800 rounded-full">
             <TabButton tab="INCOME" label={t('income')} />

@@ -100,9 +100,11 @@ export const SavingsScreen: React.FC<SavingsScreenProps> = (props) => {
   const { t } = useLocalization();
 
   return (
-    <main className="max-w-4xl mx-auto p-4 pb-32">
-      <div className="space-y-4 px-2">
-         <div className="flex items-center justify-between mb-6">
+    // 1. Корневой div с отступом для маски
+    <div className="min-h-screen bg-gray-900 pt-[85px]">
+        
+        {/* 2. Новый "липкий" header */}
+        <header className="sticky top-0 bg-gray-900/80 backdrop-blur-sm z-10 p-4 flex items-center justify-between">
            <h1 className="text-2xl font-bold text-white">{t('mySavingsGoals')}</h1>
            <button 
               onClick={onAddGoal} 
@@ -111,29 +113,34 @@ export const SavingsScreen: React.FC<SavingsScreenProps> = (props) => {
           >
              <Plus className="w-6 h-6" />
            </button>
-         </div>
+        </header>
 
-        {goals.length > 0 ? (
-          <div className="space-y-4">
-            {goals.map(goal => (
-              <SavingsGoalCard 
-                key={goal.id} 
-                goal={goal}
-                onTap={onAddToGoal}
-                onDoubleTap={onViewGoalHistory}
-                onLongPress={onEditGoal}
-                onSwipeLeft={onDeleteGoal}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="text-center py-20 bg-gray-800 rounded-2xl border border-gray-700/50">
-            <Target className="w-16 h-16 text-gray-500 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold text-white">{t('noGoals')}</h3>
-            <p className="text-gray-400 mt-2 max-w-xs mx-auto">{t('addFirstGoal')}</p>
-          </div>
-        )}
-      </div>
-    </main>
+        {/* 3. Основной контент */}
+        <main className="max-w-4xl mx-auto p-4 pb-32">
+            {/* Старый div, но уже без header'а внутри */}
+            <div className="space-y-4 px-2">
+                {goals.length > 0 ? (
+                  <div className="space-y-4">
+                    {goals.map(goal => (
+                      <SavingsGoalCard 
+                        key={goal.id} 
+                        goal={goal}
+                        onTap={onAddToGoal}
+                        onDoubleTap={onViewGoalHistory}
+                        onLongPress={onEditGoal}
+                        onSwipeLeft={onDeleteGoal}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-20 bg-gray-800 rounded-2xl border border-gray-700/50">
+                    <Target className="w-16 h-16 text-gray-500 mx-auto mb-4" />
+                    <h3 className="text-xl font-semibold text-white">{t('noGoals')}</h3>
+                    <p className="text-gray-400 mt-2 max-w-xs mx-auto">{t('addFirstGoal')}</p>
+                  </div>
+                )}
+            </div>
+        </main>
+    </div>
   );
 };

@@ -320,16 +320,8 @@ const App: React.FC = () => {
     if (!itemToDelete) return;
 
     try {
-      // *** ИСПРАВЛЕНИЕ ЗДЕСЬ ***
-      // Проблема: Объект 'Transaction' (транзакция) тоже имеет свойство 'type' ('INCOME'/'EXPENSE'),
-      // из-за чего ваше условие if ('type' in itemToDelete) срабатывало для транзакций,
-      // но не находило совпадений в switch (т.к. 'INCOME' !== 'account').
-      //
-      // Решение: Мы меняем проверку на 'value'. Только обертки для 
-      // 'account', 'category' и т.д. имеют свойство 'value'.
       if (itemToDelete && 'value' in itemToDelete) {
-          // Эта ветка теперь ТОЛЬКО для счетов, категорий, бюджетов и целей
-          const { type, value } = itemToDelete as { type: string, value: { id: string, name?: string, category?: string } }; // Добавим as для надежности
+          const { type, value } = itemToDelete as { type: string, value: { id: string, name?: string, category?: string } }; 
           
           switch(type) {
               case 'account':
@@ -352,12 +344,8 @@ const App: React.FC = () => {
                   break;
           }
       } else { 
-          // Эта ветка теперь ТОЛЬКО для транзакций
-          // 'itemToDelete' в этой ветке - это сам объект Transaction
           const transactionToDelete = itemToDelete as Transaction;
           
-          // --- ДОПОЛНИТЕЛЬНАЯ ЛОГИКА (исправление из прошлого шага) ---
-          // Если транзакция была депозитом в копилку, нужно обновить копилку
           if (transactionToDelete.goalId && transactionToDelete.type === TransactionType.EXPENSE) {
              setSavingsGoals(prevGoals => prevGoals.map(g => {
                 if (g.id === transactionToDelete.goalId) {
@@ -367,7 +355,6 @@ const App: React.FC = () => {
                 return g;
              }));
           }
-          // --- КОНЕЦ ДОП. ЛОГИКИ ---
 
           await api.deleteTransaction(transactionToDelete.id);
           setTransactions(prev => prev.filter(t => t.id !== transactionToDelete.id));
@@ -461,7 +448,6 @@ const App: React.FC = () => {
     if (isRecording) return;
     
     try {
-      // 1. Создаем AudioContext
       if (!audioCtxRef.current) {
         audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
         if (audioCtxRef.current.state === 'suspended') {
@@ -470,10 +456,9 @@ const App: React.FC = () => {
       }
 
       const mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      setStream(mediaStream); // 2. Сохраняем поток в state
+      setStream(mediaStream); 
       setIsRecording(true);
       
-      // Выбираем поддерживаемый MIME-тип
       const mimeType = [
           'audio/webm;codecs=opus',
           'audio/ogg;codecs=opus',
@@ -483,13 +468,12 @@ const App: React.FC = () => {
         
       const recorder = new MediaRecorder(mediaStream, { mimeType });
       mediaRecorderRef.current = recorder;
-      audioChunksRef.current = []; // Очищаем старые куски
+      audioChunksRef.current = []; 
 
       recorder.ondataavailable = (event) => {
         audioChunksRef.current.push(event.data);
       };
 
-      // 3. Устанавливаем обработчик для onstop
       recorder.onstop = handleRecordingStop; 
 
       recorder.start();
@@ -499,26 +483,22 @@ const App: React.FC = () => {
     }
   };
 
-  // Вызывается при нажатии кнопки "Стоп"
   const handleStopRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
     }
     setIsRecording(false);
-    setIsProcessing(true); // Показываем индикатор обработки
+    setIsProcessing(true); 
   };
 
-  // Вызывается автоматически, когда запись физически остановилась
   const handleRecordingStop = async () => {
-    // 4. Останавливаем треки
     stream?.getTracks().forEach(track => track.stop());
-    setStream(null); // Очищаем state
+    setStream(null); 
 
     const mimeType = mediaRecorderRef.current?.mimeType || 'audio/webm';
     const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
     audioChunksRef.current = [];
     
-    // Отправляем Blob на бэкенд для обработки
     try {
       const newTransaction = await api.processAudioTransaction(
         audioBlob,
@@ -526,8 +506,6 @@ const App: React.FC = () => {
         savingsGoals,
         language
       );
-      // Успех! Показываем форму
-      // --- ИСПРАВЛЕНИЕ 2: Добавляем accountId по умолчанию, если его нет
       setPotentialTransaction({
           ...newTransaction,
           accountId: newTransaction.accountId || accounts[0].id,
@@ -550,117 +528,109 @@ const App: React.FC = () => {
   };
   
 
-  // --- Render Logic (ОБНОВЛЕНО: ДОБАВЛЕН TG_HEADER_OFFSET_CLASS) ---
+  // --- Render Logic (ОБНОВЛЕНО: УБРАНЫ ЛИШНИЕ TG_HEADER_OFFSET_CLASS) ---
   const renderContent = () => {
     switch (activeScreen) {
       case 'savings': return (
-        <div className={TG_HEADER_OFFSET_CLASS}>
-          <SavingsScreen 
-            goals={savingsGoals} 
-            onAddGoal={() => setIsGoalFormOpen(true)} 
-            onAddToGoal={(goal) => { 
-              setGoalForDeposit(goal); 
-              setPotentialTransaction({ accountId: accounts[0].id, name: `Deposit to "${goal.name}"`, amount: 0, currency: displayCurrency, category: 'Savings', date: new Date().toISOString(), type: TransactionType.EXPENSE, goalId: goal.id }); 
-            }} 
-            onViewGoalHistory={setGoalForHistory} 
-            onEditGoal={(goal) => { setEditingGoal(goal); setIsGoalFormOpen(true); }} 
-            onDeleteGoal={(goal) => setItemToDelete({ type: 'savingsGoal', value: goal })} 
-          />
-        </div>
+        // УБРАНА ОБЕРТКА
+        <SavingsScreen 
+          goals={savingsGoals} 
+          onAddGoal={() => setIsGoalFormOpen(true)} 
+          onAddToGoal={(goal) => { 
+            setGoalForDeposit(goal); 
+            setPotentialTransaction({ accountId: accounts[0].id, name: `Deposit to "${goal.name}"`, amount: 0, currency: displayCurrency, category: 'Savings', date: new Date().toISOString(), type: TransactionType.EXPENSE, goalId: goal.id }); 
+          }} 
+          onViewGoalHistory={setGoalForHistory} 
+          onEditGoal={(goal) => { setEditingGoal(goal); setIsGoalFormOpen(true); }} 
+          onDeleteGoal={(goal) => setItemToDelete({ type: 'savingsGoal', value: goal })} 
+        />
       );
       case 'analytics': return (
-        <div className={TG_HEADER_OFFSET_CLASS}>
-          <AnalyticsScreen 
-            transactions={transactions} 
-            savingsGoals={savingsGoals} 
-            defaultCurrency={displayCurrency} 
-            rates={rates} 
-          />
-        </div>
+        // УБРАНА ОБЕРТКА
+        <AnalyticsScreen 
+          transactions={transactions} 
+          savingsGoals={savingsGoals} 
+          defaultCurrency={displayCurrency} 
+          rates={rates} 
+        />
       );
       case 'profile': return (
-        <div className={TG_HEADER_OFFSET_CLASS}>
-          <ProfileScreen 
-            user={tgUser || { name: 'User', email: '...' }} 
-            daysActive={daysActive} 
-            onNavigate={setActiveScreen} 
-          />
-        </div>
+        // УБРАНА ОБЕРТКА
+        <ProfileScreen 
+          user={tgUser || { name: 'User', email: '...' }} 
+          daysActive={daysActive} 
+          onNavigate={setActiveScreen} 
+        />
       );
       case 'accounts': return (
-        <div className={TG_HEADER_OFFSET_CLASS}>
-          <AccountsScreen 
-            accounts={accounts} 
-            transactions={transactions} 
-            rates={rates} 
-            onBack={() => setActiveScreen('profile')} 
-            onOpenAddForm={() => { setEditingAccount(null); setIsAccountFormOpen(true); }} 
-            onOpenActions={setAccountForActions} 
-          />
-        </div>
+        // УБРАНА ОБЕРТКА
+        <AccountsScreen 
+          accounts={accounts} 
+          transactions={transactions} 
+          rates={rates} 
+          onBack={() => setActiveScreen('profile')} 
+          onOpenAddForm={() => { setEditingAccount(null); setIsAccountFormOpen(true); }} 
+          onOpenActions={setAccountForActions} 
+        />
       );
       case 'categories': return (
-        <div className={TG_HEADER_OFFSET_CLASS}>
-          <CategoriesScreen 
-            categories={categories} 
-            onBack={() => setActiveScreen('profile')} 
-            onCreateCategory={(type) => setCategoryFormState({ isOpen: true, category: null, context: { type } })} 
-            onEditCategory={(cat) => setCategoryFormState({ isOpen: true, category: cat })} 
-            onDeleteCategory={(cat) => setItemToDelete({ type: 'category', value: cat })} 
-            onToggleFavorite={(cat) => handleSaveCategory({ ...cat, isFavorite: !cat.isFavorite })} 
-          />
-        </div>
+        // УБРАНА ОБЕРТКА
+        <CategoriesScreen 
+          categories={categories} 
+          onBack={() => setActiveScreen('profile')} 
+          onCreateCategory={(type) => setCategoryFormState({ isOpen: true, category: null, context: { type } })} 
+          onEditCategory={(cat) => setCategoryFormState({ isOpen: true, category: cat })} 
+          onDeleteCategory={(cat) => setItemToDelete({ type: 'category', value: cat })} 
+          onToggleFavorite={(cat) => handleSaveCategory({ ...cat, isFavorite: !cat.isFavorite })} 
+        />
       );
       case 'settings': return (
-        <div className={TG_HEADER_OFFSET_CLASS}>
-          <SettingsScreen 
-            onBack={() => setActiveScreen('profile')} 
-            defaultCurrency={defaultCurrency} 
-            onSetDefaultCurrency={setDefaultCurrency} 
-          />
-        </div>
+        // УБРАНА ОБЕРТКА
+        <SettingsScreen 
+          onBack={() => setActiveScreen('profile')} 
+          defaultCurrency={defaultCurrency} 
+          onSetDefaultCurrency={setDefaultCurrency} 
+        />
       );
       case 'budgetPlanning': return (
-        <div className={TG_HEADER_OFFSET_CLASS}>
-          <BudgetPlanningScreen 
-            budgets={budgets} 
-            transactions={transactions} 
-            categories={categories} 
-            onBack={() => setActiveScreen('profile')} 
-            onAddBudget={(monthKey) => { setEditingBudget({ monthKey, currency: displayCurrency }); setIsBudgetFormOpen(true); }} 
-            onEditBudget={(budget) => { setEditingBudget(budget); setIsBudgetFormOpen(true); }} 
-            onDeleteBudget={(budget) => setItemToDelete({ type: 'budget', value: budget })} 
-            onAddTransaction={(budget) => { 
-              setIsCategoryLockedInForm(true); 
-              setPotentialTransaction({ accountId: accounts[0].id, name: '', amount: 0, currency: displayCurrency, category: budget.category, date: new Date().toISOString(), type: TransactionType.EXPENSE }); 
-            }} 
-            onViewHistory={setBudgetForHistory} 
-            onCarryOver={(from, to) => setCarryOverInfo({ from, to })} 
-            rates={rates} 
-            defaultCurrency={displayCurrency} 
-          />
-        </div>
+        // УБРАНА ОБЕРТКА
+        <BudgetPlanningScreen 
+          budgets={budgets} 
+          transactions={transactions} 
+          categories={categories} 
+          onBack={() => setActiveScreen('profile')} 
+          onAddBudget={(monthKey) => { setEditingBudget({ monthKey, currency: displayCurrency }); setIsBudgetFormOpen(true); }} 
+          onEditBudget={(budget) => { setEditingBudget(budget); setIsBudgetFormOpen(true); }} 
+          onDeleteBudget={(budget) => setItemToDelete({ type: 'budget', value: budget })} 
+          onAddTransaction={(budget) => { 
+            setIsCategoryLockedInForm(true); 
+            setPotentialTransaction({ accountId: accounts[0].id, name: '', amount: 0, currency: displayCurrency, category: budget.category, date: new Date().toISOString(), type: TransactionType.EXPENSE }); 
+          }} 
+          onViewHistory={setBudgetForHistory} 
+          onCarryOver={(from, to) => setCarryOverInfo({ from, to })} 
+          rates={rates} 
+          defaultCurrency={displayCurrency} 
+        />
       );
       case 'history': return (
-        <div className={TG_HEADER_OFFSET_CLASS}>
-          <TransactionHistoryScreen 
-            transactions={transactions} 
-            accounts={accounts} 
-            categories={categories} 
-            rates={rates} 
-            defaultCurrency={displayCurrency} 
-            onSelectTransaction={setEditingTransaction} 
-            onDeleteTransaction={(tx) => setItemToDelete(tx)} 
-            onBack={() => setActiveScreen('home')} 
-          />
-        </div>
+        // УБРАНА ОБЕРТКА
+        <TransactionHistoryScreen 
+          transactions={transactions} 
+          accounts={accounts} 
+          categories={categories} 
+          rates={rates} 
+          defaultCurrency={displayCurrency} 
+          onSelectTransaction={setEditingTransaction} 
+          onDeleteTransaction={(tx) => setItemToDelete(tx)} 
+          onBack={() => setActiveScreen('home')} 
+        />
       );
       case 'comingSoon': return (
-        <div className={TG_HEADER_OFFSET_CLASS}>
-          <ComingSoonScreen onBack={() => setActiveScreen('profile')} />
-        </div>
+        // УБРАНА ОБЕРТКА
+        <ComingSoonScreen onBack={() => setActiveScreen('profile')} />
       );
       case 'home': default: return (
+        // ОСТАВЛЯЕМ ОБЕРТКУ ТОЛЬКО ДЛЯ 'home'
         <div className={TG_HEADER_OFFSET_CLASS}> 
           <main className="max-w-4xl mx-auto flex flex-col gap-4 pb-32"> 
             <AccountList 
@@ -709,6 +679,15 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-900">
+      
+      {/* --- НОВАЯ КЛИППИНГ-МАСКА --- */}
+      {/* Этот div создает "фальшивую" шапку. 
+        Он фиксирован наверху, имеет высоту 85px и тот же фон, что и приложение.
+        z-index: 20 гарантирует, что он над контентом, но под модальными окнами (z-50) и навигацией (z-40).
+        Теперь, когда контент (с pt-[85px]) скроллится вверх, он будет "исчезать" под этим блоком.
+      */}
+      <div className="fixed top-0 left-0 right-0 h-[85px] bg-gray-900 z-20"></div>
+
       {/* Основное содержимое приложения */}
       {renderContent()}
 

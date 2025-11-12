@@ -131,17 +131,22 @@ export const TransactionHistoryScreen: React.FC<TransactionHistoryScreenProps> =
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 flex flex-col">
-      <header className="px-4 pt-8 pb-4 flex items-center justify-between sticky top-0 bg-gray-900/80 backdrop-blur-sm z-10">
-        <button onClick={onBack} className="p-2 rounded-full hover:bg-gray-700">
-          <ChevronLeft className="w-6 h-6 text-white" />
-        </button>
-        <h1 className="text-xl font-bold text-white">{t('transactionHistory')}</h1>
-        <div className="w-10 h-10" />
-      </header>
-
-      <main className="flex-grow flex flex-col pb-24">
-        <div className="px-4 pt-2 space-y-4">
+    // 1. Корневой div с отступом для маски
+    <div className="min-h-screen bg-gray-900 flex flex-col pt-[85px]">
+      
+      {/* 2. "Липкий" header, теперь включающий все элементы управления */}
+      <header className="sticky top-0 bg-gray-900/80 backdrop-blur-sm z-10 px-4 pb-4">
+        {/* Заголовок */}
+        <div className="flex items-center justify-between">
+          <button onClick={onBack} className="p-2 rounded-full hover:bg-gray-700">
+            <ChevronLeft className="w-6 h-6 text-white" />
+          </button>
+          <h1 className="text-xl font-bold text-white">{t('transactionHistory')}</h1>
+          <div className="w-10 h-10" />
+        </div>
+        
+        {/* Элементы управления, которые теперь тоже "липкие" */}
+        <div className="pt-2 space-y-4">
           {/* Search Bar */}
           <div className="relative">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
@@ -176,8 +181,10 @@ export const TransactionHistoryScreen: React.FC<TransactionHistoryScreenProps> =
                 <span>{t('total')}: <span className="font-semibold text-white">{new Intl.NumberFormat(undefined, {style: 'currency', currency: defaultCurrency}).format(totalAmount)}</span></span>
            </div>
         </div>
+      </header>
 
-        <div className="flex-grow overflow-y-auto px-4 py-2">
+      {/* 3. Основной контент (только список), который будет скроллиться */}
+      <main className="flex-grow overflow-y-auto px-4 py-2 pb-24">
             <AnimatePresence>
                 {filteredAndSortedTransactions.length > 0 ? (
                     <motion.ul
@@ -213,7 +220,6 @@ export const TransactionHistoryScreen: React.FC<TransactionHistoryScreenProps> =
                     </motion.div>
                 )}
             </AnimatePresence>
-        </div>
       </main>
       
       <FilterModal

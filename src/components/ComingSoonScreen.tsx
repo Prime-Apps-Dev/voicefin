@@ -11,8 +11,10 @@ export const ComingSoonScreen: React.FC<ComingSoonScreenProps> = ({ onBack }) =>
   const { t } = useLocalization();
 
   return (
-    <div className="min-h-screen bg-gray-900 flex flex-col">
-      <header className="px-4 pt-8 pb-4 flex items-center justify-between sticky top-0 bg-gray-900/80 backdrop-blur-sm z-10">
+    // ДОБАВЛЯЕМ pt-[85px] ЗДЕСЬ
+    <div className="min-h-screen bg-gray-900 flex flex-col pt-[85px]">
+      {/* УБИРАЕМ pt-8 отсюда */}
+      <header className="px-4 pb-4 flex items-center justify-between sticky top-0 bg-gray-900/80 backdrop-blur-sm z-10">
         <button onClick={onBack} className="p-2 rounded-full hover:bg-gray-700">
           <ChevronLeft className="w-6 h-6 text-white" />
         </button>

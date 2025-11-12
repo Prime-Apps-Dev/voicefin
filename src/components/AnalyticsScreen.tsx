@@ -248,8 +248,9 @@ export const AnalyticsScreen: React.FC<AnalyticsScreenProps> = ({ transactions, 
   const periodTypes: Array<'day' | 'week' | 'month' | 'year'> = ['day', 'week', 'month', 'year'];
 
   return (
-    <div className="min-h-screen bg-gray-900 pb-32">
-        <div className="px-6 pt-8 pb-6 space-y-6">
+    // ДОБАВЛЯЕМ pt-[85px] ЗДЕСЬ
+    <div className="min-h-screen bg-gray-900 pb-32 pt-[85px]">
+        <div className="px-6 pb-6 space-y-6">
             <h1 className="text-2xl font-bold text-white mb-2">{t('analyticsTitle')}</h1>
 
              {/* Date Controls */}
