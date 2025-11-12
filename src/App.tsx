@@ -33,6 +33,7 @@ import { CategoryForm } from './components/CategoryForm';
 import { ComingSoonScreen } from './components/ComingSoonScreen';
 import { TransactionHistoryScreen } from './components/TransactionHistoryScreen';
 import { OnboardingGuide } from './components/OnboardingGuide';
+import { LoadingScreen } from './components/LoadingScreen'; // <-- ДОБАВЛЕН ИМПОРТ
 
 // Импорты утилит и сервисов
 import { getExchangeRates, convertCurrency } from './services/currency';
@@ -906,16 +907,9 @@ const App: React.FC = () => {
   }
 
 
-  // --- ЭКРАН ЗАГРУЗКИ ---
-  // (Показываем спиннер, но НЕ во время dev-логина, т.к. там своя логика)
-  if (isLoading && !isDevLoggingIn) {
-    return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="w-12 h-12 border-4 border-t-transparent border-brand-green rounded-full animate-spin"></div>
-        <p className="ml-4 text-lg text-gray-400">{t('loading')}</p>
-      </div>
-    );
-  }
+  // --- ЭКРАН ЗАГРУЗКИ (УДАЛЕНО) ---
+  // Старый блок if (isLoading && !isDevLoggingIn) { ... } был удален
+  // и заменен компонентом <LoadingScreen /> в основном блоке return.
 
   // --- НОВЫЙ ЭКРАН: ФОРМА ЛОГИНА ДЛЯ РАЗРАБОТКИ ---
   if (isDevLoggingIn) {
@@ -948,6 +942,9 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-900">
       
+      {/* --- НОВЫЙ ЭКРАН ЗАГРУЗКИ --- */}
+      <LoadingScreen isLoading={isLoading && !isDevLoggingIn} />
+
       {/* --- РЕНДЕР ONBOARDING (поверх всего) --- */}
       <AnimatePresence>
         {showOnboarding && <OnboardingGuide onFinish={handleFinishOnboarding} />}
@@ -959,7 +956,7 @@ const App: React.FC = () => {
       )}
 
       {/* Основное содержимое экрана (которое мы выбрали в renderContent) */}
-      {renderContent()}
+      {!isLoading && renderContent()}
 
       {/* Оверлей записи аудио (поверх всего) */}
       {isRecording && (
@@ -1027,14 +1024,16 @@ const App: React.FC = () => {
       {budgetForHistory && <BudgetTransactionsModal isOpen={!!budgetForHistory} onClose={() => setBudgetForHistory(null)} budget={budgetForHistory} transactions={transactions} accounts={accounts} onSelectTransaction={setEditingTransaction} onDeleteTransaction={(tx) => setItemToDelete(tx)} rates={rates} />}
       
       {/* Нижняя навигационная панель (поверх всего) */}
-      <BottomNavBar 
-        activeScreen={activeScreen} 
-        onNavigate={setActiveScreen} 
-        isRecording={isRecording} 
-        isProcessing={isProcessing} 
-        onToggleRecording={isRecording ? handleStopRecording : handleStartRecording} 
-        onLongPressAdd={() => setIsTextInputOpen(true)} 
-      />
+      {!isLoading && (
+        <BottomNavBar 
+          activeScreen={activeScreen} 
+          onNavigate={setActiveScreen} 
+          isRecording={isRecording} 
+          isProcessing={isProcessing} 
+          onToggleRecording={isRecording ? handleStopRecording : handleStartRecording} 
+          onLongPressAdd={() => setIsTextInputOpen(true)} 
+        />
+      )}
     </div>
   );
 };

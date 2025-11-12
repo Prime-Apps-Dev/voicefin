@@ -229,5 +229,12 @@
   "error": "Error",
   "telegramErrorNotTelegram": "This application can only be run inside Telegram.",
   "telegramErrorNoData": "Failed to get user data. Please try restarting the app.",
-  "telegramErrorHint": "Please launch this app through the official Telegram bot."
+  "telegramErrorHint": "Please launch this app through the official Telegram bot.",
+  "microphonePermissionDenied": "Microphone access has been blocked. Please enable it in your Telegram settings.",
+  "loadingConnect": "Connecting to financial satellites...",
+  "loadingPixels": "Polishing the pixels...",
+  "loadingAI": "Warming up the AI brain...",
+  "loadingNetWorth": "Calculating your net worth...",
+  "loadingSecure": "Securing your data...",
+  "loadingOrganize": "Organizing your transactions..."
 }
