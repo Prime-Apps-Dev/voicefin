@@ -82,7 +82,7 @@ export const BudgetTransactionsModal: React.FC<BudgetTransactionsModalProps> = (
                     <TransactionItem 
                       key={tx.id} 
                       transaction={tx} 
-                      account={accountsById[tx.accountId]}
+                      account={accountsById[tx.accountid]}
                       onSelect={onSelectTransaction}
                       onDelete={onDeleteTransaction}
                       rates={rates}

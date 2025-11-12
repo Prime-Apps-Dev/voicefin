@@ -206,8 +206,8 @@ export const updateAccount = async (account: Account): Promise<Account> => {
   return data;
 };
 
-export const deleteAccount = async (accountId: string): Promise<void> => {
-  const { error } = await supabase.from('accounts').delete().eq('id', accountId);
+export const deleteAccount = async (accountid: string): Promise<void> => {
+  const { error } = await supabase.from('accounts').delete().eq('id', accountid);
   if (error) throw error;
 };
 

@@ -39,7 +39,7 @@ export const TransactionList: React.FC<TransactionListProps> = ({ transactions, 
             <TransactionItem 
               key={tx.id} 
               transaction={tx} 
-              account={accountsById[tx.accountId]}
+              account={accountsById[tx.accountid]}
               onSelect={onSelectTransaction}
               onDelete={onDeleteTransaction}
               rates={rates}
