@@ -179,7 +179,10 @@ const App: React.FC = () => {
   // UI-состояния для блокировки и Dev-логина
   const [isBlocked, setIsBlocked] = useState(false);
   const [blockMessage, setBlockMessage] = useState('');
-  const [isDevLoggingIn, setIsDevLoggingIn] = useState(false); // <-- НОВОЕ СОСТОЯНИЕ
+  const [isDevLoggingIn, setIsDevLoggingIn] = useState(false); 
+
+  // --- НОВОЕ СОСТОЯНИЕ ДЛЯ ОТСЛЕЖИВАНИЯ РАЗВЕРТЫВАНИЯ ---
+  const [isAppExpanded, setIsAppExpanded] = useState(false); 
 
   // Refs для записи аудио
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -257,6 +260,15 @@ const App: React.FC = () => {
     // @ts-ignore (Наш mock-файл создаст этот объект в dev-режиме)
     const tg = window.Telegram.WebApp;
 
+    // --- НОВЫЙ ОБРАБОТЧИК ДЛЯ VIEWPORT ---
+    const handleViewportChange = () => {
+      if (tg) {
+        // Устанавливаем состояние React в 
+        // соответствие с состоянием Telegram
+        setIsAppExpanded(tg.isExpanded); 
+      }
+    };
+
     const startApp = async () => {
       try {
         if (isDev) {
@@ -292,6 +304,14 @@ const App: React.FC = () => {
           
           tg.ready();
           tg.expand();
+
+          // --- НОВАЯ ЛОГИКА: ПОДПИСКА НА СОБЫТИЕ ---
+          tg.onEvent('viewportChanged', handleViewportChange);
+          
+          // --- НОВАЯ ЛОГИКА: УСТАНОВКА НАЧАЛЬНОГО ЗНАЧЕНИЯ ---
+          // Вызываем один раз при запуске, чтобы 
+          // получить актуальное состояние
+          handleViewportChange();
 
           // Шаг 1: Аутентификация через Telegram
           const authResponse = await api.authenticateWithTelegram(tg.initData);
@@ -332,6 +352,14 @@ const App: React.FC = () => {
     };
 
     startApp();
+
+    // --- НОВАЯ ЛОГИКА: ОЧИСТКА ПОДПИСКИ ---
+    return () => {
+      if (tg) {
+        tg.offEvent('viewportChanged', handleViewportChange);
+      }
+    };
+
   }, [t]); // t (перевод) добавлен в зависимости
   
 
@@ -759,12 +787,16 @@ const App: React.FC = () => {
   };
 
 
-  // --- Render Logic (Рендеринг Контента) (без изменений) ---
+  // --- Render Logic (Рендеринг Контента) (ИЗМЕНЕНИЯ ЗДЕСЬ) ---
   const renderContent = () => {
     // В dev-режиме нам не нужен отступ, если только мы не хотим его симулировать
     const isDev = import.meta.env.DEV;
-    // В режиме разработки мы можем убрать отступ, чтобы видеть весь экран
-    const headerOffsetClass = isDev ? '' : TG_HEADER_OFFSET_CLASS;
+
+    // --- ИЗМЕНЕННАЯ ЛОГИКА РАСЧЕТА ОТСТУПА ---
+    // Отступ (pt-[85px]) будет применен, ТОЛЬКО если:
+    // 1. Мы НЕ в режиме разработки (isDev = false)
+    // 2. И приложение развернуто (isAppExpanded = true)
+    const headerOffsetClass = !isDev && isAppExpanded ? TG_HEADER_OFFSET_CLASS : '';
 
     switch (activeScreen) {
       case 'savings': return (
@@ -868,7 +900,7 @@ const App: React.FC = () => {
         <ComingSoonScreen onBack={() => setActiveScreen('profile')} />
       );
       case 'home': default: return (
-        // (Только главный экран требует отступа, и то только в prod)
+        // (Класс headerOffsetClass теперь динамический)
         <div className={headerOffsetClass}> 
           <main className="max-w-4xl mx-auto flex flex-col gap-4 pb-32"> 
             <AccountList 
@@ -908,8 +940,7 @@ const App: React.FC = () => {
 
 
   // --- ЭКРАН ЗАГРУЗКИ (УДАЛЕНО) ---
-  // Старый блок if (isLoading && !isDevLoggingIn) { ... } был удален
-  // и заменен компонентом <LoadingScreen /> в основном блоке return.
+  // (Логика была перенесена в LoadingScreen)
 
   // --- НОВЫЙ ЭКРАН: ФОРМА ЛОГИНА ДЛЯ РАЗРАБОТКИ ---
   if (isDevLoggingIn) {
@@ -936,7 +967,7 @@ const App: React.FC = () => {
     );
   }
 
-  // --- ОСНОВНОЙ РЕНДЕРИНГ ПРИЛОЖЕНИЯ ---
+  // --- ОСНОВНОЙ РЕНДЕРИНГ ПРИЛОЖЕНИЯ (ИЗМЕНЕНИЯ ЗДЕСЬ) ---
   const isDev = import.meta.env.DEV;
   
   return (
@@ -950,8 +981,14 @@ const App: React.FC = () => {
         {showOnboarding && <OnboardingGuide onFinish={handleFinishOnboarding} />}
       </AnimatePresence>
 
-      {/* --- Маска для "прилипания" (Только в prod-режиме) --- */}
-      {!isDev && (
+      {/* --- ИЗМЕНЕННАЯ ЛОГИКА "МАСКИ" (ШИР-МЫ) --- */}
+      {/* Эта "маска" (визуальный блок, закрывающий 
+        верхние 85px)
+        теперь будет показана, ТОЛЬКО если:
+        1. Мы НЕ в режиме разработки
+        2. И приложение развернуто
+      */}
+      {!isDev && isAppExpanded && (
         <div className="fixed top-0 left-0 right-0 h-[85px] bg-gray-900 z-20"></div>
       )}
 
