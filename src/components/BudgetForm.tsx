@@ -1,3 +1,5 @@
+// src/components/BudgetForm.tsx
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Budget, Category } from '../types';
@@ -24,25 +26,81 @@ export const BudgetForm: React.FC<{
   onCreateNewCategory: () => void;
   defaultCurrency: string;
 }> = ({ isOpen, onClose, onSave, budget, allCategories, budgetsForMonth, onCreateNewCategory, defaultCurrency }) => {
-  const { t } = useLocalization();
+  const { t, language } = useLocalization();
   const [formData, setFormData] = useState(defaultState);
   const [limitStr, setLimitStr] = useState('');
+  
+  // НОВОЕ: Локальное состояние для выпадающих списков
+  const [selectedYear, setSelectedYear] = useState<string>('');
+  const [selectedMonth, setSelectedMonth] = useState<string>('');
 
   const availableCategories = useMemo(() => {
-    const budgetedCategories = budgetsForMonth.map(b => b.category);
+    const budgetedCategories = budgetsForMonth
+        .filter(b => !budget || b.id !== budget.id) // Исключаем текущий редактируемый бюджет
+        .map(b => b.category);
+        
     let unbudgeted = allCategories.filter(c => !budgetedCategories.includes(c.name)).map(c => c.name);
-    if (budget && 'category' in budget && budget.category) {
+    
+    // Если мы редактируем, убедимся, что категория этого бюджета доступна в списке
+    if (budget && 'category' in budget && budget.category && !unbudgeted.includes(budget.category)) {
         unbudgeted = [budget.category, ...unbudgeted];
     }
     return unbudgeted.sort();
   }, [allCategories, budgetsForMonth, budget]);
 
+  // НОВОЕ: Генерируем списки для выбора
+  const currentNumericYear = useMemo(() => new Date().getFullYear(), []);
+  const years = useMemo(() => [currentNumericYear - 1, currentNumericYear, currentNumericYear + 1], [currentNumericYear]);
+
+  const months = useMemo(() => {
+    return Array.from({ length: 12 }, (_, i) => {
+      const monthDate = new Date(currentNumericYear, i, 15); // Год не важен, нужен для локализации
+      const monthName = monthDate.toLocaleDateString(language, { month: 'long' });
+      const monthValue = String(i + 1).padStart(2, '0');
+      return { name: monthName, value: monthValue };
+    });
+  }, [language, currentNumericYear]);
+
+
   useEffect(() => {
     if (isOpen) {
+        let initialMonthKey = '';
+        let initialYear = '';
+        let initialMonth = '';
+
+        const now = new Date();
+        const defaultYear = String(now.getFullYear());
+        const defaultMonth = String(now.getMonth() + 1).padStart(2, '0');
+
+        // 1. Проверяем, есть ли monthKey в переданном бюджете (редактирование или создание)
+        if (budget && budget.monthKey) {
+            initialMonthKey = budget.monthKey;
+            const parts = initialMonthKey.split('-');
+            if (parts.length === 2) {
+              initialYear = parts[0];
+              initialMonth = parts[1];
+            } else {
+              // Fallback, если monthKey в плохом формате
+              initialYear = defaultYear;
+              initialMonth = defaultMonth;
+              initialMonthKey = `${initialYear}-${initialMonth}`;
+            }
+        } else {
+            // 2. Создание нового бюджета, используем текущий год и месяц
+            initialYear = defaultYear;
+            initialMonth = defaultMonth;
+            initialMonthKey = `${initialYear}-${initialMonth}`;
+        }
+        
+        // Устанавливаем состояние для селекторов
+        setSelectedYear(initialYear);
+        setSelectedMonth(initialMonth);
+
         const initialData: Partial<Budget> = {
             ...defaultState,
             currency: defaultCurrency,
             ...budget,
+            monthKey: initialMonthKey, // Явно устанавливаем monthKey
         };
 
         if (!initialData.category && availableCategories.length > 0) {
@@ -86,6 +144,22 @@ export const BudgetForm: React.FC<{
     }
   };
 
+  // НОВОЕ: Обработчик для селекторов месяца и года
+  const handleMonthYearChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    let newMonthKey = '';
+    
+    if (name === 'year') {
+      setSelectedYear(value);
+      newMonthKey = `${value}-${selectedMonth}`;
+    } else { // name === 'month'
+      setSelectedMonth(value);
+      newMonthKey = `${selectedYear}-${value}`;
+    }
+    
+    setFormData(prev => ({ ...prev, monthKey: newMonthKey }));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (formData.category && formData.limit > 0 && formData.monthKey) {
@@ -121,6 +195,29 @@ export const BudgetForm: React.FC<{
             </div>
             <form onSubmit={handleSubmit} className="overflow-y-auto">
               <div className="px-6 py-6 space-y-4">
+                
+                {/* НОВЫЙ БЛОК: Выбор месяца и года */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="month" className="block text-sm font-medium text-zinc-300 mb-1.5">{t('month')}</label>
+                    <div className="relative">
+                      <select name="month" value={selectedMonth} onChange={handleMonthYearChange} required className="w-full appearance-none px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-600 transition-all duration-200 pr-10">
+                        {months.map(m => <option key={m.value} value={m.value}>{m.name}</option>)}
+                      </select>
+                      <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 pointer-events-none" />
+                    </div>
+                  </div>
+                  <div>
+                    <label htmlFor="year" className="block text-sm font-medium text-zinc-300 mb-1.5">{t('year')}</label>
+                    <div className="relative">
+                      <select name="year" value={selectedYear} onChange={handleMonthYearChange} required className="w-full appearance-none px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-600 transition-all duration-200 pr-10">
+                        {years.map(y => <option key={y} value={y}>{y}</option>)}
+                      </select>
+                      <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 pointer-events-none" />
+                    </div>
+                  </div>
+                </div>
+
                 <div>
                   <label htmlFor="category" className="block text-sm font-medium text-zinc-300 mb-1.5">{t('category')}</label>
                   <div className="relative">
