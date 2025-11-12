@@ -1,3 +1,5 @@
+// src/components/TransactionForm.tsx
+
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Transaction, TransactionType, Account, SavingsGoal, Category, Budget, ExchangeRates } from '../types';
@@ -71,9 +73,29 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
   const isSavingsTransaction = formData.category === 'Savings';
 
   React.useEffect(() => {
-    setFormData(transaction);
+    // *** ИСПРАВЛЕНИЕ ЗДЕСЬ ***
+    // Когда пропс 'transaction' меняется (т.е. форма открывается):
+    
+    // 1. Проверяем, является ли это НОВОЙ транзакцией (нет 'id')
+    //    И отсутствует ли у нее дата (была `''` или `undefined`)
+    if (!('id' in transaction) && !transaction.date) {
+      
+      // 2. Если да, устанавливаем дату и время по умолчанию на "СЕЙЧАС"
+      setFormData({
+        ...transaction,
+        date: new Date().toISOString(),
+      });
+
+    } else {
+      // 3. Иначе (это редактирование или у новой транзакции уже есть дата)
+      //    используем данные "как есть".
+      setFormData(transaction);
+    }
+    
+    // Также устанавливаем строку для суммы
     setAmountStr(String(transaction.amount || ''));
-  }, [transaction]);
+    
+  }, [transaction]); // Этот хук запускается, когда открывается форма
 
   React.useEffect(() => {
     if (isSavingsTransaction) {
@@ -110,7 +132,8 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
       return null;
     }
 
-    const transactionDate = new Date(formData.date);
+    // formData.date теперь всегда будет валидной строкой
+    const transactionDate = new Date(formData.date); 
     const monthKey = `${transactionDate.getFullYear()}-${String(transactionDate.getMonth() + 1).padStart(2, '0')}`;
 
     const budgetForCategory = budgets.find(b => b.monthKey === monthKey && b.category === formData.category);
@@ -185,6 +208,21 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
       maximumFractionDigits: 2,
     }).format(amount);
   };
+
+  // Проверка, чтобы избежать "Invalid Date" перед рендерингом
+  const safeDate = React.useMemo(() => {
+    try {
+      const d = new Date(formData.date);
+      // Проверяем, валидна ли дата
+      if (isNaN(d.getTime())) {
+        // Если нет, возвращаем текущую дату (хотя useEffect должен это предотвратить)
+        return new Date();
+      }
+      return d;
+    } catch (e) {
+      return new Date(); // Fallback
+    }
+  }, [formData.date]);
 
   return (
     <>
@@ -407,7 +445,8 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
                     onClick={() => setIsDatePickerOpen(true)}
                     className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white text-left flex justify-between items-center focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200"
                   >
-                    <span>{new Date(formData.date).toLocaleDateString(language === 'ru' ? 'ru-RU' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                    {/* Используем 'safeDate' для отображения */}
+                    <span>{safeDate.toLocaleDateString(language === 'ru' ? 'ru-RU' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
                     <Calendar className="w-5 h-5 text-zinc-400" />
                   </button>
                 </div>
@@ -419,7 +458,8 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
                     onClick={() => setIsTimePickerOpen(true)}
                     className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white text-left flex justify-between items-center focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200"
                   >
-                    <span>{new Date(formData.date).toTimeString().slice(0, 5)}</span>
+                    {/* Используем 'safeDate' для отображения */}
+                    <span>{safeDate.toTimeString().slice(0, 5)}</span>
                     <Clock className="w-5 h-5 text-zinc-400" />
                   </button>
                 </div>
@@ -488,8 +528,8 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
               setFormData(prev => ({ ...prev, date: newDate.toISOString() }));
               setIsDatePickerOpen(false);
             }}
-            initialStartDate={new Date(formData.date)}
-            initialEndDate={new Date(formData.date)}
+            initialStartDate={safeDate} // Используем safeDate
+            initialEndDate={safeDate}   // Используем safeDate
             selectionMode="single"
           />
         }
@@ -501,7 +541,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
                 setFormData(prev => ({...prev, date: newTime.toISOString()}));
                 setIsTimePickerOpen(false);
             }}
-            initialTime={new Date(formData.date)}
+            initialTime={safeDate} // Используем safeDate
           />
         }
       </AnimatePresence>
