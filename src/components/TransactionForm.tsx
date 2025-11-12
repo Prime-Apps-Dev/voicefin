@@ -73,26 +73,25 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
   const isSavingsTransaction = formData.category === 'Savings';
 
   React.useEffect(() => {
-    // Логика для инициализации данных формы при открытии/изменении пропса 'transaction'.
-    
+    // ----------------------------------------------------------------------------------
+    // ИСПРАВЛЕНИЕ ОШИБКИ ФИКСИРОВАННОЙ ДАТЫ:
+    // Для новой транзакции (когда нет 'id'), всегда устанавливаем текущую дату и время,
+    // игнорируя любую фиксированную дату, которая могла быть передана в пропсах.
+    // ----------------------------------------------------------------------------------
     const isNewTransaction = !('id' in transaction);
-    // Проверяем, отсутствует ли у транзакции дата (null, undefined, или пустая строка)
-    const isDateMissingOrEmpty = !transaction.date || transaction.date === '';
+    
+    let newFormData = transaction;
 
-    if (isNewTransaction && isDateMissingOrEmpty) {
-      
-      // Для новой транзакции без даты устанавливаем дату и время по умолчанию на "СЕЙЧАС".
-      setFormData({
+    if (isNewTransaction) {
+      // Для новой транзакции (не редактирование) всегда устанавливаем текущую дату и время.
+      newFormData = {
         ...transaction,
         // Используем new Date().toISOString() для установки текущего времени, дня, месяца и года.
         date: new Date().toISOString(),
-      });
-
-    } else {
-      // Для редактирования существующей транзакции или новой транзакции с заданной датой
-      // используем данные из пропса.
-      setFormData(transaction);
+      };
     }
+    
+    setFormData(newFormData);
     
     // Также устанавливаем строку для суммы
     setAmountStr(String(transaction.amount || ''));
