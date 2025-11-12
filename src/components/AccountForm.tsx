@@ -23,11 +23,19 @@ export const AccountForm: React.FC<AccountFormProps> = ({ isOpen, onClose, onSav
   const { t } = useLocalization();
   const [formData, setFormData] = useState(defaultState);
 
+  // *** ИСПРАВЛЕНИЕ ЗДЕСЬ ***
+  // Мы явно указываем, какие поля нужно загружать в форму,
+  // чтобы случайно не захватить 'balance' или 'id'.
   useEffect(() => {
     if (isOpen) {
         if (account) {
-          const { id, ...dataToSet } = account;
-          setFormData(dataToSet);
+          // Явно выбираем только те поля, которые есть в форме
+          setFormData({
+            name: account.name,
+            currency: account.currency,
+            gradient: account.gradient,
+            type: account.type,
+          });
         } else {
           setFormData(defaultState);
         }

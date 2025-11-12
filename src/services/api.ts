@@ -6,7 +6,7 @@ import { supabase } from './supabase';
 import { Transaction, Account, SavingsGoal, Budget, Category, TransactionType, AccountType } from '../types';
 import { ICON_NAMES } from '../components/icons';
 
-// --- Auth ---
+// --- Аутентификация ---
 /**
  * Шаг 1: Аутентификация
  * Вызываем нашу бэкенд-функцию 'telegram-auth'.
@@ -18,11 +18,11 @@ export async function authenticateWithTelegram(initData: string) {
   });
 
   if (error) {
-    throw new Error(`Auth function error: ${error.message}`);
+    throw new Error(`Ошибка функции аутентификации: ${error.message}`);
   }
 
   if (!data || !data.token) {
-    throw new Error('No token returned from auth function');
+    throw new Error('Функция аутентификации не вернула токен');
   }
 
   return data; // Возвращаем { token: '...', user: {...} }
@@ -76,19 +76,19 @@ export const initializeUser = async () => {
  */
 const createDefaultCategories = async (): Promise<Category[]> => {
   const DEFAULT_CATEGORIES = [
-    { name: 'Food & Drink', icon: 'UtensilsCrossed', type: TransactionType.EXPENSE, isDefault: true, isFavorite: false },
-    { name: 'Shopping', icon: 'ShoppingCart', type: TransactionType.EXPENSE, isDefault: true, isFavorite: false },
-    { name: 'Transport', icon: 'Bus', type: TransactionType.EXPENSE, isDefault: true, isFavorite: false },
-    { name: 'Home', icon: 'Home', type: TransactionType.EXPENSE, isDefault: true, isFavorite: false },
-    { name: 'Bills & Utilities', icon: 'Lightbulb', type: TransactionType.EXPENSE, isDefault: true, isFavorite: false },
-    { name: 'Savings', icon: 'PiggyBank', type: TransactionType.EXPENSE, isDefault: true, isFavorite: false },
-    { name: 'Salary', icon: 'Banknote', type: TransactionType.INCOME, isDefault: true, isFavorite: false },
-    { name: 'Gifts', icon: 'Gift', type: TransactionType.INCOME, isDefault: true, isFavorite: false },
+    { name: 'Еда и напитки', icon: 'UtensilsCrossed', type: TransactionType.EXPENSE, isDefault: true, isFavorite: false },
+    { name: 'Покупки', icon: 'ShoppingCart', type: TransactionType.EXPENSE, isDefault: true, isFavorite: false },
+    { name: 'Транспорт', icon: 'Bus', type: TransactionType.EXPENSE, isDefault: true, isFavorite: false },
+    { name: 'Дом', icon: 'Home', type: TransactionType.EXPENSE, isDefault: true, isFavorite: false },
+    { name: 'Счета и коммуналка', icon: 'Lightbulb', type: TransactionType.EXPENSE, isDefault: true, isFavorite: false },
+    { name: 'Накопления', icon: 'PiggyBank', type: TransactionType.EXPENSE, isDefault: true, isFavorite: false },
+    { name: 'Зарплата', icon: 'Banknote', type: TransactionType.INCOME, isDefault: true, isFavorite: false },
+    { name: 'Подарки', icon: 'Gift', type: TransactionType.INCOME, isDefault: true, isFavorite: false },
   ];
 
   // Получаем ID пользователя
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("User not authenticated for creating categories");
+  if (!user) throw new Error("Пользователь не аутентифицирован для создания категорий");
   
   const categoriesToInsert = DEFAULT_CATEGORIES.map(c => ({
     ...c,
@@ -106,10 +106,10 @@ const createDefaultCategories = async (): Promise<Category[]> => {
  */
 const createDefaultAccount = async (): Promise<Account> => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("User not authenticated for creating account");
+    if (!user) throw new Error("Пользователь не аутентифицирован для создания счета");
 
     const defaultAccount = {
-      name: 'Cash',
+      name: 'Наличные',
       currency: 'USD',
       type: AccountType.CASH,
       gradient: 'from-gray-700 to-gray-800',
@@ -123,12 +123,12 @@ const createDefaultAccount = async (): Promise<Account> => {
 };
 
 
-// --- CRUD Operations ---
+// --- Операции CRUD (Создание, Чтение, Обновление, Удаление) ---
 
 // Получаем ID пользователя ОДИН раз, чтобы добавлять его во все запросы
 const getUserId = async () => {
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("User not authenticated");
+  if (!user) throw new Error("Пользователь не аутентифицирован");
   return user.id;
 };
 
@@ -148,19 +148,18 @@ export async function generateFinancialAnalysis(
   });
 
   if (error) {
-    throw new Error(`Failed to generate financial analysis: ${error.message}`);
+    throw new Error(`Ошибка генерации финансового анализа: ${error.message}`);
   }
 
   // Бэкенд, вероятно, возвращает объект { analysis: "..." }
   if (!data || !data.analysis) {
-    throw new Error('Invalid response from analysis function');
+    throw new Error('Некорректный ответ от функции анализа');
   }
 
   return data.analysis;
 }
 
-// Transactions
-// ИСПРАВЛЕНИЕ 2: Это ЕДИНСТВЕННАЯ декларация addTransaction
+// Транзакции
 export const addTransaction = async (transaction: Omit<Transaction, 'id'>): Promise<Transaction> => {
   const userId = await getUserId();
   const { data, error } = await supabase
@@ -188,7 +187,7 @@ export const deleteTransaction = async (transactionId: string): Promise<void> =>
   if (error) throw error;
 };
 
-// Accounts
+// Счета
 export const addAccount = async (account: Omit<Account, 'id'>): Promise<Account> => {
   const userId = await getUserId();
   const { data, error } = await supabase
@@ -200,8 +199,20 @@ export const addAccount = async (account: Omit<Account, 'id'>): Promise<Account>
   return data;
 };
 
+// *** ИСПРАВЛЕНИЕ ЗДЕСЬ ***
+// Мы отделяем 'id' от 'updateData', чтобы не пытаться обновить 'id' в базе данных.
 export const updateAccount = async (account: Account): Promise<Account> => {
-  const { data, error } = await supabase.from('accounts').update(account).eq('id', account.id).select().single();
+  // Деструктурируем 'id' из объекта 'account'
+  // 'updateData' будет содержать все остальные поля (name, currency, gradient, type)
+  const { id, ...updateData } = account;
+
+  const { data, error } = await supabase
+    .from('accounts')
+    .update(updateData) // Передаем в update() только 'updateData'
+    .eq('id', id)       // Используем 'id' для .eq()
+    .select()
+    .single();
+    
   if (error) throw error;
   return data;
 };
@@ -211,7 +222,7 @@ export const deleteAccount = async (accountId: string): Promise<void> => {
   if (error) throw error;
 };
 
-// Categories
+// Категории
 export const addCategory = async (category: Omit<Category, 'id'>): Promise<Category> => {
   const userId = await getUserId();
   const { data, error } = await supabase.from('categories').insert({ ...category, telegram_user_id: userId }).select().single();
@@ -230,7 +241,7 @@ export const deleteCategory = async (categoryId: string): Promise<void> => {
   if (error) throw error;
 };
 
-// Savings Goals
+// Копилки (Цели накоплений)
 export const addSavingsGoal = async (goal: Omit<SavingsGoal, 'id'>): Promise<SavingsGoal> => {
   const userId = await getUserId();
   const { data, error } = await supabase.from('savings_goals').insert({ ...goal, telegram_user_id: userId }).select().single();
@@ -249,7 +260,7 @@ export const deleteSavingsGoal = async (goalId: string): Promise<void> => {
   if (error) throw error;
 };
 
-// Budgets
+// Бюджеты
 export const addBudget = async (budget: Omit<Budget, 'id'>): Promise<Budget> => {
   const userId = await getUserId();
   const { data, error } = await supabase.from('budgets').insert({ ...budget, telegram_user_id: userId }).select().single();
@@ -269,10 +280,10 @@ export const deleteBudget = async (budgetId: string): Promise<void> => {
 };
 
 
-// --- Gemini Edge Function Calls ---
+// --- Вызовы Edge Function (Gemini AI) ---
 
 /**
- * Парсит транзакцию из текста
+ * Парсит (распознает) транзакцию из текста
  */
 export const parseTransactionFromText = async (
   text: string,
@@ -324,13 +335,13 @@ export const processAudioTransaction = async (
   language: string
 ): Promise<Omit<Transaction, 'id'>> => {
 
-  console.log('API: Starting processAudioTransaction...'); // LOG 1: Начало
+  console.log('API: Начинаем processAudioTransaction...'); // LOG 1: Начало
 
   const formData = new FormData();
   formData.append('audio', audioBlob, 'transaction.webm');
   
   const context = { categories, savingsGoals, language };
-  console.log('API: Context for AI:', context); // LOG 2: Контекст для ИИ
+  console.log('API: Контекст для ИИ:', context); // LOG 2: Контекст для ИИ
   
   formData.append('context', JSON.stringify(context));
 
@@ -340,12 +351,12 @@ export const processAudioTransaction = async (
   const SUPABASE_URL: string = import.meta.env.VITE_SUPABASE_URL || '';
 
   if (!SUPABASE_URL) {
-    throw new Error("VITE_SUPABASE_URL environment variable is missing or empty.");
+    throw new Error("VITE_SUPABASE_URL переменная окружения отсутствует или пуста.");
   }
 
   const url = `${SUPABASE_URL}/functions/v1/process-audio-transaction`;
-  console.log('API: Fetching URL:', url); // LOG 3: URL запроса
-  console.log(`API: Audio Blob size: ${audioBlob.size} bytes, type: ${audioBlob.type}`); // LOG 4: Детали Blob
+  console.log('API: Запрос на URL:', url); // LOG 3: URL запроса
+  console.log(`API: Размер аудио Blob: ${audioBlob.size} байт, тип: ${audioBlob.type}`); // LOG 4: Детали Blob
 
   const response = await fetch(
     url,
@@ -358,15 +369,15 @@ export const processAudioTransaction = async (
     }
   );
 
-  console.log('API: Response status:', response.status); // LOG 5: Статус ответа
+  console.log('API: Статус ответа:', response.status); // LOG 5: Статус ответа
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error('API: Function call failed. Error response text:', errorText); // LOG 6: Текст ошибки
-    throw new Error(`Function call failed (Status: ${response.status}): ${errorText}`);
+    console.error('API: Ошибка вызова функции. Текст ошибки:', errorText); // LOG 6: Текст ошибки
+    throw new Error(`Ошибка вызова функции (Статус: ${response.status}): ${errorText}`);
   }
 
   const data = await response.json();
-  console.log('API: Successfully received data:', data); // LOG 7: Успешный ответ
+  console.log('API: Успешно получены данные:', data); // LOG 7: Успешный ответ
   return data as Omit<Transaction, 'id'>;
 };
