@@ -1,3 +1,8 @@
+// src/index.tsx
+
+// --- ДОБАВЬТЕ ЭТУ СТРОКУ В САМОМ ВЕРХУ ---
+import './utils/telegram-mock.ts';
+// ------------------------------------------
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';

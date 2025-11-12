@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { ChevronLeft, ChevronDown } from 'lucide-react';
+import { ChevronLeft, ChevronDown, BookOpen } from 'lucide-react'; // Добавил иконку для примера, можно использовать любую
 import { useLocalization } from '../context/LocalizationContext';
 import { COMMON_CURRENCIES } from '../constants';
 
@@ -8,9 +8,10 @@ interface SettingsScreenProps {
     defaultCurrency: string;
     onSetDefaultCurrency: (currency: string) => void;
     onBack: () => void;
+    onShowOnboarding: () => void; // Добавлено новое свойство
 }
 
-export const SettingsScreen: React.FC<SettingsScreenProps> = ({ defaultCurrency, onSetDefaultCurrency, onBack }) => {
+export const SettingsScreen: React.FC<SettingsScreenProps> = ({ defaultCurrency, onSetDefaultCurrency, onBack, onShowOnboarding }) => {
     const { t, language, setLanguage } = useLocalization();
 
     return (
@@ -49,6 +50,18 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ defaultCurrency,
                                 <button onClick={() => setLanguage('en')} className={`px-4 py-3 rounded-xl text-sm font-semibold transition-colors ${language === 'en' ? 'bg-brand-green text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}>English</button>
                                 <button onClick={() => setLanguage('ru')} className={`px-4 py-3 rounded-xl text-sm font-semibold transition-colors ${language === 'ru' ? 'bg-brand-green text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}>Русский</button>
                             </div>
+                        </div>
+
+                        {/* --- НОВЫЙ БЛОК ДЛЯ ОБУЧЕНИЯ --- */}
+                        <div>
+                            <label className="block text-base font-medium text-gray-300 mb-2">{t('tutorial')}</label>
+                            <button
+                                onClick={onShowOnboarding}
+                                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold transition-colors bg-gray-700 text-gray-300 hover:bg-gray-600"
+                            >
+                                <BookOpen className="w-4 h-4" />
+                                {t('showTutorial')}
+                            </button>
                         </div>
                     </div>
                 </motion.div>

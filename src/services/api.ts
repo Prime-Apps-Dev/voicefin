@@ -381,3 +381,21 @@ export const processAudioTransaction = async (
   console.log('API: Успешно получены данные:', data); // LOG 7: Успешный ответ
   return data as Omit<Transaction, 'id'>;
 };
+
+
+// <-- НАЧАЛО НОВОЙ ФУНКЦИИ -->
+/**
+ * Устанавливает флаг has_completed_onboarding в true для пользователя
+ */
+export const markOnboardingAsCompleted = async (userId: string): Promise<void> => {
+  const { error } = await supabase
+    .from('profiles')
+    .update({ has_completed_onboarding: true, updated_at: new Date().toISOString() }) // Также обновим updated_at
+    .eq('id', userId); // 'id' в таблице profiles совпадает с auth.users 'id'
+
+  if (error) {
+    console.error("Ошибка при обновлении статуса онбординга:", error);
+    throw error;
+  }
+};
+// <-- КОНЕЦ НОВОЙ ФУНКЦИИ -->

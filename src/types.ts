@@ -1,3 +1,5 @@
+// src/types.ts
+
 export enum TransactionType {
   INCOME = 'INCOME',
   EXPENSE = 'EXPENSE',
@@ -33,11 +35,24 @@ export interface ExchangeRates {
   [key: string]: number;
 }
 
+// --- ИЗМЕНЕНИЯ ЗДЕСЬ ---
+// Этот интерфейс теперь отражает данные, которые мы собираем
+// из auth.users и public.profiles
 export interface User {
-  id: string;
-  name: string;
-  email: string;
+  id: string; // из auth.users
+  email: string | undefined; // из auth.users
+  name: string; // Имя, которое мы конструируем (напр., full_name или telegram first_name)
+  
+  // Поля из вашей таблицы profiles
+  updated_at: string | null;
+  username: string | null;
+  full_name: string | null;
+  avatar_url: string | null;
+  telegram_id: number | null;
+  has_completed_onboarding: boolean; // Наша новая колонка
 }
+// --- КОНЕЦ ИЗМЕНЕНИЙ ---
+
 
 export interface SavingsGoal {
   id: string;

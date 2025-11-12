@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { AlertTriangle, Eye, EyeOff } from 'lucide-react';
 import * as api from './services/api';
-import { supabase } from './services/supabase'; 
+import { supabase } from './services/supabase';
 // Импорты типов
 import { Transaction, TransactionType, Account, ExchangeRates, User, SavingsGoal, Budget, Category } from './types';
 // Импорты компонентов
@@ -31,20 +32,104 @@ import { SettingsScreen } from './components/SettingsScreen';
 import { CategoryForm } from './components/CategoryForm';
 import { ComingSoonScreen } from './components/ComingSoonScreen';
 import { TransactionHistoryScreen } from './components/TransactionHistoryScreen';
+import { OnboardingGuide } from './components/OnboardingGuide';
 
 // Импорты утилит и сервисов
 import { getExchangeRates, convertCurrency } from './services/currency';
 import { useLocalization } from './context/LocalizationContext';
 
-
 // --- КОНСТАНТА ДЛЯ ОТСТУПА TELEGRAM MINI APP ---
-// Устанавливает отступ сверху 85px для всех основных экранов
-const TG_HEADER_OFFSET_CLASS = 'pt-[85px]'; 
+const TG_HEADER_OFFSET_CLASS = 'pt-[85px]';
+
+// --- НОВЫЙ КОМПОНЕНТ: ФОРМА ЛОГИНА ДЛЯ РАЗРАБОТКИ ---
+const DevLoginForm: React.FC<{
+  onSubmit: (email: string, pass: string) => Promise<void>;
+  error: string | null;
+  isLoading: boolean;
+}> = ({ onSubmit, error, isLoading }) => {
+  const [email, setEmail] = useState('test@example.com'); // Можете вписать свой email по умолчанию
+  const [password, setPassword] = useState('');
+  const [showPass, setShowPass] = useState(false);
+  const { t } = useLocalization();
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit(email, password);
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
+      <div className="w-full max-w-sm p-8 bg-gray-800 rounded-2xl shadow-xl">
+        <h1 className="text-3xl font-bold text-center text-white mb-2">
+          VoiceFin
+        </h1>
+        <p className="text-center text-brand-purple mb-6 text-sm font-medium">
+          {t('devLoginTitle')}
+        </p>
+        
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            <label className="text-sm font-medium text-gray-400 block mb-2" htmlFor="email">
+              {t('email')}
+            </label>
+            <input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full px-4 py-3 bg-gray-700 text-white rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-brand-purple"
+              placeholder="user@supabase.com"
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-400 block mb-2" htmlFor="password">
+              {t('password')}
+            </label>
+            <div className="relative">
+              <input
+                id="password"
+                type={showPass ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-4 py-3 bg-gray-700 text-white rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-brand-purple"
+                placeholder="••••••••"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPass(!showPass)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+              >
+                {showPass ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
+            </div>
+          </div>
+          
+          {error && (
+            <p className="text-sm text-red-400 text-center">{error}</p>
+          )}
+
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full bg-brand-green text-white font-bold py-3 px-4 rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+          >
+            {isLoading ? (
+              <div className="w-6 h-6 border-2 border-t-transparent border-white rounded-full animate-spin"></div>
+            ) : (
+              t('login')
+            )}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+};
+
 
 // --- App State & Backend Interaction ---
 const App: React.FC = () => {
   const { t, language } = useLocalization();
-  
+
   // App State
   const [isLoading, setIsLoading] = useState(true);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -54,16 +139,16 @@ const App: React.FC = () => {
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [defaultCurrency, setDefaultCurrency] = useState<string>('DEFAULT');
   const [rates, setRates] = useState<ExchangeRates>({});
-  
-  // Состояние пользователя Telegram
+
+  // Состояние пользователя (из Supabase/Telegram)
   const [tgUser, setTgUser] = useState<User | null>(null);
 
   // UI State
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
-  
-  const [transcription, setTranscription] = useState(''); 
+
+  const [transcription, setTranscription] = useState('');
   const [potentialTransaction, setPotentialTransaction] = useState<Omit<Transaction, 'id'> | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [savingsTips, setSavingsTips] = useState<string | null>(null);
@@ -88,6 +173,12 @@ const App: React.FC = () => {
   const [isCategoryLockedInForm, setIsCategoryLockedInForm] = useState(false);
   const [carryOverInfo, setCarryOverInfo] = useState<{ from: string, to: string } | null>(null);
   const [categoryFormState, setCategoryFormState] = useState<{ isOpen: boolean; category: Category | null; context?: { type: TransactionType; from?: 'budget' } }>({ isOpen: false, category: null });
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  
+  // UI-состояния для блокировки и Dev-логина
+  const [isBlocked, setIsBlocked] = useState(false);
+  const [blockMessage, setBlockMessage] = useState('');
+  const [isDevLoggingIn, setIsDevLoggingIn] = useState(false); // <-- НОВОЕ СОСТОЯНИЕ
 
   // Refs для записи аудио
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -95,75 +186,181 @@ const App: React.FC = () => {
   const audioCtxRef = useRef<AudioContext | null>(null);
 
 
-  // --- Data Fetching и Аутентификация ---
+  // --- НОВАЯ УНИВЕРСАЛЬНАЯ ФУНКЦИЯ ЗАГРУЗКИ ДАННЫХ ---
+  /**
+   * Эта функция вызывается ПОСЛЕ того, как пользователь аутентифицирован
+   * (либо через Telegram, либо через Dev-логин).
+   * @param authUserId - ID пользователя из Supabase Auth (session.user.id)
+   * @param teleUser - Объект пользователя из Telegram (если есть, для имени)
+   */
+  const loadAppData = async (authUserId: string, teleUser?: { first_name?: string }) => {
+    try {
+      // 1. Загружаем профиль пользователя из таблицы 'profiles'
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', authUserId)
+        .single();
+
+      if (profileError) {
+        throw new Error(`Не удалось загрузить профиль пользователя: ${profileError.message}`);
+      }
+
+      // 2. Собираем полный объект User для приложения
+      const appUser: User = {
+          id: authUserId,
+          email: profileData.email, // Предполагаем, что email есть в профиле
+          name: profileData.full_name || teleUser?.first_name || profileData.username || 'User',
+          updated_at: profileData.updated_at,
+          username: profileData.username,
+          full_name: profileData.full_name,
+          avatar_url: profileData.avatar_url,
+          telegram_id: profileData.telegram_id,
+          has_completed_onboarding: profileData.has_completed_onboarding
+      };
+      
+      setTgUser(appUser); // Сохраняем ПОЛНЫЙ объект пользователя в state
+
+      // 3. Проверяем, нужно ли показать онбординг
+      if (!appUser.has_completed_onboarding) {
+          setShowOnboarding(true);
+      }
+      
+      // 4. Загружаем остальные данные приложения (транзакции, счета и т.д.)
+      const [exchangeRates, initialData] = await Promise.all([
+        getExchangeRates(),
+        api.initializeUser(), // initializeUser теперь просто грузит данные для auth-юзера
+      ]);
+      
+      setRates(exchangeRates);
+      setTransactions(initialData.transactions);
+      setAccounts(initialData.accounts);
+      setCategories(initialData.categories);
+      setSavingsGoals(initialData.savingsGoals);
+      setBudgets(initialData.budgets);
+
+    } catch (err: any) {
+      console.error("Data loading failed:", err);
+      setError(`Failed to load app data: ${err.message}`);
+    } finally {
+      setIsLoading(false); // Загрузка завершена (успешно или с ошибкой)
+    }
+  };
+
+
+  // --- ОБНОВЛЕННЫЙ ХУК АУТЕНТИФИКАЦИИ И ИНИЦИАЛИЗАЦИИ ---
   useEffect(() => {
-    // @ts-ignore
+    // Vite-переменная, true если `npm run dev`
+    const isDev = import.meta.env.DEV;
+    
+    // @ts-ignore (Наш mock-файл создаст этот объект в dev-режиме)
     const tg = window.Telegram.WebApp;
 
-    const initializeApp = async (initData: string) => {
+    const startApp = async () => {
       try {
-        const authResponse = await api.authenticateWithTelegram(initData);
-        
-        if (!authResponse || !authResponse.token || !authResponse.user) {
-            throw new Error("Invalid auth response from server");
+        if (isDev) {
+          // --- 1. DEV PATH (РЕЖИМ РАЗРАБОТКИ) ---
+          console.log('DEV MODE: Checking Supabase session...');
+          
+          // Проверяем, есть ли уже активная сессия в localStorage
+          const { data: { session } } = await supabase.auth.getSession();
+          
+          if (session) {
+            // Сессия есть, отлично. Просто загружаем данные.
+            console.log('DEV MODE: Session found. Loading app data...');
+            await loadAppData(session.user.id, { first_name: 'Dev' });
+          } else {
+            // Сессии нет. Показываем нашу форму Dev-логина.
+            console.log('DEV MODE: No session. Showing dev login form.');
+            setIsDevLoggingIn(true);
+            setIsLoading(false);
+          }
+
+        } else {
+          // --- 2. PROD PATH (РЕЖИМ TELEGRAM) ---
+          
+          // --- ПРОВЕРКА #1: ЗАПУСК В TELEGRAM ---
+          if (!tg) {
+              throw new Error(t('telegramErrorNotTelegram'));
+          }
+
+          // --- ПРОВЕРКА #2: НАЛИЧИЕ ДАННЫХ АУТЕНТИФИКАЦИИ ---
+          if (!tg.initData) {
+              throw new Error(t('telegramErrorNoData'));
+          }
+          
+          tg.ready();
+          tg.expand();
+
+          // Шаг 1: Аутентификация через Telegram
+          const authResponse = await api.authenticateWithTelegram(tg.initData);
+          if (!authResponse || !authResponse.token || !authResponse.user) {
+              throw new Error("Invalid auth response from server");
+          }
+
+          // Шаг 2: Установка сессии Supabase
+          const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+            access_token: authResponse.token,
+            refresh_token: authResponse.token,
+          });
+
+          if (sessionError) {
+            throw new Error(`Failed to set session: ${sessionError.message}`);
+          }
+          if (!sessionData || !sessionData.user) {
+            throw new Error("Auth session missing after setSession!");
+          }
+          
+          // Шаг 3: Загрузка данных приложения
+          await loadAppData(sessionData.user.id, authResponse.user);
         }
-
-        const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
-          access_token: authResponse.token,
-          refresh_token: authResponse.token,
-        });
-
-        if (sessionError) {
-          throw new Error(`Failed to set session: ${sessionError.message}`);
-        }
-        
-        if (!sessionData || !sessionData.user) {
-          throw new Error("Auth session missing after setSession!");
-        }
-
-        const teleUser = authResponse.user; 
-        const supUser = sessionData.user;   
-
-        const appUser: User = {
-            id: supUser.id,
-            name: teleUser.first_name || teleUser.username || supUser.email || 'User',
-            email: supUser.email
-        };
-        
-        setTgUser(appUser);
-        
-        const [exchangeRates, initialData] = await Promise.all([
-          getExchangeRates(),
-          api.initializeUser(),
-        ]);
-        
-        setRates(exchangeRates);
-        setTransactions(initialData.transactions);
-        setAccounts(initialData.accounts);
-        setCategories(initialData.categories);
-        setSavingsGoals(initialData.savingsGoals);
-        setBudgets(initialData.budgets);
 
       } catch (err: any) {
         console.error("Initialization failed:", err);
-        setError(`Failed to load app data: ${err.message}`);
-      } finally {
+        const errorMsg = (err instanceof Error) ? err.message : String(err);
+        
+        // Отлавливаем наши "блокирующие" ошибки
+        if (errorMsg === t('telegramErrorNotTelegram') || errorMsg === t('telegramErrorNoData')) {
+            setBlockMessage(errorMsg);
+            setIsBlocked(true);
+        } else {
+            setError(`Failed to load app data: ${errorMsg}`);
+        }
         setIsLoading(false);
       }
     };
 
-    tg.ready();
-    tg.expand();
-
-    if (tg.initData) {
-      initializeApp(tg.initData);
-    } else {
-      setError(t('telegramError'));
-      setIsLoading(false);
-    }
-  }, [t]); 
+    startApp();
+  }, [t]); // t (перевод) добавлен в зависимости
   
-  // --- Memoized Calculations ---
+
+  // --- НОВЫЙ ОБРАБОТЧИК: ЛОГИН В РЕЖИМЕ РАЗРАБОТКИ ---
+  const handleDevLogin = async (email: string, password: string) => {
+    setIsLoading(true); // Показываем спиннер на кнопке
+    setError(null);
+    
+    try {
+      // Пытаемся войти с помощью email/password
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      
+      if (error) throw error;
+      if (!data.user) throw new Error("Login successful but no user data returned.");
+      
+      // Успех! Загружаем данные приложения
+      await loadAppData(data.user.id, { first_name: 'Dev' });
+      
+      // Прячем форму логина
+      setIsDevLoggingIn(false);
+      
+    } catch (err: any) {
+      console.error("Dev login failed:", err);
+      setError(err.message || t('loginError'));
+      setIsLoading(false); // Выключаем спиннер (т.к. мы остались на форме)
+    }
+  };
+
+  
+  // --- Memoized Calculations (без изменений) ---
   const displayCurrency = useMemo(() => defaultCurrency === 'DEFAULT' ? 'USD' : defaultCurrency, [defaultCurrency]);
 
   const filteredTransactions = useMemo(() => {
@@ -222,9 +419,11 @@ const App: React.FC = () => {
   }, [transactions]);
   
 
-  // --- Handlers for Data Mutation ---
+  // --- Handlers for Data Mutation (без изменений) ---
+
   const handleConfirmTransaction = async (transactionData: Omit<Transaction, 'id'> | Transaction) => {
     try {
+      // 1. (Авто-создание категории, если ее нет)
       if (transactionData.category && !categories.some(c => c.name.toLowerCase() === transactionData.category.toLowerCase())) {
           const iconName = await api.getIconForCategory(transactionData.category);
           const newCategoryData: Omit<Category, 'id'> = {
@@ -238,6 +437,7 @@ const App: React.FC = () => {
           setCategories(prev => [...prev, newCategory]);
       }
 
+      // 2. (Обновление баланса Копилки, если транзакция к ней привязана)
       const originalTransaction = 'id' in transactionData ? transactions.find(t => t.id === transactionData.id) : null;
       const currentGoalId = (transactionData as Transaction).goalId; 
 
@@ -245,7 +445,7 @@ const App: React.FC = () => {
           setSavingsGoals(prevGoals => prevGoals.map(g => {
               let newCurrentAmount = g.currentAmount;
               if (originalTransaction?.goalId === g.id) {
-                  // Отмена старого депозита
+                  // Отмена старого депозита (при редактировании)
                   newCurrentAmount -= convertCurrency(originalTransaction.amount, originalTransaction.currency, g.currency, rates);
               }
               if (currentGoalId === g.id && transactionData.type === TransactionType.EXPENSE) {
@@ -256,6 +456,7 @@ const App: React.FC = () => {
           }));
       }
 
+      // 3. (Сохранение самой транзакции - обновление или создание)
       if ('id' in transactionData) {
         const updatedTx = await api.updateTransaction(transactionData);
         setTransactions(prev => prev.map(t => t.id === updatedTx.id ? updatedTx : t));
@@ -268,6 +469,7 @@ const App: React.FC = () => {
         console.error("Transaction save failed:", err);
         setError(err.message || t('connectionError'));
     } finally {
+        // 4. (Закрытие модальных окон)
         setPotentialTransaction(null);
         setEditingTransaction(null);
         setGoalForDeposit(null);
@@ -321,6 +523,7 @@ const App: React.FC = () => {
 
     try {
       if (itemToDelete && 'value' in itemToDelete) {
+          // Удаление Счета, Категории, Копилки или Бюджета
           const { type, value } = itemToDelete as { type: string, value: { id: string, name?: string, category?: string } }; 
           
           switch(type) {
@@ -344,8 +547,10 @@ const App: React.FC = () => {
                   break;
           }
       } else { 
+          // Удаление Транзакции
           const transactionToDelete = itemToDelete as Transaction;
           
+          // Если транзакция была вкладом в копилку, откатываем баланс копилки
           if (transactionToDelete.goalId && transactionToDelete.type === TransactionType.EXPENSE) {
              setSavingsGoals(prevGoals => prevGoals.map(g => {
                 if (g.id === transactionToDelete.goalId) {
@@ -364,7 +569,7 @@ const App: React.FC = () => {
        setError(err.message);
     }
     
-    setItemToDelete(null);
+    setItemToDelete(null); // Закрываем модальное окно
   };
 
   const handleSaveCategory = async (categoryData: Omit<Category, 'id'> | Category) => {
@@ -443,11 +648,12 @@ const App: React.FC = () => {
   };
 
 
-  // --- Audio Recording Handlers ---
+  // --- Audio Recording Handlers (без изменений) ---
   const handleStartRecording = async () => {
     if (isRecording) return;
     
     try {
+      // 1. (Инициализация AudioContext)
       if (!audioCtxRef.current) {
         audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
         if (audioCtxRef.current.state === 'suspended') {
@@ -455,10 +661,12 @@ const App: React.FC = () => {
         }
       }
 
+      // 2. (Запрос доступа к микрофону)
       const mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
       setStream(mediaStream); 
       setIsRecording(true);
       
+      // 3. (Выбор кодека)
       const mimeType = [
           'audio/webm;codecs=opus',
           'audio/ogg;codecs=opus',
@@ -466,6 +674,7 @@ const App: React.FC = () => {
           'audio/mp4',
         ].find(type => MediaRecorder.isTypeSupported(type)) || 'audio/webm';
         
+      // 4. (Начало записи)
       const recorder = new MediaRecorder(mediaStream, { mimeType });
       mediaRecorderRef.current = recorder;
       audioChunksRef.current = []; 
@@ -474,7 +683,7 @@ const App: React.FC = () => {
         audioChunksRef.current.push(event.data);
       };
 
-      recorder.onstop = handleRecordingStop; 
+      recorder.onstop = handleRecordingStop; // Указываем, что делать после остановки
 
       recorder.start();
     } catch (err) {
@@ -485,20 +694,23 @@ const App: React.FC = () => {
 
   const handleStopRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current.stop(); // Это вызовет .onstop и handleRecordingStop
     }
     setIsRecording(false);
-    setIsProcessing(true); 
+    setIsProcessing(true); // Показываем индикатор обработки
   };
 
   const handleRecordingStop = async () => {
+    // 1. (Очистка)
     stream?.getTracks().forEach(track => track.stop());
     setStream(null); 
 
+    // 2. (Сборка аудио-файла)
     const mimeType = mediaRecorderRef.current?.mimeType || 'audio/webm';
     const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
     audioChunksRef.current = [];
     
+    // 3. (Отправка в API)
     try {
       const newTransaction = await api.processAudioTransaction(
         audioBlob,
@@ -506,6 +718,7 @@ const App: React.FC = () => {
         savingsGoals,
         language
       );
+      // 4. (Показ окна подтверждения)
       setPotentialTransaction({
           ...newTransaction,
           accountId: newTransaction.accountId || accounts[0].id,
@@ -514,12 +727,12 @@ const App: React.FC = () => {
       console.error('Failed to process audio:', err);
       setError(err.message || t('connectionError'));
     } finally {
-      setIsProcessing(false);
+      setIsProcessing(false); // Убираем индикатор обработки
     }
   };
 
   
-  // --- UI Handlers ---
+  // --- UI Handlers (без изменений) ---
   const handleCancelTransaction = () => {
     setPotentialTransaction(null);
     setEditingTransaction(null);
@@ -527,12 +740,33 @@ const App: React.FC = () => {
     setIsCategoryLockedInForm(false);
   };
   
+  // --- ONBOARDING HANDLERS (без изменений) ---
+  const handleFinishOnboarding = async () => {
+    setShowOnboarding(false); 
+    if (tgUser) {
+        try {
+            await api.markOnboardingAsCompleted(tgUser.id);
+            setTgUser(prevUser => prevUser ? ({ ...prevUser, has_completed_onboarding: true }) : null);
+        } catch (err) {
+            console.error("Не удалось обновить статус онбординга:", err);
+        }
+    }
+  };
 
-  // --- Render Logic (ОБНОВЛЕНО: УБРАНЫ ЛИШНИЕ TG_HEADER_OFFSET_CLASS) ---
+  const handleShowOnboarding = () => {
+    setShowOnboarding(true);
+  };
+
+
+  // --- Render Logic (Рендеринг Контента) (без изменений) ---
   const renderContent = () => {
+    // В dev-режиме нам не нужен отступ, если только мы не хотим его симулировать
+    const isDev = import.meta.env.DEV;
+    // В режиме разработки мы можем убрать отступ, чтобы видеть весь экран
+    const headerOffsetClass = isDev ? '' : TG_HEADER_OFFSET_CLASS;
+
     switch (activeScreen) {
       case 'savings': return (
-        // УБРАНА ОБЕРТКА
         <SavingsScreen 
           goals={savingsGoals} 
           onAddGoal={() => setIsGoalFormOpen(true)} 
@@ -546,7 +780,6 @@ const App: React.FC = () => {
         />
       );
       case 'analytics': return (
-        // УБРАНА ОБЕРТКА
         <AnalyticsScreen 
           transactions={transactions} 
           savingsGoals={savingsGoals} 
@@ -555,15 +788,23 @@ const App: React.FC = () => {
         />
       );
       case 'profile': return (
-        // УБРАНА ОБЕРТКА
         <ProfileScreen 
-          user={tgUser || { name: 'User', email: '...' }} 
+          user={tgUser || { 
+              id: '...', 
+              email: '...', 
+              name: 'User', 
+              updated_at: null, 
+              username: null, 
+              full_name: null, 
+              avatar_url: null, 
+              telegram_id: null, 
+              has_completed_onboarding: true 
+          }}
           daysActive={daysActive} 
           onNavigate={setActiveScreen} 
         />
       );
       case 'accounts': return (
-        // УБРАНА ОБЕРТКА
         <AccountsScreen 
           accounts={accounts} 
           transactions={transactions} 
@@ -574,7 +815,6 @@ const App: React.FC = () => {
         />
       );
       case 'categories': return (
-        // УБРАНА ОБЕРТКА
         <CategoriesScreen 
           categories={categories} 
           onBack={() => setActiveScreen('profile')} 
@@ -585,15 +825,14 @@ const App: React.FC = () => {
         />
       );
       case 'settings': return (
-        // УБРАНА ОБЕРТКА
         <SettingsScreen 
           onBack={() => setActiveScreen('profile')} 
           defaultCurrency={defaultCurrency} 
-          onSetDefaultCurrency={setDefaultCurrency} 
+          onSetDefaultCurrency={setDefaultCurrency}
+          onShowOnboarding={handleShowOnboarding}
         />
       );
       case 'budgetPlanning': return (
-        // УБРАНА ОБЕРТКА
         <BudgetPlanningScreen 
           budgets={budgets} 
           transactions={transactions} 
@@ -613,7 +852,6 @@ const App: React.FC = () => {
         />
       );
       case 'history': return (
-        // УБРАНА ОБЕРТКА
         <TransactionHistoryScreen 
           transactions={transactions} 
           accounts={accounts} 
@@ -626,12 +864,11 @@ const App: React.FC = () => {
         />
       );
       case 'comingSoon': return (
-        // УБРАНА ОБЕРТКА
         <ComingSoonScreen onBack={() => setActiveScreen('profile')} />
       );
       case 'home': default: return (
-        // ОСТАВЛЯЕМ ОБЕРТКУ ТОЛЬКО ДЛЯ 'home'
-        <div className={TG_HEADER_OFFSET_CLASS}> 
+        // (Только главный экран требует отступа, и то только в prod)
+        <div className={headerOffsetClass}> 
           <main className="max-w-4xl mx-auto flex flex-col gap-4 pb-32"> 
             <AccountList 
               accounts={accounts} 
@@ -661,14 +898,17 @@ const App: React.FC = () => {
                 rates={rates} 
               /> 
             </div> 
-            {error && <p className="text-center text-red-500 mt-2 px-6" onClick={() => setError(null)}>{error}</p>} 
+            {error && !isDevLoggingIn && <p className="text-center text-red-500 mt-2 px-6" onClick={() => setError(null)}>{error}</p>} 
           </main> 
         </div>
       );
     }
   }
 
-  if (isLoading) {
+
+  // --- ЭКРАН ЗАГРУЗКИ ---
+  // (Показываем спиннер, но НЕ во время dev-логина, т.к. там своя логика)
+  if (isLoading && !isDevLoggingIn) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
         <div className="w-12 h-12 border-4 border-t-transparent border-brand-green rounded-full animate-spin"></div>
@@ -677,21 +917,51 @@ const App: React.FC = () => {
     );
   }
 
+  // --- НОВЫЙ ЭКРАН: ФОРМА ЛОГИНА ДЛЯ РАЗРАБОТКИ ---
+  if (isDevLoggingIn) {
+      return (
+          <DevLoginForm 
+              onSubmit={handleDevLogin} 
+              error={error} 
+              isLoading={isLoading} // Передаем isLoading для спиннера на кнопке
+          />
+      );
+  }
+
+  // --- ЭКРАН БЛОКИРОВКИ (Если не в Telegram и не в Dev-режиме) ---
+  if (isBlocked) {
+    return (
+        <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center text-center p-6">
+            <div className="text-red-500 mb-6">
+                <AlertTriangle className="w-16 h-16" />
+            </div>
+            <h1 className="text-2xl font-bold text-white mb-2">{t('error')}</h1>
+            <p className="text-lg text-gray-300 max-w-sm">{blockMessage}</p>
+            <p className="text-sm text-gray-500 mt-6 max-w-sm">{t('telegramErrorHint')}</p>
+        </div>
+    );
+  }
+
+  // --- ОСНОВНОЙ РЕНДЕРИНГ ПРИЛОЖЕНИЯ ---
+  const isDev = import.meta.env.DEV;
+  
   return (
     <div className="min-h-screen bg-gray-900">
       
-      {/* --- НОВАЯ КЛИППИНГ-МАСКА --- */}
-      {/* Этот div создает "фальшивую" шапку. 
-        Он фиксирован наверху, имеет высоту 85px и тот же фон, что и приложение.
-        z-index: 20 гарантирует, что он над контентом, но под модальными окнами (z-50) и навигацией (z-40).
-        Теперь, когда контент (с pt-[85px]) скроллится вверх, он будет "исчезать" под этим блоком.
-      */}
-      <div className="fixed top-0 left-0 right-0 h-[85px] bg-gray-900 z-20"></div>
+      {/* --- РЕНДЕР ONBOARDING (поверх всего) --- */}
+      <AnimatePresence>
+        {showOnboarding && <OnboardingGuide onFinish={handleFinishOnboarding} />}
+      </AnimatePresence>
 
-      {/* Основное содержимое приложения */}
+      {/* --- Маска для "прилипания" (Только в prod-режиме) --- */}
+      {!isDev && (
+        <div className="fixed top-0 left-0 right-0 h-[85px] bg-gray-900 z-20"></div>
+      )}
+
+      {/* Основное содержимое экрана (которое мы выбрали в renderContent) */}
       {renderContent()}
 
-      {/* Оверлей записи аудио */}
+      {/* Оверлей записи аудио (поверх всего) */}
       {isRecording && (
         <RecordingOverlay 
           transcription={transcription}
@@ -701,8 +971,8 @@ const App: React.FC = () => {
           audioContext={audioCtxRef.current} 
         />
       )}
-
-      {/* Модальное окно/Форма транзакции */}
+      
+      {/* Модальное окно/Форма транзакции (поверх всего) */}
       {(potentialTransaction || editingTransaction) && (
         <TransactionForm
           transaction={potentialTransaction || editingTransaction!}
@@ -722,14 +992,14 @@ const App: React.FC = () => {
         />
       )}
       
-      {/* Модальные формы */}
+      {/* Остальные модальные окна (поверх всего) */}
       <AccountForm isOpen={isAccountFormOpen} onClose={() => setIsAccountFormOpen(false)} onSave={handleSaveAccount} account={editingAccount} />
       <SavingsGoalForm isOpen={isGoalFormOpen} onClose={() => { setIsGoalFormOpen(false); setEditingGoal(null); }} onSave={handleSaveGoal} goal={editingGoal} defaultCurrency={displayCurrency} />
       <BudgetForm isOpen={isBudgetFormOpen} onClose={() => { setIsBudgetFormOpen(false); setEditingBudget(null); }} onSave={handleSaveBudget} budget={editingBudget} allCategories={categories} budgetsForMonth={budgets.filter(b => b.monthKey === editingBudget?.monthKey)} onCreateNewCategory={() => setCategoryFormState({ isOpen: true, category: null, context: {type: TransactionType.EXPENSE, from: 'budget'} })} defaultCurrency={displayCurrency} />
       <CategoryForm isOpen={categoryFormState.isOpen} onClose={() => setCategoryFormState({isOpen: false, category: null})} onSave={handleSaveCategory} onDelete={(cat) => setItemToDelete({type: 'category', value: cat})} category={categoryFormState.category} isFavoriteDisabled={!categoryFormState.category?.isFavorite && categories.filter(c => c.isFavorite).length >= 10} categories={categories} />
       <AccountActionsModal isOpen={!!accountForActions} account={accountForActions} onClose={() => setAccountForActions(null)} onAddTransaction={(acc) => { setPotentialTransaction({ accountId: acc.id, name: '', amount: 0, currency: displayCurrency, category: '', date: new Date().toISOString(), type: TransactionType.EXPENSE }); setActiveScreen('home'); setAccountForActions(null); }} onEdit={(acc) => { setEditingAccount(acc); setIsAccountFormOpen(true); setAccountForActions(null); }} onDelete={(acc) => { setItemToDelete({ type: 'account', value: acc }); setAccountForActions(null); }} />
       
-      {/* Модальные окна подтверждения */}
+      {/* Модальные окна подтверждения (поверх всего) */}
       <ConfirmationModal 
         isOpen={!!itemToDelete} 
         onCancel={() => setItemToDelete(null)} 
@@ -751,12 +1021,12 @@ const App: React.FC = () => {
         message={t('carryOverBudgetsMessage')} 
       />
       
-      {/* Модальное окно ввода текста и истории */}
+      {/* Модальное окно ввода текста и истории (поверх всего) */}
       <TextInputModal isOpen={isTextInputOpen} isProcessing={isProcessingText} onClose={() => setIsTextInputOpen(false)} onSubmit={handleTextTransactionSubmit} text={textInputValue} onTextChange={setTextInputValue} />
       {goalForHistory && <GoalTransactionsModal isOpen={!!goalForHistory} onClose={() => setGoalForHistory(null)} goal={goalForHistory} transactions={transactions} accounts={accounts} onSelectTransaction={setEditingTransaction} onDeleteTransaction={(tx) => setItemToDelete(tx)} rates={rates} />}
       {budgetForHistory && <BudgetTransactionsModal isOpen={!!budgetForHistory} onClose={() => setBudgetForHistory(null)} budget={budgetForHistory} transactions={transactions} accounts={accounts} onSelectTransaction={setEditingTransaction} onDeleteTransaction={(tx) => setItemToDelete(tx)} rates={rates} />}
       
-      {/* Нижняя навигационная панель */}
+      {/* Нижняя навигационная панель (поверх всего) */}
       <BottomNavBar 
         activeScreen={activeScreen} 
         onNavigate={setActiveScreen} 
