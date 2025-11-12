@@ -29,7 +29,7 @@ export const BudgetTransactionsModal: React.FC<BudgetTransactionsModalProps> = (
   const { t } = useLocalization();
 
   const budgetTransactions = React.useMemo(() => {
-    const [year, month] = budget.monthKey.split('-').map(Number);
+    const [year, month] = budget.monthkey.split('-').map(Number);
     return transactions
       .filter(tx => {
         const txDate = new Date(tx.date);

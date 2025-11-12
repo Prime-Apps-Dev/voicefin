@@ -88,7 +88,7 @@ export const BudgetForm: React.FC<{
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (formData.category && formData.limit > 0 && formData.monthKey) {
+    if (formData.category && formData.limit > 0 && formData.monthkey) {
       onSave(formData);
     }
   };

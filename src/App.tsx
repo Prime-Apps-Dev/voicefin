@@ -601,7 +601,7 @@ const App: React.FC = () => {
             transactions={transactions} 
             categories={categories} 
             onBack={() => setActiveScreen('profile')} 
-            onAddBudget={(monthKey) => { setEditingBudget({ monthKey, currency: displayCurrency }); setIsBudgetFormOpen(true); }} 
+            onAddBudget={(monthkey) => { setEditingBudget({ monthkey, currency: displayCurrency }); setIsBudgetFormOpen(true); }} 
             onEditBudget={(budget) => { setEditingBudget(budget); setIsBudgetFormOpen(true); }} 
             onDeleteBudget={(budget) => setItemToDelete({ type: 'budget', value: budget })} 
             onAddTransaction={(budget) => { 
@@ -711,7 +711,7 @@ const App: React.FC = () => {
           isCategoryLocked={isCategoryLockedInForm}
           budgets={budgets}
           transactions={transactions}
-          onCreateBudget={(cat, monthKey) => { setEditingBudget({ monthKey, category: cat, icon: categories.find(c=>c.name===cat)?.icon || 'LayoutGrid', limit: 0, currency: displayCurrency }); setIsBudgetFormOpen(true); }}
+          onCreateBudget={(cat, monthkey) => { setEditingBudget({ monthkey, category: cat, icon: categories.find(c=>c.name===cat)?.icon || 'LayoutGrid', limit: 0, currency: displayCurrency }); setIsBudgetFormOpen(true); }}
           rates={rates}
           defaultCurrency={displayCurrency}
         />
@@ -720,7 +720,7 @@ const App: React.FC = () => {
       {/* Модальные формы */}
       <AccountForm isOpen={isAccountFormOpen} onClose={() => setIsAccountFormOpen(false)} onSave={handleSaveAccount} account={editingAccount} />
       <SavingsGoalForm isOpen={isGoalFormOpen} onClose={() => { setIsGoalFormOpen(false); setEditingGoal(null); }} onSave={handleSaveGoal} goal={editingGoal} defaultCurrency={displayCurrency} />
-      <BudgetForm isOpen={isBudgetFormOpen} onClose={() => { setIsBudgetFormOpen(false); setEditingBudget(null); }} onSave={handleSaveBudget} budget={editingBudget} allCategories={categories} budgetsForMonth={budgets.filter(b => b.monthKey === editingBudget?.monthKey)} onCreateNewCategory={() => setCategoryFormState({ isOpen: true, category: null, context: {type: TransactionType.EXPENSE, from: 'budget'} })} defaultCurrency={displayCurrency} />
+      <BudgetForm isOpen={isBudgetFormOpen} onClose={() => { setIsBudgetFormOpen(false); setEditingBudget(null); }} onSave={handleSaveBudget} budget={editingBudget} allCategories={categories} budgetsForMonth={budgets.filter(b => b.monthkey === editingBudget?.monthkey)} onCreateNewCategory={() => setCategoryFormState({ isOpen: true, category: null, context: {type: TransactionType.EXPENSE, from: 'budget'} })} defaultCurrency={displayCurrency} />
       <CategoryForm isOpen={categoryFormState.isOpen} onClose={() => setCategoryFormState({isOpen: false, category: null})} onSave={handleSaveCategory} onDelete={(cat) => setItemToDelete({type: 'category', value: cat})} category={categoryFormState.category} isFavoriteDisabled={!categoryFormState.category?.isFavorite && categories.filter(c => c.isFavorite).length >= 10} categories={categories} />
       <AccountActionsModal isOpen={!!accountForActions} account={accountForActions} onClose={() => setAccountForActions(null)} onAddTransaction={(acc) => { setPotentialTransaction({ accountid: acc.id, name: '', amount: 0, currency: displayCurrency, category: '', date: new Date().toISOString(), type: TransactionType.EXPENSE }); setActiveScreen('home'); setAccountForActions(null); }} onEdit={(acc) => { setEditingAccount(acc); setIsAccountFormOpen(true); setAccountForActions(null); }} onDelete={(acc) => { setItemToDelete({ type: 'account', value: acc }); setAccountForActions(null); }} />
       
@@ -737,8 +737,8 @@ const App: React.FC = () => {
         onCancel={() => setCarryOverInfo(null)} 
         onConfirm={() => { 
           if(carryOverInfo) { 
-            const prevBudgets = budgets.filter(b => b.monthKey === carryOverInfo.from); 
-            prevBudgets.forEach(b => handleSaveBudget({...b, monthKey: carryOverInfo.to})); 
+            const prevBudgets = budgets.filter(b => b.monthkey === carryOverInfo.from); 
+            prevBudgets.forEach(b => handleSaveBudget({...b, monthkey: carryOverInfo.to})); 
           } 
           setCarryOverInfo(null); 
         }} 

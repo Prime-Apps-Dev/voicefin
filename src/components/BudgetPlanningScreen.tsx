@@ -11,7 +11,7 @@ interface BudgetPlanningScreenProps {
     transactions: Transaction[];
     categories: Category[];
     onBack: () => void;
-    onAddBudget: (monthKey: string) => void;
+    onAddBudget: (monthkey: string) => void;
     onEditBudget: (budget: Budget) => void;
     onDeleteBudget: (budget: Budget) => void;
     onAddTransaction: (budget: Budget) => void;
@@ -46,20 +46,20 @@ export const BudgetPlanningScreen: React.FC<BudgetPlanningScreenProps> = (props)
         const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
         const selectedMonthStart = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
         
-        const monthlyBudgets = budgets.filter(b => b.monthKey === currentMonthKey);
+        const monthlyBudgets = budgets.filter(b => b.monthkey === currentMonthKey);
 
         if (selectedMonthStart > currentMonthStart && monthlyBudgets.length === 0) {
             const prevDate = new Date(selectedDate);
             prevDate.setMonth(prevDate.getMonth() - 1);
             const prevMonthKey = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
-            const prevMonthBudgets = budgets.filter(b => b.monthKey === prevMonthKey);
+            const prevMonthBudgets = budgets.filter(b => b.monthkey === prevMonthKey);
             if (prevMonthBudgets.length > 0) {
                 onCarryOver(prevMonthKey, currentMonthKey);
             }
         }
     }, [selectedDate, budgets, currentMonthKey, onCarryOver]);
 
-    const monthlyBudgets = useMemo(() => budgets.filter(b => b.monthKey === currentMonthKey), [budgets, currentMonthKey]);
+    const monthlyBudgets = useMemo(() => budgets.filter(b => b.monthkey === currentMonthKey), [budgets, currentMonthKey]);
     
     const getSpentAmount = (budget: Budget) => {
         return transactions

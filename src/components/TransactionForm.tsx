@@ -22,7 +22,7 @@ interface TransactionFormProps {
   goalName?: string;
   budgets: Budget[];
   transactions: Transaction[];
-  onCreateBudget: (category: string, monthKey: string) => void;
+  onCreateBudget: (category: string, monthkey: string) => void;
   rates: ExchangeRates;
   defaultCurrency: string;
 }
@@ -111,9 +111,9 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
     }
 
     const transactionDate = new Date(formData.date);
-    const monthKey = `${transactionDate.getFullYear()}-${String(transactionDate.getMonth() + 1).padStart(2, '0')}`;
+    const monthkey = `${transactionDate.getFullYear()}-${String(transactionDate.getMonth() + 1).padStart(2, '0')}`;
 
-    const budgetForCategory = budgets.find(b => b.monthKey === monthKey && b.category === formData.category);
+    const budgetForCategory = budgets.find(b => b.monthkey === monthkey && b.category === formData.category);
 
     if (budgetForCategory) {
       const spentAmountSoFar = transactions
@@ -143,7 +143,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
       return {
         type: 'missing' as const,
         category: formData.category,
-        monthKey: monthKey,
+        monthkey: monthkey,
       };
     }
   }, [formData.category, formData.date, formData.type, formData.amount, formData.currency, budgets, transactions, rates, defaultCurrency, transaction]);
@@ -387,7 +387,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
                                     </div>
                                     <button
                                         type="button"
-                                        onClick={() => onCreateBudget(budgetInfo.category, budgetInfo.monthKey)}
+                                        onClick={() => onCreateBudget(budgetInfo.category, budgetInfo.monthkey)}
                                         className="px-3 py-1.5 bg-brand-blue text-white text-xs font-semibold rounded-lg hover:bg-blue-500 active:scale-95 transition-all"
                                     >
                                         Create
