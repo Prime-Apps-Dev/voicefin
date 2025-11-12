@@ -7,7 +7,7 @@ import { ChevronDown } from 'lucide-react';
 import { COMMON_CURRENCIES } from '../constants';
 
 const defaultState: Omit<Budget, 'id'> = {
-  monthkey: '',
+  monthKey: '',
   category: '',
   limit: 0,
   icon: 'LayoutGrid',
@@ -88,7 +88,7 @@ export const BudgetForm: React.FC<{
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (formData.category && formData.limit > 0 && formData.monthkey) {
+    if (formData.category && formData.limit > 0 && formData.monthKey) {
       onSave(formData);
     }
   };

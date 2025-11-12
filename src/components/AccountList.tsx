@@ -11,14 +11,14 @@ interface AccountListProps {
   transactions: Transaction[];
   rates: ExchangeRates;
   selectedAccountId: string;
-  onSelectAccount: (accountid: string) => void;
+  onSelectAccount: (accountId: string) => void;
   totalBalance: number;
   defaultCurrency: string;
 }
 
-const calculateAccountBalance = (accountid: string, transactions: Transaction[], rates: ExchangeRates, accountCurrency: string) => {
+const calculateAccountBalance = (accountId: string, transactions: Transaction[], rates: ExchangeRates, accountCurrency: string) => {
     return transactions
-        .filter(t => t.accountid === accountid)
+        .filter(t => t.accountId === accountId)
         .reduce((sum, tx) => {
             const amountInAccountCurrency = convertCurrency(tx.amount, tx.currency, accountCurrency, rates);
             return sum + (tx.type === 'INCOME' ? amountInAccountCurrency : -amountInAccountCurrency);

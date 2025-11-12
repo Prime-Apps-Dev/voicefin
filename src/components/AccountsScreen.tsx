@@ -27,7 +27,7 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({
   const accountsWithBalances = React.useMemo(() => {
     return accounts.map(account => {
       const balance = transactions
-        .filter(t => t.accountid === account.id)
+        .filter(t => t.accountId === account.id)
         .reduce((sum, tx) => {
           // Assuming direct calculation in account's currency for simplicity here
           return sum + (tx.type === 'INCOME' ? tx.amount : -tx.amount);

@@ -8,8 +8,8 @@ import { Trash2, Star } from 'lucide-react';
 const defaultState: Omit<Category, 'id' | 'isDefault'> = {
   name: '',
   icon: 'LayoutGrid',
-  isdefault: false,
-  isfavorite: false,
+  isDefault: false,
+  isFavorite: false,
   type: TransactionType.EXPENSE,
 };
 

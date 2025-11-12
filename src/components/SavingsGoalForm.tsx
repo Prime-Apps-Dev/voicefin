@@ -9,8 +9,8 @@ import { ChevronDown } from 'lucide-react';
 const defaultState: Omit<SavingsGoal, 'id' | 'currentAmount'> = {
   name: '',
   icon: 'Target',
-  currentamount: 0,
-  targetamount: 0,
+  currentAmount: 0,
+  targetAmount: 0,
   currency: 'USD',
 };
 

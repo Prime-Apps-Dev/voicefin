@@ -22,7 +22,7 @@ interface TransactionFormProps {
   goalName?: string;
   budgets: Budget[];
   transactions: Transaction[];
-  onCreateBudget: (category: string, monthkey: string) => void;
+  onCreateBudget: (category: string, monthKey: string) => void;
   rates: ExchangeRates;
   defaultCurrency: string;
 }
@@ -111,9 +111,9 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
     }
 
     const transactionDate = new Date(formData.date);
-    const monthkey = `${transactionDate.getFullYear()}-${String(transactionDate.getMonth() + 1).padStart(2, '0')}`;
+    const monthKey = `${transactionDate.getFullYear()}-${String(transactionDate.getMonth() + 1).padStart(2, '0')}`;
 
-    const budgetForCategory = budgets.find(b => b.monthkey === monthkey && b.category === formData.category);
+    const budgetForCategory = budgets.find(b => b.monthKey === monthKey && b.category === formData.category);
 
     if (budgetForCategory) {
       const spentAmountSoFar = transactions
@@ -143,7 +143,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
       return {
         type: 'missing' as const,
         category: formData.category,
-        monthkey: monthkey,
+        monthKey: monthKey,
       };
     }
   }, [formData.category, formData.date, formData.type, formData.amount, formData.currency, budgets, transactions, rates, defaultCurrency, transaction]);
@@ -210,9 +210,9 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
           <form onSubmit={handleSubmit} className="overflow-y-auto">
             <div className="px-6 py-6 space-y-4">
               <div>
-                <label htmlFor="accountid" className="block text-sm font-medium text-zinc-300 mb-1.5">{t('account')}</label>
+                <label htmlFor="accountId" className="block text-sm font-medium text-zinc-300 mb-1.5">{t('account')}</label>
                 <div className="relative">
-                  <select id="accountid" name="accountid" value={formData.accountid} onChange={handleChange} required className="appearance-none w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 pr-10">
+                  <select id="accountId" name="accountId" value={formData.accountId} onChange={handleChange} required className="appearance-none w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 pr-10">
                     {accounts.map((acc) => (
                       <option key={acc.id} value={acc.id}>
                         {acc.name} ({acc.currency})
@@ -387,7 +387,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
                                     </div>
                                     <button
                                         type="button"
-                                        onClick={() => onCreateBudget(budgetInfo.category, budgetInfo.monthkey)}
+                                        onClick={() => onCreateBudget(budgetInfo.category, budgetInfo.monthKey)}
                                         className="px-3 py-1.5 bg-brand-blue text-white text-xs font-semibold rounded-lg hover:bg-blue-500 active:scale-95 transition-all"
                                     >
                                         Create

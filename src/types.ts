@@ -18,7 +18,7 @@ export interface Account {
 
 export interface Transaction {
   id:string;
-  accountid: string;
+  accountId: string;
   name: string;
   amount: number;
   currency: string;
@@ -26,7 +26,7 @@ export interface Transaction {
   date: string; // Storing as ISO string e.g., '2023-10-27'
   type: TransactionType;
   description?: string;
-  goalid?: string;
+  goalId?: string;
 }
 
 export interface ExchangeRates {
@@ -42,15 +42,15 @@ export interface User {
 export interface SavingsGoal {
   id: string;
   name: string;
-  targetamount: number;
-  currentamount: number;
+  targetAmount: number;
+  currentAmount: number;
   icon: string;
   currency: string;
 }
 
 export interface Budget {
   id: string;
-  monthkey: string; // "YYYY-MM"
+  monthKey: string; // "YYYY-MM"
   category: string;
   limit: number;
   icon: string;
@@ -61,7 +61,7 @@ export interface Category {
   id: string;
   name: string;
   icon: string;
-  isfavorite: boolean;
-  isdefault: boolean;
+  isFavorite: boolean;
+  isDefault: boolean;
   type: TransactionType;
 }

@@ -168,7 +168,7 @@ const App: React.FC = () => {
 
   const filteredTransactions = useMemo(() => {
     if (selectedAccountId === 'all') return transactions;
-    return transactions.filter(tx => tx.accountid === selectedAccountId);
+    return transactions.filter(tx => tx.accountId === selectedAccountId);
   }, [transactions, selectedAccountId]);
   
   const totalBalance = useMemo(() => {
@@ -230,8 +230,8 @@ const App: React.FC = () => {
           const newCategoryData: Omit<Category, 'id'> = {
               name: transactionData.category,
               icon: iconName,
-              isfavorite: false,
-              isdefault: false,
+              isFavorite: false,
+              isDefault: false,
               type: transactionData.type,
           };
           const newCategory = await api.addCategory(newCategoryData);
@@ -239,7 +239,7 @@ const App: React.FC = () => {
       }
 
       const originalTransaction = 'id' in transactionData ? transactions.find(t => t.id === transactionData.id) : null;
-      const currentGoalId = (transactionData as Transaction).goalid; 
+      const currentGoalId = (transactionData as Transaction).goalId; 
 
       if (currentGoalId || originalTransaction?.goalId) {
           setSavingsGoals(prevGoals => prevGoals.map(g => {
@@ -290,7 +290,7 @@ const App: React.FC = () => {
 
         setPotentialTransaction({
             ...newTransaction,
-            accountid: newTransaction.accountid || accounts[0].id,
+            accountId: newTransaction.accountId || accounts[0].id,
         });
         setTextInputValue('');
     } catch (err: any) {
@@ -326,7 +326,7 @@ const App: React.FC = () => {
               case 'account':
                   await api.deleteAccount(value.id);
                   setAccounts(prev => prev.filter(a => a.id !== value.id));
-                  setTransactions(prev => prev.filter(tx => tx.accountid !== value.id));
+                  setTransactions(prev => prev.filter(tx => tx.accountId !== value.id));
                   if(selectedAccountId === value.id) setSelectedAccountId('all');
                   break;
               case 'category':
@@ -361,7 +361,7 @@ const App: React.FC = () => {
             savedCategory = await api.updateCategory(categoryData);
             setCategories(prev => prev.map(cat => cat.id === savedCategory.id ? savedCategory : cat));
         } else {
-            savedCategory = await api.addCategory({ ...categoryData, isdefault: false });
+            savedCategory = await api.addCategory({ ...categoryData, isDefault: false });
             setCategories(prev => [...prev, savedCategory]);
         }
         if (categoryFormState.context?.from === 'budget') {
@@ -399,7 +399,7 @@ const App: React.FC = () => {
             const updated = await api.updateSavingsGoal(goalData);
             setSavingsGoals(prev => prev.map(g => g.id === updated.id ? updated : g));
         } else {
-            const newGoal = await api.addSavingsGoal({ ...goalData, currentamount: 0 });
+            const newGoal = await api.addSavingsGoal({ ...goalData, currentAmount: 0 });
             setSavingsGoals(prev => [...prev, newGoal]);
         }
     } catch (err: any) {
@@ -504,7 +504,7 @@ const App: React.FC = () => {
       // --- ИСПРАВЛЕНИЕ 2: Добавляем accountId по умолчанию, если его нет
       setPotentialTransaction({
           ...newTransaction,
-          accountid: newTransaction.accountid || accounts[0].id,
+          accountId: newTransaction.accountId || accounts[0].id,
       });
     } catch (err: any) {
       console.error('Failed to process audio:', err);
@@ -534,7 +534,7 @@ const App: React.FC = () => {
             onAddGoal={() => setIsGoalFormOpen(true)} 
             onAddToGoal={(goal) => { 
               setGoalForDeposit(goal); 
-              setPotentialTransaction({ accountid: accounts[0].id, name: `Deposit to "${goal.name}"`, amount: 0, currency: displayCurrency, category: 'Savings', date: new Date().toISOString(), type: TransactionType.EXPENSE, goalId: goal.id }); 
+              setPotentialTransaction({ accountId: accounts[0].id, name: `Deposit to "${goal.name}"`, amount: 0, currency: displayCurrency, category: 'Savings', date: new Date().toISOString(), type: TransactionType.EXPENSE, goalId: goal.id }); 
             }} 
             onViewGoalHistory={setGoalForHistory} 
             onEditGoal={(goal) => { setEditingGoal(goal); setIsGoalFormOpen(true); }} 
@@ -601,12 +601,12 @@ const App: React.FC = () => {
             transactions={transactions} 
             categories={categories} 
             onBack={() => setActiveScreen('profile')} 
-            onAddBudget={(monthkey) => { setEditingBudget({ monthkey, currency: displayCurrency }); setIsBudgetFormOpen(true); }} 
+            onAddBudget={(monthKey) => { setEditingBudget({ monthKey, currency: displayCurrency }); setIsBudgetFormOpen(true); }} 
             onEditBudget={(budget) => { setEditingBudget(budget); setIsBudgetFormOpen(true); }} 
             onDeleteBudget={(budget) => setItemToDelete({ type: 'budget', value: budget })} 
             onAddTransaction={(budget) => { 
               setIsCategoryLockedInForm(true); 
-              setPotentialTransaction({ accountid: accounts[0].id, name: '', amount: 0, currency: displayCurrency, category: budget.category, date: new Date().toISOString(), type: TransactionType.EXPENSE }); 
+              setPotentialTransaction({ accountId: accounts[0].id, name: '', amount: 0, currency: displayCurrency, category: budget.category, date: new Date().toISOString(), type: TransactionType.EXPENSE }); 
             }} 
             onViewHistory={setBudgetForHistory} 
             onCarryOver={(from, to) => setCarryOverInfo({ from, to })} 
@@ -711,7 +711,7 @@ const App: React.FC = () => {
           isCategoryLocked={isCategoryLockedInForm}
           budgets={budgets}
           transactions={transactions}
-          onCreateBudget={(cat, monthkey) => { setEditingBudget({ monthkey, category: cat, icon: categories.find(c=>c.name===cat)?.icon || 'LayoutGrid', limit: 0, currency: displayCurrency }); setIsBudgetFormOpen(true); }}
+          onCreateBudget={(cat, monthKey) => { setEditingBudget({ monthKey, category: cat, icon: categories.find(c=>c.name===cat)?.icon || 'LayoutGrid', limit: 0, currency: displayCurrency }); setIsBudgetFormOpen(true); }}
           rates={rates}
           defaultCurrency={displayCurrency}
         />
@@ -720,9 +720,9 @@ const App: React.FC = () => {
       {/* Модальные формы */}
       <AccountForm isOpen={isAccountFormOpen} onClose={() => setIsAccountFormOpen(false)} onSave={handleSaveAccount} account={editingAccount} />
       <SavingsGoalForm isOpen={isGoalFormOpen} onClose={() => { setIsGoalFormOpen(false); setEditingGoal(null); }} onSave={handleSaveGoal} goal={editingGoal} defaultCurrency={displayCurrency} />
-      <BudgetForm isOpen={isBudgetFormOpen} onClose={() => { setIsBudgetFormOpen(false); setEditingBudget(null); }} onSave={handleSaveBudget} budget={editingBudget} allCategories={categories} budgetsForMonth={budgets.filter(b => b.monthkey === editingBudget?.monthkey)} onCreateNewCategory={() => setCategoryFormState({ isOpen: true, category: null, context: {type: TransactionType.EXPENSE, from: 'budget'} })} defaultCurrency={displayCurrency} />
+      <BudgetForm isOpen={isBudgetFormOpen} onClose={() => { setIsBudgetFormOpen(false); setEditingBudget(null); }} onSave={handleSaveBudget} budget={editingBudget} allCategories={categories} budgetsForMonth={budgets.filter(b => b.monthKey === editingBudget?.monthKey)} onCreateNewCategory={() => setCategoryFormState({ isOpen: true, category: null, context: {type: TransactionType.EXPENSE, from: 'budget'} })} defaultCurrency={displayCurrency} />
       <CategoryForm isOpen={categoryFormState.isOpen} onClose={() => setCategoryFormState({isOpen: false, category: null})} onSave={handleSaveCategory} onDelete={(cat) => setItemToDelete({type: 'category', value: cat})} category={categoryFormState.category} isFavoriteDisabled={!categoryFormState.category?.isFavorite && categories.filter(c => c.isFavorite).length >= 10} categories={categories} />
-      <AccountActionsModal isOpen={!!accountForActions} account={accountForActions} onClose={() => setAccountForActions(null)} onAddTransaction={(acc) => { setPotentialTransaction({ accountid: acc.id, name: '', amount: 0, currency: displayCurrency, category: '', date: new Date().toISOString(), type: TransactionType.EXPENSE }); setActiveScreen('home'); setAccountForActions(null); }} onEdit={(acc) => { setEditingAccount(acc); setIsAccountFormOpen(true); setAccountForActions(null); }} onDelete={(acc) => { setItemToDelete({ type: 'account', value: acc }); setAccountForActions(null); }} />
+      <AccountActionsModal isOpen={!!accountForActions} account={accountForActions} onClose={() => setAccountForActions(null)} onAddTransaction={(acc) => { setPotentialTransaction({ accountId: acc.id, name: '', amount: 0, currency: displayCurrency, category: '', date: new Date().toISOString(), type: TransactionType.EXPENSE }); setActiveScreen('home'); setAccountForActions(null); }} onEdit={(acc) => { setEditingAccount(acc); setIsAccountFormOpen(true); setAccountForActions(null); }} onDelete={(acc) => { setItemToDelete({ type: 'account', value: acc }); setAccountForActions(null); }} />
       
       {/* Модальные окна подтверждения */}
       <ConfirmationModal 
@@ -737,8 +737,8 @@ const App: React.FC = () => {
         onCancel={() => setCarryOverInfo(null)} 
         onConfirm={() => { 
           if(carryOverInfo) { 
-            const prevBudgets = budgets.filter(b => b.monthkey === carryOverInfo.from); 
-            prevBudgets.forEach(b => handleSaveBudget({...b, monthkey: carryOverInfo.to})); 
+            const prevBudgets = budgets.filter(b => b.monthKey === carryOverInfo.from); 
+            prevBudgets.forEach(b => handleSaveBudget({...b, monthKey: carryOverInfo.to})); 
           } 
           setCarryOverInfo(null); 
         }} 

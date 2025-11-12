@@ -64,7 +64,7 @@ export const TransactionHistoryScreen: React.FC<TransactionHistoryScreenProps> =
       filtered = filtered.filter(tx => tx.type.toLowerCase() === filters.type);
     }
     if (filters.selectedAccounts.length > 0) {
-      filtered = filtered.filter(tx => filters.selectedAccounts.includes(tx.accountid));
+      filtered = filtered.filter(tx => filters.selectedAccounts.includes(tx.accountId));
     }
     if (filters.selectedCategories.length > 0) {
       filtered = filtered.filter(tx => filters.selectedCategories.includes(tx.category));
@@ -193,7 +193,7 @@ export const TransactionHistoryScreen: React.FC<TransactionHistoryScreenProps> =
                             <motion.li key={tx.id} variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }}>
                                 <TransactionItem
                                     transaction={tx}
-                                    account={accountsById[tx.accountid]}
+                                    account={accountsById[tx.accountId]}
                                     onSelect={onSelectTransaction}
                                     onDelete={onDeleteTransaction}
                                     rates={rates}
