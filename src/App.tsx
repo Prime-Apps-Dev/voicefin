@@ -320,8 +320,17 @@ const App: React.FC = () => {
     if (!itemToDelete) return;
 
     try {
-      if ('type' in itemToDelete) {
-          const { type, value } = itemToDelete;
+      // *** ИСПРАВЛЕНИЕ ЗДЕСЬ ***
+      // Проблема: Объект 'Transaction' (транзакция) тоже имеет свойство 'type' ('INCOME'/'EXPENSE'),
+      // из-за чего ваше условие if ('type' in itemToDelete) срабатывало для транзакций,
+      // но не находило совпадений в switch (т.к. 'INCOME' !== 'account').
+      //
+      // Решение: Мы меняем проверку на 'value'. Только обертки для 
+      // 'account', 'category' и т.д. имеют свойство 'value'.
+      if (itemToDelete && 'value' in itemToDelete) {
+          // Эта ветка теперь ТОЛЬКО для счетов, категорий, бюджетов и целей
+          const { type, value } = itemToDelete as { type: string, value: { id: string, name?: string, category?: string } }; // Добавим as для надежности
+          
           switch(type) {
               case 'account':
                   await api.deleteAccount(value.id);
@@ -342,9 +351,26 @@ const App: React.FC = () => {
                   setBudgets(prev => prev.filter(b => b.id !== value.id));
                   break;
           }
-      } else { // It's a transaction
-          await api.deleteTransaction(itemToDelete.id);
-          setTransactions(prev => prev.filter(t => t.id !== itemToDelete.id));
+      } else { 
+          // Эта ветка теперь ТОЛЬКО для транзакций
+          // 'itemToDelete' в этой ветке - это сам объект Transaction
+          const transactionToDelete = itemToDelete as Transaction;
+          
+          // --- ДОПОЛНИТЕЛЬНАЯ ЛОГИКА (исправление из прошлого шага) ---
+          // Если транзакция была депозитом в копилку, нужно обновить копилку
+          if (transactionToDelete.goalId && transactionToDelete.type === TransactionType.EXPENSE) {
+             setSavingsGoals(prevGoals => prevGoals.map(g => {
+                if (g.id === transactionToDelete.goalId) {
+                    const amountInGoalCurrency = convertCurrency(transactionToDelete.amount, transactionToDelete.currency, g.currency, rates);
+                    return { ...g, currentAmount: Math.max(0, g.currentAmount - amountInGoalCurrency) };
+                }
+                return g;
+             }));
+          }
+          // --- КОНЕЦ ДОП. ЛОГИКИ ---
+
+          await api.deleteTransaction(transactionToDelete.id);
+          setTransactions(prev => prev.filter(t => t.id !== transactionToDelete.id));
       }
     } catch (err: any) {
        console.error("Delete failed:", err);
