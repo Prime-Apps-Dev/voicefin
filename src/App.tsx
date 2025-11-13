@@ -46,8 +46,6 @@ import { useLocalization } from './context/LocalizationContext';
 // --- КОНСТАНТА ДЛЯ ОТСТУПА TELEGRAM MINI APP ---
 const TG_HEADER_OFFSET_CLASS = 'pt-[85px]';
 
-// --- КОМПОНЕНТ ФОРМЫ ЛОГИНА (DevLoginForm) УДАЛЕН ОТСЮДА ---
-
 
 // --- App State & Backend Interaction ---
 const App: React.FC = () => {
@@ -182,12 +180,19 @@ const App: React.FC = () => {
     // @ts-ignore (Наш mock-файл создаст этот объект в dev-режиме)
     const tg = window.Telegram.WebApp;
 
-    // --- НОВЫЙ ОБРАБОТЧИК ДЛЯ VIEWPORT ---
+    // --- ИЗМЕНЕНИЕ ЗДЕСЬ: ОБНОВЛЕННЫЙ ОБРАБОТЧИК VIEWPORT ---
     const handleViewportChange = () => {
       if (tg) {
+        // Новая, более точная проверка:
+        // Приложение считается "полностью" развернутым, 
+        // только когда его текущая высота (viewportHeight) 
+        // равна его "стабильной" высоте (viewportStableHeight).
+        // Свойство tg.isExpanded срабатывает слишком рано (в "почти" развернутом состоянии).
+        const isTrulyExpanded = tg.viewportHeight === tg.viewportStableHeight;
+        
         // Устанавливаем состояние React в 
-        // соответствие с состоянием Telegram
-        setIsAppExpanded(tg.isExpanded); 
+        // соответствие с этой точной проверкой
+        setIsAppExpanded(isTrulyExpanded); 
       }
     };
 
@@ -227,10 +232,10 @@ const App: React.FC = () => {
           tg.ready();
           tg.expand();
 
-          // --- НОВАЯ ЛОГИКА: ПОДПИСКА НА СОБЫТИЕ ---
+          // --- ЛОГИКА: ПОДПИСКА НА СОБЫТИЕ ---
           tg.onEvent('viewportChanged', handleViewportChange);
           
-          // --- НОВАЯ ЛОГИКА: УСТАНОВКА НАЧАЛЬНОГО ЗНАЧЕНИЯ ---
+          // --- ЛОГИКА: УСТАНОВКА НАЧАЛЬНОГО ЗНАЧЕНИЯ ---
           // Вызываем один раз при запуске, чтобы 
           // получить актуальное состояние
           handleViewportChange();
@@ -275,7 +280,7 @@ const App: React.FC = () => {
 
     startApp();
 
-    // --- НОВАЯ ЛОГИКА: ОЧИСТКА ПОДПИСКИ ---
+    // --- ЛОГИКА: ОЧИСТКА ПОДПИСКИ ---
     return () => {
       if (tg) {
         tg.offEvent('viewportChanged', handleViewportChange);
@@ -709,7 +714,7 @@ const App: React.FC = () => {
   };
 
 
-  // --- Render Logic (Рендеринг Контента) (ИЗМЕНЕНИЯ ЗДЕСЬ) ---
+  // --- Render Logic (Рендеринг Контента) (без изменений) ---
   const renderContent = () => {
     
     switch (activeScreen) {
@@ -814,8 +819,6 @@ const App: React.FC = () => {
         <ComingSoonScreen onBack={() => setActiveScreen('profile')} />
       );
       
-      // --- ИЗМЕНЕНИЕ ЗДЕСЬ ---
-      // Вместо верстки <main>...</main> мы вызываем новый компонент
       case 'home': 
       default: 
         return (
@@ -870,13 +873,14 @@ const App: React.FC = () => {
     );
   }
 
-  // --- ОСНОВНОЙ РЕНДЕРИНГ ПРИЛОЖЕНИЯ (ИЗМЕНЕНИЯ ЗДЕСЬ) ---
+  // --- ОСНОВНОЙ РЕНДЕРИНГ ПРИЛОЖЕНИЯ (без изменений) ---
   const isDev = import.meta.env.DEV;
   
-  // --- ДИНАМИЧЕСКАЯ ЛОГИКА ОТСТУПА (ПЕРЕМЕЩЕНА СЮДА) ---
+  // --- ДИНАМИЧЕСКАЯ ЛОГИКА ОТСТУПА ---
   // Отступ (pt-[85px]) будет применен, ТОЛЬКО если:
   // 1. Мы НЕ в режиме разработки (isDev = false)
-  // 2. И приложение развернуто (isAppExpanded = true)
+  // 2. И приложение развернуто (isAppExpanded = true, 
+  //    что теперь означает viewportHeight === viewportStableHeight)
   const headerOffsetClass = !isDev && isAppExpanded ? TG_HEADER_OFFSET_CLASS : '';
 
   return (
@@ -897,7 +901,7 @@ const App: React.FC = () => {
         <div className="fixed top-0 left-0 right-0 h-[85px] bg-gray-900 z-20"></div>
       )}
 
-      {/* --- ИЗМЕНЕНИЕ ЗДЕСЬ: ОБЕРТКА ДЛЯ ВСЕХ ЭКРАНОВ --- */}
+      {/* --- ОБЕРТКА ДЛЯ ВСЕХ ЭКРАНОВ --- */}
       {/* Основное содержимое экрана (которое мы выбрали в renderContent) */}
       {!isLoading && (
         // Применяем динмический класс отступа ЗДЕСЬ
