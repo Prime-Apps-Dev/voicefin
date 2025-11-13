@@ -180,17 +180,22 @@ const App: React.FC = () => {
     // @ts-ignore (Наш mock-файл создаст этот объект в dev-режиме)
     const tg = window.Telegram.WebApp;
 
-    // --- ИЗМЕНЕНИЕ ЗДЕСЬ: ОБНОВЛЕННЫЙ ОБРАБОТЧИК VIEWPORT ---
+    // --- ИЗМЕНЕНИЕ ЗДЕСЬ: НОВАЯ, ПРАВИЛЬНАЯ ЛОГИКА ---
     const handleViewportChange = () => {
       if (tg) {
-        // Новая, более точная проверка:
-        // Приложение считается "полностью" развернутым, 
-        // только когда его текущая высота (viewportHeight) 
-        // равна его "стабильной" высоте (viewportStableHeight).
-        const isTrulyExpanded = tg.viewportHeight === tg.viewportStableHeight;
+        //
+        // tg.isExpanded становится true в "почти" развернутом состоянии (80-90%).
+        // В этот же момент, viewportHeight === viewportStableHeight.
+        //
+        // Когда пользователь вручную дотягивает до 100%,
+        // tg.isExpanded все еще true, НО
+        // viewportHeight становится БОЛЬШЕ, чем viewportStableHeight.
+        //
+        // Поэтому, 100% — это ЕДИНСТВЕННОЕ состояние,
+        // где isExpanded = true И viewportHeight > viewportStableHeight
         
-        // Устанавливаем состояние React в 
-        // соответствие с этой точной проверкой
+        const isTrulyExpanded = tg.isExpanded && tg.viewportHeight > tg.viewportStableHeight;
+        
         setIsAppExpanded(isTrulyExpanded); 
       }
     };
@@ -229,7 +234,7 @@ const App: React.FC = () => {
           }
           
           tg.ready();
-          tg.expand();
+          tg.expand(); // Эта команда разворачивает до 80-90% (Точка 2)
 
           // --- ЛОГИКА: ПОДПИСКА НА СОБЫТИЕ ---
           tg.onEvent('viewportChanged', handleViewportChange);
@@ -879,7 +884,7 @@ const App: React.FC = () => {
   // Отступ (pt-[85px]) будет применен, ТОЛЬКО если:
   // 1. Мы НЕ в режиме разработки (isDev = false)
   // 2. И приложение развернуто (isAppExpanded = true, 
-  //    что теперь означает viewportHeight === viewportStableHeight)
+  //    что теперь означает viewportHeight > viewportStableHeight)
   const headerOffsetClass = !isDev && isAppExpanded ? TG_HEADER_OFFSET_CLASS : '';
 
   return (
