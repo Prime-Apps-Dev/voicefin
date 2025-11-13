@@ -33,11 +33,7 @@ import { CategoryForm } from './components/CategoryForm';
 import { ComingSoonScreen } from './components/ComingSoonScreen';
 import { TransactionHistoryScreen } from './components/TransactionHistoryScreen';
 import { OnboardingGuide } from './components/OnboardingGuide';
-import { LoadingScreen } from './components/LoadingScreen';
-
-// --- НОВЫЕ ИМПОРТЫ ВЫНЕСЕННЫХ КОМПОНЕНТОВ ---
-import { DevLoginForm } from './components/DevLoginForm';
-import { HomeScreen } from './components/HomeScreen';
+import { LoadingScreen } from './components/LoadingScreen'; // <-- ДОБАВЛЕН ИМПОРТ
 
 // Импорты утилит и сервисов
 import { getExchangeRates, convertCurrency } from './services/currency';
@@ -45,6 +41,90 @@ import { useLocalization } from './context/LocalizationContext';
 
 // --- КОНСТАНТА ДЛЯ ОТСТУПА TELEGRAM MINI APP ---
 const TG_HEADER_OFFSET_CLASS = 'pt-[85px]';
+
+// --- НОВЫЙ КОМПОНЕНТ: ФОРМА ЛОГИНА ДЛЯ РАЗРАБОТКИ ---
+const DevLoginForm: React.FC<{
+  onSubmit: (email: string, pass: string) => Promise<void>;
+  error: string | null;
+  isLoading: boolean;
+}> = ({ onSubmit, error, isLoading }) => {
+  const [email, setEmail] = useState('test@example.com'); // Можете вписать свой email по умолчанию
+  const [password, setPassword] = useState('');
+  const [showPass, setShowPass] = useState(false);
+  const { t } = useLocalization();
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit(email, password);
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
+      <div className="w-full max-w-sm p-8 bg-gray-800 rounded-2xl shadow-xl">
+        <h1 className="text-3xl font-bold text-center text-white mb-2">
+          VoiceFin
+        </h1>
+        <p className="text-center text-brand-purple mb-6 text-sm font-medium">
+          {t('devLoginTitle')}
+        </p>
+        
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            <label className="text-sm font-medium text-gray-400 block mb-2" htmlFor="email">
+              {t('email')}
+            </label>
+            <input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full px-4 py-3 bg-gray-700 text-white rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-brand-purple"
+              placeholder="user@supabase.com"
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-400 block mb-2" htmlFor="password">
+              {t('password')}
+            </label>
+            <div className="relative">
+              <input
+                id="password"
+                type={showPass ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-4 py-3 bg-gray-700 text-white rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-brand-purple"
+                placeholder="••••••••"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPass(!showPass)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+              >
+                {showPass ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
+            </div>
+          </div>
+          
+          {error && (
+            <p className="text-sm text-red-400 text-center">{error}</p>
+          )}
+
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full bg-brand-green text-white font-bold py-3 px-4 rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+          >
+            {isLoading ? (
+              <div className="w-6 h-6 border-2 border-t-transparent border-white rounded-full animate-spin"></div>
+            ) : (
+              t('login')
+            )}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+};
 
 
 // --- App State & Backend Interaction ---
@@ -101,8 +181,9 @@ const App: React.FC = () => {
   const [blockMessage, setBlockMessage] = useState('');
   const [isDevLoggingIn, setIsDevLoggingIn] = useState(false); 
 
-  // --- НОВОЕ СОСТОЯНИЕ ДЛЯ ОТСЛЕЖИВАНИЯ РАЗВЕРТЫВАНИЯ ---
+  // --- ИЗМЕНЕНИЕ: 2 НОВЫХ СОСТОЯНИЯ ДЛЯ VIEWPORT ---
   const [isAppExpanded, setIsAppExpanded] = useState(false); 
+  const [isAppFullscreen, setIsAppFullscreen] = useState(false);
 
   // Refs для записи аудио
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -180,23 +261,14 @@ const App: React.FC = () => {
     // @ts-ignore (Наш mock-файл создаст этот объект в dev-режиме)
     const tg = window.Telegram.WebApp;
 
-    // --- ИЗМЕНЕНИЕ ЗДЕСЬ: НОВАЯ, ПРАВИЛЬНАЯ ЛОГИКА ---
+    // --- ИЗМЕНЕНИЕ: ОБНОВЛЕННЫЙ ОБРАБОТЧИК ---
     const handleViewportChange = () => {
       if (tg) {
-        //
-        // tg.isExpanded становится true в "почти" развернутом состоянии (80-90%).
-        // В этот же момент, viewportHeight === viewportStableHeight.
-        //
-        // Когда пользователь вручную дотягивает до 100%,
-        // tg.isExpanded все еще true, НО
-        // viewportHeight становится БОЛЬШЕ, чем viewportStableHeight.
-        //
-        // Поэтому, 100% — это ЕДИНСТВЕННОЕ состояние,
-        // где isExpanded = true И viewportHeight > viewportStableHeight
-        
-        const isTrulyExpanded = tg.isExpanded && tg.viewportHeight > tg.viewportStableHeight;
-        
-        setIsAppExpanded(isTrulyExpanded); 
+        // Обновляем ОБА состояния 
+        setIsAppExpanded(tg.isExpanded);
+        // "tg.isFullscreen" может быть undefined, 
+        // если версия API старая
+        setIsAppFullscreen(tg.isFullscreen || false); 
       }
     };
 
@@ -206,15 +278,12 @@ const App: React.FC = () => {
           // --- 1. DEV PATH (РЕЖИМ РАЗРАБОТКИ) ---
           console.log('DEV MODE: Checking Supabase session...');
           
-          // Проверяем, есть ли уже активная сессия в localStorage
           const { data: { session } } = await supabase.auth.getSession();
           
           if (session) {
-            // Сессия есть, отлично. Просто загружаем данные.
             console.log('DEV MODE: Session found. Loading app data...');
             await loadAppData(session.user.id, { first_name: 'Dev' });
           } else {
-            // Сессии нет. Показываем нашу форму Dev-логина.
             console.log('DEV MODE: No session. Showing dev login form.');
             setIsDevLoggingIn(true);
             setIsLoading(false);
@@ -223,25 +292,29 @@ const App: React.FC = () => {
         } else {
           // --- 2. PROD PATH (РЕЖИМ TELEGRAM) ---
           
-          // --- ПРОВЕРКА #1: ЗАПУСК В TELEGRAM ---
           if (!tg) {
               throw new Error(t('telegramErrorNotTelegram'));
           }
-
-          // --- ПРОВЕРКА #2: НАЛИЧИЕ ДАННЫХ АУТЕНТИФИКАЦИИ ---
           if (!tg.initData) {
               throw new Error(t('telegramErrorNoData'));
           }
           
           tg.ready();
-          tg.expand(); // Эта команда разворачивает до 80-90% (Точка 2)
+          
+          // 1. Просим развернуться (на случай, если fullscreen не сработает)
+          tg.expand();
 
-          // --- ЛОГИКА: ПОДПИСКА НА СОБЫТИЕ ---
+          // 2. ИЗМЕНЕНИЕ: Просим включить полноэкранный режим
+          if (tg.requestFullscreen) {
+            tg.requestFullscreen();
+          }
+
+          // 3. Подписываемся на событие, которое 
+          // скажет нам *реальное* состояние
           tg.onEvent('viewportChanged', handleViewportChange);
           
-          // --- ЛОГИКА: УСТАНОВКА НАЧАЛЬНОГО ЗНАЧЕНИЯ ---
-          // Вызываем один раз при запуске, чтобы 
-          // получить актуальное состояние
+          // 4. Вызываем один раз, чтобы 
+          // получить начальное состояние
           handleViewportChange();
 
           // Шаг 1: Аутентификация через Telegram
@@ -271,7 +344,6 @@ const App: React.FC = () => {
         console.error("Initialization failed:", err);
         const errorMsg = (err instanceof Error) ? err.message : String(err);
         
-        // Отлавливаем наши "блокирующие" ошибки
         if (errorMsg === t('telegramErrorNotTelegram') || errorMsg === t('telegramErrorNoData')) {
             setBlockMessage(errorMsg);
             setIsBlocked(true);
@@ -284,7 +356,7 @@ const App: React.FC = () => {
 
     startApp();
 
-    // --- ЛОГИКА: ОЧИСТКА ПОДПИСКИ ---
+    // --- ОЧИСТКА ПОДПИСКИ ---
     return () => {
       if (tg) {
         tg.offEvent('viewportChanged', handleViewportChange);
@@ -718,9 +790,9 @@ const App: React.FC = () => {
   };
 
 
-  // --- Render Logic (Рендеринг Контента) (без изменений) ---
+  // --- Render Logic (Рендеринг Контента) (ИЗМЕНЕНИЯ ЗДЕСЬ) ---
+  // (Эта функция теперь возвращает *только* компонент экрана)
   const renderContent = () => {
-    
     switch (activeScreen) {
       case 'savings': return (
         <SavingsScreen 
@@ -822,29 +894,41 @@ const App: React.FC = () => {
       case 'comingSoon': return (
         <ComingSoonScreen onBack={() => setActiveScreen('profile')} />
       );
-      
-      case 'home': 
-      default: 
-        return (
-          <HomeScreen
-            accounts={accounts}
-            transactions={transactions}
-            rates={rates}
-            selectedAccountId={selectedAccountId}
-            onSelectAccount={setSelectedAccountId}
-            totalBalance={totalBalance}
-            defaultCurrency={displayCurrency}
-            summary={summary}
-            totalSavings={totalSavings}
-            onNavigate={setActiveScreen}
-            onGenerateTips={handleGenerateSavingsTips}
-            filteredTransactions={filteredTransactions}
-            onSelectTransaction={setEditingTransaction}
-            onDeleteTransaction={(tx) => setItemToDelete(tx)}
-            error={error}
-            isDevLoggingIn={isDevLoggingIn}
-          />
-        );
+      case 'home': default: return (
+        // (Обертка с отступом УБРАНА отсюда и перенесена 
+        // в главный рендер)
+        <main className="max-w-4xl mx-auto flex flex-col gap-4 pb-32"> 
+          <AccountList 
+            accounts={accounts} 
+            transactions={transactions} 
+            rates={rates} 
+            selectedAccountId={selectedAccountId} 
+            onSelectAccount={setSelectedAccountId} 
+            totalBalance={totalBalance} 
+            defaultCurrency={displayCurrency} 
+          /> 
+          <FinancialOverview 
+            monthlyIncome={summary.monthlyIncome} 
+            monthlyExpense={summary.monthlyExpense} 
+            totalBalance={summary.selectedBalance} 
+            totalSavings={totalSavings} 
+            defaultCurrency={displayCurrency} 
+            onNavigate={setActiveScreen} 
+            onGenerateTips={handleGenerateSavingsTips} 
+          /> 
+          <div className="px-6"> 
+            <TransactionList 
+              transactions={filteredTransactions} 
+              accounts={accounts} 
+              onSelectTransaction={setEditingTransaction} 
+              onDeleteTransaction={(tx) => setItemToDelete(tx)} 
+              onViewAll={() => setActiveScreen('history')} 
+              rates={rates} 
+            /> 
+          </div> 
+          {error && !isDevLoggingIn && <p className="text-center text-red-500 mt-2 px-6" onClick={() => setError(null)}>{error}</p>} 
+        </main> 
+      );
     }
   }
 
@@ -877,20 +961,49 @@ const App: React.FC = () => {
     );
   }
 
-  // --- ОСНОВНОЙ РЕНДЕРИНГ ПРИЛОЖЕНИЯ (без изменений) ---
+  // --- ОСНОВНОЙ РЕНДЕРИНГ ПРИЛОЖЕНИЯ (ИЗМЕНЕНИЯ ЗДЕСЬ) ---
   const isDev = import.meta.env.DEV;
+
+  // --- ИЗМЕНЕНИЕ: СЛОЖНАЯ ЛОГИКА ОТСТУПОВ ---
+  let paddingTopClass = '';
+  // `pb-32` (8rem) — это базовый отступ, чтобы 
+  // контент не "залез" под BottomNavBar
+  let contentBottomPaddingClass = 'pb-32'; 
   
-  // --- ДИНАМИЧЕСКАЯ ЛОГИКА ОТСТУПА ---
-  // Отступ (pt-[85px]) будет применен, ТОЛЬКО если:
-  // 1. Мы НЕ в режиме разработки (isDev = false)
-  // 2. И приложение развернуто (isAppExpanded = true, 
-  //    что теперь означает viewportHeight > viewportStableHeight)
-  const headerOffsetClass = !isDev && isAppExpanded ? TG_HEADER_OFFSET_CLASS : '';
+  // Эта логика будет работать, только если мы *не* в 
+  // режиме разработки
+  if (!isDev) {
+    if (isAppFullscreen) {
+      // 1. РЕЖИМ FULLSCREEN ("Чёлка" видна, шапка TG - нет)
+      // Добавляем отступ для "чёлки" (status bar)
+      paddingTopClass = 'pt-[env(safe-area-inset-top)]';
+      // Добавляем отступ для "полоски домой" (home bar) 
+      // К базовому отступу pb-32
+      contentBottomPaddingClass = 'pb-[calc(8rem+env(safe-area-inset-bottom))]';
+
+    } else if (isAppExpanded && activeScreen === 'home') {
+      // 2. РЕЖИМ EXPANDED (Шапка TG видна, "чёлки" - нет)
+      // Добавляем отступ 85px (только для 'home')
+      paddingTopClass = TG_HEADER_OFFSET_CLASS; 
+      // Нижний отступ остается базовым (pb-32), 
+      // т.к. BottomNavBar сам справится
+    }
+    // 3. В СВЕРНУТОМ режиме (isAppExpanded: false) 
+    // paddingTopClass будет '', что корректно.
+  }
+  
+  // --- ИЗМЕНЕНИЕ: Логика для "маски" 85px ---
+  // Маска (фон для отступа) нужна, ТОЛЬКО если:
+  // 1. Не Dev-режим
+  // 2. Приложение развернуто (isAppExpanded = true)
+  // 3. Приложение НЕ в fullscreen (isAppFullscreen = false)
+  // 4. И мы на главном экране ('home')
+  const showMask = !isDev && isAppExpanded && !isAppFullscreen && activeScreen === 'home';
 
   return (
     <div className="min-h-screen bg-gray-900">
       
-      {/* --- НОВЫЙ ЭКРАН ЗАГРУЗКИ --- */}
+      {/* --- НОВЫЙ ЭКРАН ЗАГРУЗKI --- */}
       <LoadingScreen isLoading={isLoading && !isDevLoggingIn} />
 
       {/* --- РЕНДЕР ONBOARDING (поверх всего) --- */}
@@ -899,20 +1012,21 @@ const App: React.FC = () => {
       </AnimatePresence>
 
       {/* --- ИЗМЕНЕННАЯ ЛОГИКА "МАСКИ" (ШИР-МЫ) --- */}
-      {/* Эта "маска" (визуальный блок) будет 
-        показана при тех же условиях, что и отступ */}
-      {!isDev && isAppExpanded && (
+      {/* Показываем "маску" (фон для отступа) только при 
+          соблюдении всех условий */}
+      {showMask && (
         <div className="fixed top-0 left-0 right-0 h-[85px] bg-gray-900 z-20"></div>
       )}
 
-      {/* --- ОБЕРТКА ДЛЯ ВСЕХ ЭКРАНОВ --- */}
-      {/* Основное содержимое экрана (которое мы выбрали в renderContent) */}
+      {/* --- ИЗМЕНЕНИЕ: ГЛАВНЫЙ КОНТЕЙНЕР КОНТЕНТА --- */}
+      {/* Этот div теперь оборачивает ВЕСЬ контент и применяет 
+          НУЖНЫЕ отступы (для "чёлки" или для шапки TG) */}
       {!isLoading && (
-        // Применяем динмический класс отступа ЗДЕСЬ
-        <div className={headerOffsetClass}>
+        <div className={`${paddingTopClass} ${contentBottomPaddingClass}`}>
           {renderContent()}
         </div>
       )}
+
 
       {/* Оверлей записи аудио (поверх всего) */}
       {isRecording && (
@@ -980,6 +1094,8 @@ const App: React.FC = () => {
       {budgetForHistory && <BudgetTransactionsModal isOpen={!!budgetForHistory} onClose={() => setBudgetForHistory(null)} budget={budgetForHistory} transactions={transactions} accounts={accounts} onSelectTransaction={setEditingTransaction} onDeleteTransaction={(tx) => setItemToDelete(tx)} rates={rates} />}
       
       {/* Нижняя навигационная панель (поверх всего) */}
+      {/* BottomNavBar ТЕПЕРЬ ОТДЕЛЬНЫЙ КОМПОНЕНТ, 
+          ОН САМ ДОБАВИТ СЕБЕ НИЖНИЙ ОТСТУП (в Шаге 3) */}
       {!isLoading && (
         <BottomNavBar 
           activeScreen={activeScreen} 
