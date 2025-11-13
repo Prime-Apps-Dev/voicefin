@@ -187,7 +187,6 @@ const App: React.FC = () => {
         // Приложение считается "полностью" развернутым, 
         // только когда его текущая высота (viewportHeight) 
         // равна его "стабильной" высоте (viewportStableHeight).
-        // Свойство tg.isExpanded срабатывает слишком рано (в "почти" развернутом состоянии).
         const isTrulyExpanded = tg.viewportHeight === tg.viewportStableHeight;
         
         // Устанавливаем состояние React в 
