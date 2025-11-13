@@ -113,10 +113,10 @@ export const CategoriesScreen: React.FC<CategoriesScreenProps> = (props) => {
 
   return (
     // Корневой div с отступом для маски
-    <div className="min-h-screen bg-gray-900 flex flex-col pb-24 pt-[85px]">
+    <div className="min-h-screen bg-gray-900 flex flex-col pb-24">
       
       {/* "Липкий" header */}
-      <header className="px-4 pb-4 flex items-center justify-between sticky top-0 bg-gray-900/80 backdrop-blur-sm z-10">
+      <header className="px-4 pb-4 pt-4 flex items-center justify-between sticky top-0 bg-gray-900/80 backdrop-blur-sm z-10">
         <button onClick={onBack} className="p-2 rounded-full hover:bg-gray-700">
           <ChevronLeft className="w-6 h-6 text-white" />
         </button>

@@ -101,11 +101,11 @@ export const SavingsScreen: React.FC<SavingsScreenProps> = (props) => {
 
   return (
     // 1. Корневой div с отступом для маски
-    <div className="min-h-screen bg-gray-900 pt-[85px]">
+    <div className="min-h-screen bg-gray-900">
         
         {/* 2. Новый "липкий" header */}
-        <header className="sticky top-0 bg-gray-900/80 backdrop-blur-sm z-10 p-4 flex items-center justify-between">
-           <h1 className="text-2xl font-bold text-white">{t('mySavingsGoals')}</h1>
+        <header className="sticky top-0 bg-gray-900/80 backdrop-blur-sm z-10 px-4 pt-4 flex items-center justify-between">
+           <h1 className="pl-2 text-2xl font-bold text-white">{t('mySavingsGoals')}</h1>
            <button 
               onClick={onAddGoal} 
               className="p-2 rounded-full text-gray-300 hover:bg-gray-700 hover:text-white transition-colors"

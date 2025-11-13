@@ -55,14 +55,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = (props) => {
     const avatarColor = stringToColor(user.name);
     
     return (
-        // ДОБАВЛЯЕМ pt-[85px] ЗДЕСЬ
-        <div ref={scrollRef} className="h-screen overflow-y-auto bg-gradient-to-b from-gray-900 to-gray-800 pb-32 scrollbar-hide pt-[85px]">
-            {/* Sticky header container:
-              Этот 'sticky top-0' приклеится к ВЕРХУ этого div'а (который начинается с 85px).
-              Это означает, что он НЕ будет "наползать" на нашу новую "маску", 
-              а будет прокручиваться ВМЕСТЕ с контентом и исчезать под маской.
-              Это ИДЕАЛЬНО. Нам не нужно менять z-index здесь.
-            */}
+
+        <div ref={scrollRef} className="h-screen overflow-y-auto bg-gradient-to-b from-gray-900 to-gray-800 pb-32 scrollbar-hide">
+            
             <div className="sticky top-0 h-[180px] bg-gradient-to-b from-gray-900 to-gray-800 z-0 flex items-center justify-center px-6">
                 <motion.div
                     className="w-full max-w-md"

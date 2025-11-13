@@ -48,7 +48,7 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({
 
   return (
     // Корневой div с отступом для маски
-    <div className="min-h-screen bg-gray-900 flex flex-col pt-[85px]">
+    <div className="min-h-screen bg-gray-900 flex flex-col">
       
       {/* "Липкий" header */}
       <header className="p-4 flex items-center justify-between sticky top-0 bg-gray-900/80 backdrop-blur-sm z-10">

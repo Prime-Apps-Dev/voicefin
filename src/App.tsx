@@ -33,7 +33,11 @@ import { CategoryForm } from './components/CategoryForm';
 import { ComingSoonScreen } from './components/ComingSoonScreen';
 import { TransactionHistoryScreen } from './components/TransactionHistoryScreen';
 import { OnboardingGuide } from './components/OnboardingGuide';
-import { LoadingScreen } from './components/LoadingScreen'; // <-- ДОБАВЛЕН ИМПОРТ
+import { LoadingScreen } from './components/LoadingScreen';
+
+// --- НОВЫЕ ИМПОРТЫ ВЫНЕСЕННЫХ КОМПОНЕНТОВ ---
+import { DevLoginForm } from './components/DevLoginForm';
+import { HomeScreen } from './components/HomeScreen';
 
 // Импорты утилит и сервисов
 import { getExchangeRates, convertCurrency } from './services/currency';
@@ -42,89 +46,7 @@ import { useLocalization } from './context/LocalizationContext';
 // --- КОНСТАНТА ДЛЯ ОТСТУПА TELEGRAM MINI APP ---
 const TG_HEADER_OFFSET_CLASS = 'pt-[85px]';
 
-// --- НОВЫЙ КОМПОНЕНТ: ФОРМА ЛОГИНА ДЛЯ РАЗРАБОТКИ ---
-const DevLoginForm: React.FC<{
-  onSubmit: (email: string, pass: string) => Promise<void>;
-  error: string | null;
-  isLoading: boolean;
-}> = ({ onSubmit, error, isLoading }) => {
-  const [email, setEmail] = useState('test@example.com'); // Можете вписать свой email по умолчанию
-  const [password, setPassword] = useState('');
-  const [showPass, setShowPass] = useState(false);
-  const { t } = useLocalization();
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSubmit(email, password);
-  };
-
-  return (
-    <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
-      <div className="w-full max-w-sm p-8 bg-gray-800 rounded-2xl shadow-xl">
-        <h1 className="text-3xl font-bold text-center text-white mb-2">
-          VoiceFin
-        </h1>
-        <p className="text-center text-brand-purple mb-6 text-sm font-medium">
-          {t('devLoginTitle')}
-        </p>
-        
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label className="text-sm font-medium text-gray-400 block mb-2" htmlFor="email">
-              {t('email')}
-            </label>
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 bg-gray-700 text-white rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-brand-purple"
-              placeholder="user@supabase.com"
-            />
-          </div>
-          <div>
-            <label className="text-sm font-medium text-gray-400 block mb-2" htmlFor="password">
-              {t('password')}
-            </label>
-            <div className="relative">
-              <input
-                id="password"
-                type={showPass ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-700 text-white rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-brand-purple"
-                placeholder="••••••••"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPass(!showPass)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
-              >
-                {showPass ? <EyeOff size={20} /> : <Eye size={20} />}
-              </button>
-            </div>
-          </div>
-          
-          {error && (
-            <p className="text-sm text-red-400 text-center">{error}</p>
-          )}
-
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full bg-brand-green text-white font-bold py-3 px-4 rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-          >
-            {isLoading ? (
-              <div className="w-6 h-6 border-2 border-t-transparent border-white rounded-full animate-spin"></div>
-            ) : (
-              t('login')
-            )}
-          </button>
-        </form>
-      </div>
-    </div>
-  );
-};
+// --- КОМПОНЕНТ ФОРМЫ ЛОГИНА (DevLoginForm) УДАЛЕН ОТСЮДА ---
 
 
 // --- App State & Backend Interaction ---
@@ -789,15 +711,7 @@ const App: React.FC = () => {
 
   // --- Render Logic (Рендеринг Контента) (ИЗМЕНЕНИЯ ЗДЕСЬ) ---
   const renderContent = () => {
-    // В dev-режиме нам не нужен отступ, если только мы не хотим его симулировать
-    const isDev = import.meta.env.DEV;
-
-    // --- ИЗМЕНЕННАЯ ЛОГИКА РАСЧЕТА ОТСТУПА ---
-    // Отступ (pt-[85px]) будет применен, ТОЛЬКО если:
-    // 1. Мы НЕ в режиме разработки (isDev = false)
-    // 2. И приложение развернуто (isAppExpanded = true)
-    const headerOffsetClass = !isDev && isAppExpanded ? TG_HEADER_OFFSET_CLASS : '';
-
+    
     switch (activeScreen) {
       case 'savings': return (
         <SavingsScreen 
@@ -899,47 +813,36 @@ const App: React.FC = () => {
       case 'comingSoon': return (
         <ComingSoonScreen onBack={() => setActiveScreen('profile')} />
       );
-      case 'home': default: return (
-        // (Класс headerOffsetClass теперь динамический)
-        <div className={headerOffsetClass}> 
-          <main className="max-w-4xl mx-auto flex flex-col gap-4 pb-32"> 
-            <AccountList 
-              accounts={accounts} 
-              transactions={transactions} 
-              rates={rates} 
-              selectedAccountId={selectedAccountId} 
-              onSelectAccount={setSelectedAccountId} 
-              totalBalance={totalBalance} 
-              defaultCurrency={displayCurrency} 
-            /> 
-            <FinancialOverview 
-              monthlyIncome={summary.monthlyIncome} 
-              monthlyExpense={summary.monthlyExpense} 
-              totalBalance={summary.selectedBalance} 
-              totalSavings={totalSavings} 
-              defaultCurrency={displayCurrency} 
-              onNavigate={setActiveScreen} 
-              onGenerateTips={handleGenerateSavingsTips} 
-            /> 
-            <div className="px-6"> 
-              <TransactionList 
-                transactions={filteredTransactions} 
-                accounts={accounts} 
-                onSelectTransaction={setEditingTransaction} 
-                onDeleteTransaction={(tx) => setItemToDelete(tx)} 
-                onViewAll={() => setActiveScreen('history')} 
-                rates={rates} 
-              /> 
-            </div> 
-            {error && !isDevLoggingIn && <p className="text-center text-red-500 mt-2 px-6" onClick={() => setError(null)}>{error}</p>} 
-          </main> 
-        </div>
-      );
+      
+      // --- ИЗМЕНЕНИЕ ЗДЕСЬ ---
+      // Вместо верстки <main>...</main> мы вызываем новый компонент
+      case 'home': 
+      default: 
+        return (
+          <HomeScreen
+            accounts={accounts}
+            transactions={transactions}
+            rates={rates}
+            selectedAccountId={selectedAccountId}
+            onSelectAccount={setSelectedAccountId}
+            totalBalance={totalBalance}
+            defaultCurrency={displayCurrency}
+            summary={summary}
+            totalSavings={totalSavings}
+            onNavigate={setActiveScreen}
+            onGenerateTips={handleGenerateSavingsTips}
+            filteredTransactions={filteredTransactions}
+            onSelectTransaction={setEditingTransaction}
+            onDeleteTransaction={(tx) => setItemToDelete(tx)}
+            error={error}
+            isDevLoggingIn={isDevLoggingIn}
+          />
+        );
     }
   }
 
 
-  // --- ЭКРАН ЗАГРУЗКИ (УДАЛЕНО) ---
+  // --- ЭКРАН ЗАГРУЗКИ ---
   // (Логика была перенесена в LoadingScreen)
 
   // --- НОВЫЙ ЭКРАН: ФОРМА ЛОГИНА ДЛЯ РАЗРАБОТКИ ---
@@ -970,6 +873,12 @@ const App: React.FC = () => {
   // --- ОСНОВНОЙ РЕНДЕРИНГ ПРИЛОЖЕНИЯ (ИЗМЕНЕНИЯ ЗДЕСЬ) ---
   const isDev = import.meta.env.DEV;
   
+  // --- ДИНАМИЧЕСКАЯ ЛОГИКА ОТСТУПА (ПЕРЕМЕЩЕНА СЮДА) ---
+  // Отступ (pt-[85px]) будет применен, ТОЛЬКО если:
+  // 1. Мы НЕ в режиме разработки (isDev = false)
+  // 2. И приложение развернуто (isAppExpanded = true)
+  const headerOffsetClass = !isDev && isAppExpanded ? TG_HEADER_OFFSET_CLASS : '';
+
   return (
     <div className="min-h-screen bg-gray-900">
       
@@ -982,18 +891,20 @@ const App: React.FC = () => {
       </AnimatePresence>
 
       {/* --- ИЗМЕНЕННАЯ ЛОГИКА "МАСКИ" (ШИР-МЫ) --- */}
-      {/* Эта "маска" (визуальный блок, закрывающий 
-        верхние 85px)
-        теперь будет показана, ТОЛЬКО если:
-        1. Мы НЕ в режиме разработки
-        2. И приложение развернуто
-      */}
+      {/* Эта "маска" (визуальный блок) будет 
+        показана при тех же условиях, что и отступ */}
       {!isDev && isAppExpanded && (
         <div className="fixed top-0 left-0 right-0 h-[85px] bg-gray-900 z-20"></div>
       )}
 
+      {/* --- ИЗМЕНЕНИЕ ЗДЕСЬ: ОБЕРТКА ДЛЯ ВСЕХ ЭКРАНОВ --- */}
       {/* Основное содержимое экрана (которое мы выбрали в renderContent) */}
-      {!isLoading && renderContent()}
+      {!isLoading && (
+        // Применяем динмический класс отступа ЗДЕСЬ
+        <div className={headerOffsetClass}>
+          {renderContent()}
+        </div>
+      )}
 
       {/* Оверлей записи аудио (поверх всего) */}
       {isRecording && (
