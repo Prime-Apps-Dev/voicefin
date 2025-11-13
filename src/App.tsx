@@ -964,42 +964,27 @@ const App: React.FC = () => {
   // --- ОСНОВНОЙ РЕНДЕРИНГ ПРИЛОЖЕНИЯ (ИЗМЕНЕНИЯ ЗДЕСЬ) ---
   const isDev = import.meta.env.DEV;
 
-  // --- ИЗМЕНЕНИЕ: СЛОЖНАЯ ЛОГИКА ОТСТУПОВ ---
+  // --- ИЗМЕНЕНИЕ: ЛОГИКА ОТСТУПОВ СОГЛАСНО ВАШЕМУ ТРЕБОВАНИЮ ---
   let paddingTopClass = '';
-  // `pb-32` (8rem) — это базовый отступ, чтобы 
-  // контент не "залез" под BottomNavBar
-  let contentBottomPaddingClass = 'pb-32'; 
+  let showMask = false;
   
-  // Эта логика будет работать, только если мы *не* в 
-  // режиме разработки
   if (!isDev) {
     if (isAppFullscreen) {
-      // 1. РЕЖИМ FULLSCREEN ("Чёлка" видна, шапка TG - нет)
-      // Добавляем отступ для "чёлки" (status bar)
-      paddingTopClass = 'pt-[env(safe-area-inset-top)]';
-      // Добавляем отступ для "полоски домой" (home bar) 
-      // К базовому отступу pb-32
-      contentBottomPaddingClass = 'pb-[calc(8rem+env(safe-area-inset-bottom))]';
+      // 1. РЕЖИМ FULLSCREEN:
+      // Вы просили добавить маску 85px
+      paddingTopClass = TG_HEADER_OFFSET_CLASS; // 'pt-[85px]'
+      showMask = true; // Показать фон для этой "маски"
 
-    } else if (isAppExpanded && activeScreen === 'home') {
-      // 2. РЕЖИМ EXPANDED (Шапка TG видна, "чёлки" - нет)
-      // Добавляем отступ 85px (только для 'home')
-      paddingTopClass = TG_HEADER_OFFSET_CLASS; 
-      // Нижний отступ остается базовым (pb-32), 
-      // т.к. BottomNavBar сам справится
+    } else if (isAppExpanded) {
+      // 2. РЕЖИМ EXPANDED:
+      // Вы просили убрать маску
+      paddingTopClass = '';
+      showMask = false;
+    
     }
-    // 3. В СВЕРНУТОМ режиме (isAppExpanded: false) 
-    // paddingTopClass будет '', что корректно.
+    // 3. В СВЕРНУТОМ режиме отступов тоже не будет
   }
   
-  // --- ИЗМЕНЕНИЕ: Логика для "маски" 85px ---
-  // Маска (фон для отступа) нужна, ТОЛЬКО если:
-  // 1. Не Dev-режим
-  // 2. Приложение развернуто (isAppExpanded = true)
-  // 3. Приложение НЕ в fullscreen (isAppFullscreen = false)
-  // 4. И мы на главном экране ('home')
-  const showMask = !isDev && isAppExpanded && !isAppFullscreen && activeScreen === 'home';
-
   return (
     <div className="min-h-screen bg-gray-900">
       
@@ -1012,17 +997,17 @@ const App: React.FC = () => {
       </AnimatePresence>
 
       {/* --- ИЗМЕНЕННАЯ ЛОГИКА "МАСКИ" (ШИР-МЫ) --- */}
-      {/* Показываем "маску" (фон для отступа) только при 
-          соблюдении всех условий */}
+      {/* Показываем "маску" (фон для отступа) 
+          только если showMask = true */}
       {showMask && (
         <div className="fixed top-0 left-0 right-0 h-[85px] bg-gray-900 z-20"></div>
       )}
 
       {/* --- ИЗМЕНЕНИЕ: ГЛАВНЫЙ КОНТЕЙНЕР КОНТЕНТА --- */}
       {/* Этот div теперь оборачивает ВЕСЬ контент и применяет 
-          НУЖНЫЕ отступы (для "чёлки" или для шапки TG) */}
+          отступ `paddingTopClass` (85px в fullscreen, 0 в expanded) */}
       {!isLoading && (
-        <div className={`${paddingTopClass} ${contentBottomPaddingClass}`}>
+        <div className={paddingTopClass}>
           {renderContent()}
         </div>
       )}
@@ -1094,8 +1079,6 @@ const App: React.FC = () => {
       {budgetForHistory && <BudgetTransactionsModal isOpen={!!budgetForHistory} onClose={() => setBudgetForHistory(null)} budget={budgetForHistory} transactions={transactions} accounts={accounts} onSelectTransaction={setEditingTransaction} onDeleteTransaction={(tx) => setItemToDelete(tx)} rates={rates} />}
       
       {/* Нижняя навигационная панель (поверх всего) */}
-      {/* BottomNavBar ТЕПЕРЬ ОТДЕЛЬНЫЙ КОМПОНЕНТ, 
-          ОН САМ ДОБАВИТ СЕБЕ НИЖНИЙ ОТСТУП (в Шаге 3) */}
       {!isLoading && (
         <BottomNavBar 
           activeScreen={activeScreen} 
