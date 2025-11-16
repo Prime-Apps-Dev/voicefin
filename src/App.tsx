@@ -792,6 +792,65 @@ const App: React.FC = () => {
 
   // --- Render Logic (Рендеринг Контента) (ИЗМЕНЕНИЯ ЗДЕСЬ) ---
   // (Эта функция теперь возвращает *только* компонент экрана)
+  const globalStyle = `
+    /* Отключаем выделение для главного контейнера и всех его потомков */
+    .min-h-screen, 
+    .min-h-screen * { 
+      -webkit-user-select: none; /* Safari */
+      -moz-user-select: none; /* Firefox */
+      -ms-user-select: none; /* IE10+ */
+      user-select: none; /* Standard syntax */
+    }
+
+    /* Разрешаем выделение ТОЛЬКО для полей ввода, используя !important для переопределения */
+    input[type="text"], 
+    input[type="number"], 
+    input[type="email"], 
+    input[type="password"], 
+    input:not([type]), /* Инпуты без явного типа (по умолчанию text) */
+    textarea,
+    /* Общий класс для кастомных инпутов, если они не нативные */
+    .text-input-field {
+      -webkit-user-select: text !important;
+      -moz-user-select: text !important;
+      -ms-user-select: text !important;
+      user-select: text !important;
+    }
+    
+    /* 3. ОТКЛЮЧЕНИЕ HOVER-ЭФФЕКТОВ ДЛЯ МОБИЛЬНЫХ/СЕНСОРНЫХ УСТРОЙСТВ */
+    /* Используем Media Feature (hover: none) для устройств без курсора */
+    @media (hover: none) {
+      /* Сброс всех :hover стилей, специфичных для Tailwind */
+      a:hover, 
+      button:hover, 
+      input:hover,
+      .hover\\:bg-*, /* Отключаем общие классы hover:bg-* */
+      .hover\\:text-*, /* Отключаем общие классы hover:text-* */
+      .hover\\:opacity-*, /* Отключаем общие классы hover:opacity-* */
+      .hover\\:shadow-*, /* Отключаем общие классы hover:shadow-* */
+      .hover\\:border-*, /* Отключаем общие классы hover:border-* */
+      .group:hover .group-hover\\:*, /* Отключаем групповые hover-эффекты */
+      .peer:hover ~ .peer-hover\\:* /* Отключаем peer hover-эффекты */
+      {
+        /* Сбрасываем все изменения, примененные через псевдокласс :hover */
+        /* Используем !important, чтобы перебить специфичность классов Tailwind */
+        color: inherit !important;
+        background-color: inherit !important;
+        opacity: 1 !important;
+        box-shadow: none !important;
+        border-color: inherit !important;
+        transform: none !important;
+        transition-property: none !important;
+        cursor: default !important;
+        text-decoration: none !important;
+      }
+      
+      /* Если у нас есть специфический класс для активного состояния (например, :active или :focus-visible) */
+      /* то его нужно оставить, чтобы пользователь видел реакцию на тап. */
+      /* Для имитации hover на мобилках часто используют псевдокласс :active. */
+    }
+  `;
+  
   const renderContent = () => {
     switch (activeScreen) {
       case 'savings': return (
@@ -987,6 +1046,8 @@ const App: React.FC = () => {
   
   return (
     <div className="min-h-screen bg-gray-900">
+
+      <style>{globalStyle}</style>
       
       {/* --- НОВЫЙ ЭКРАН ЗАГРУЗKI --- */}
       <LoadingScreen isLoading={isLoading && !isDevLoggingIn} />

@@ -1,5 +1,3 @@
-
-
 import React from 'react';
 import { Account, ExchangeRates, Transaction } from '../types';
 import { AccountCard } from './AccountCard';
@@ -47,7 +45,7 @@ export const AccountList: React.FC<AccountListProps> = ({ accounts, transactions
           {t('accounts')}
       </h2>
       <div className="overflow-x-auto scrollbar-hide">
-        <div className="flex space-x-4 pb-4 px-6 py-4">
+        <div className="flex space-x-4 px-6 py-4">
           {/* "All Accounts" Card */}
           <div
             onClick={() => onSelectAccount('all')}

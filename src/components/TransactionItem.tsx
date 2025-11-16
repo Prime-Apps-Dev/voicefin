@@ -70,7 +70,8 @@ export const TransactionItem: React.FC<TransactionItemProps> = ({ transaction, a
             aria-label={`Transaction: ${transaction.name}`}
             role="button"
           >
-            <div className={`w-12 h-12 rounded-full flex items-center justify-center ${isIncome ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
+            {/* ИСПРАВЛЕНИЕ: Добавлен класс flex-shrink-0, чтобы иконка не сжималась по ширине. */}
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${isIncome ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
               {isIncome ? <ArrowUpCircle className="w-7 h-7" /> : <ArrowDownCircle className="w-7 h-7" />}
             </div>
             <div className="flex-grow min-w-0">

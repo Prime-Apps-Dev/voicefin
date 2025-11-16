@@ -15,12 +15,22 @@ interface BottomNavBarProps {
 
 const NavButton = ({ screen, label, icon: Icon, activeScreen, onNavigate }: { screen: Screen, label: string, icon: React.ElementType, activeScreen: Screen | 'accounts' | 'budgetPlanning' | 'categories' | 'settings', onNavigate: (s: Screen) => void }) => {
     const isActive = activeScreen === screen || (screen === 'profile' && (activeScreen === 'accounts' || activeScreen === 'budgetPlanning' || activeScreen === 'categories' || activeScreen === 'settings'));
-    const colorClass = isActive ? 'text-brand-green' : 'text-gray-400';
+    
+    // --- ИЗМЕНЕНИЯ ЗДЕСЬ: Условное применение hover/focus стилей ---
+    // Базовые классы, общие для всех кнопок
+    const baseClasses = 'flex flex-col items-center justify-center h-full py-4 px-1 text-xs transition-colors focus:outline-none';
+
+    // Классы, зависящие от состояния активности
+    const stateClasses = isActive
+        ? 'text-brand-green' // Активная кнопка всегда зеленая
+        : 'text-gray-400 hover:text-white focus:text-white'; // Неактивная кнопка серая, белая при наведении/фокусе
+
     return (
       <button
         key={screen}
         onClick={() => onNavigate(screen)}
-        className={`flex flex-col items-center justify-center h-full py-4 px-1 text-xs transition-colors hover:text-white focus:outline-none ${colorClass}`}
+        // Применяем классы
+        className={`${baseClasses} ${stateClasses}`}
         aria-current={isActive ? 'page' : undefined}
       >
         <Icon className="w-6 h-6 mb-1" />
@@ -28,6 +38,7 @@ const NavButton = ({ screen, label, icon: Icon, activeScreen, onNavigate }: { sc
       </button>
     );
   };
+// --- КОНЕЦ ИЗМЕНЕНИЙ ---
 
 
 export const BottomNavBar: React.FC<BottomNavBarProps> = ({ activeScreen, onNavigate, isRecording, isProcessing, onToggleRecording, onLongPressAdd }) => {
@@ -73,7 +84,7 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({ activeScreen, onNavi
   };
 
   return (
-    <footer className="fixed bottom-0 left-0 right-0 bg-gray-800/80 backdrop-blur-sm border-t border-gray-700 z-40">
+    <footer className="fixed bottom-0 left-0 right-0 bg-gray-800/80 backdrop-blur-sm border-t border-gray-700 z-40 pb-[env(safe-area-inset-bottom)]">
       <nav className="grid grid-cols-5 items-center max-w-4xl mx-auto h-20">
         <NavButton screen="home" label={t('home')} icon={Home} activeScreen={activeScreen} onNavigate={onNavigate} />
         <NavButton screen="savings" label={t('savings')} icon={PiggyBank} activeScreen={activeScreen} onNavigate={onNavigate} />

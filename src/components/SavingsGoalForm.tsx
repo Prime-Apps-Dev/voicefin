@@ -9,7 +9,6 @@ import { ChevronDown } from 'lucide-react';
 const defaultState: Omit<SavingsGoal, 'id' | 'currentAmount'> = {
   name: '',
   icon: 'Target',
-  currentAmount: 0,
   targetAmount: 0,
   currency: 'USD',
 };
@@ -130,7 +129,8 @@ export const SavingsGoalForm: React.FC<{
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-zinc-300 mb-2">{t('goalIcon')}</label>
-                  <div className="h-48 overflow-y-auto grid grid-cols-6 gap-3 p-1 bg-zinc-800/50 rounded-xl border border-zinc-700/50">
+                  {/* Изменено на flex flex-wrap justify-around для равномерного распределения пространства (justify-content) */}
+                  <div className="h-48 overflow-y-auto flex flex-wrap justify-around gap-x-2 gap-y-2 p-3 bg-zinc-800/50 rounded-xl border border-zinc-700/50">
                     {ICON_NAMES.map(iconName => {
                       const isSelected = formData.icon === iconName;
                       return (

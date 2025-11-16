@@ -8,7 +8,6 @@ import { Trash2, Star } from 'lucide-react';
 const defaultState: Omit<Category, 'id' | 'isDefault'> = {
   name: '',
   icon: 'LayoutGrid',
-  isDefault: false,
   isFavorite: false,
   type: TransactionType.EXPENSE,
 };
@@ -121,8 +120,10 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ isOpen, onClose, onS
                   {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
                 </div>
                 <div>
+                <div>
                   <label className="block text-sm font-medium text-zinc-300 mb-2">{t('categoryIcon')}</label>
-                  <div className="h-48 overflow-y-auto grid grid-cols-6 gap-3 p-2 bg-zinc-800/50 rounded-xl border border-zinc-700/50">
+                  {/* Изменено на flex flex-wrap justify-around для равномерного распределения пространства (justify-content) */}
+                  <div className="h-48 overflow-y-auto flex flex-wrap justify-around gap-x-2 gap-y-2 p-3 bg-zinc-800/50 rounded-xl border border-zinc-700/50">
                     {ICON_NAMES.map(iconName => {
                       const isSelected = formData.icon === iconName;
                       return (
@@ -133,6 +134,7 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ isOpen, onClose, onS
                       )
                     })}
                   </div>
+                </div>
                 </div>
                 <div className="flex items-center justify-between bg-zinc-800 p-3 rounded-2xl border border-gray-700/50">
                     <span className="text-white font-medium">{t('favorite')}</span>

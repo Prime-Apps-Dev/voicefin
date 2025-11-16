@@ -14,7 +14,9 @@ export const SummaryCard: React.FC<SummaryCardProps> = ({ title, subtitle, amoun
     return (
         <button
             onClick={onClick}
-            className={`relative overflow-hidden ${gradient} rounded-3xl p-6 text-white text-left w-full h-full transform transition-transform duration-300 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-white/50`}
+            // --- ИЗМЕНЕНИЯ ЗДЕСЬ: Удалены hover- и transition-эффекты ---
+            className={`relative overflow-hidden ${gradient} rounded-3xl p-6 text-white text-left w-full h-full focus:outline-none`}
+            // --- КОНЕЦ ИЗМЕНЕНИЙ ---
         >
             <div className="absolute -top-4 -right-4 w-24 h-24 bg-white/10 rounded-full blur-xl" />
             <div className="relative z-10 flex flex-col justify-between h-full">

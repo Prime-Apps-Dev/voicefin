@@ -1,19 +1,29 @@
 import React from 'react';
 import { SummaryCard } from './SummaryCard';
-import { ArrowDownCircle, ArrowUpCircle, Wallet, PiggyBank } from 'lucide-react';
+// Иконка Wallet удалена, так как карточка Total Balance больше не используется
+import { ArrowDownCircle, ArrowUpCircle, PiggyBank } from 'lucide-react';
 import { useLocalization } from '../context/LocalizationContext';
 
 interface FinancialOverviewProps {
     monthlyIncome: number;
     monthlyExpense: number;
-    totalBalance: number;
+    // totalBalance: number; // УДАЛЕНА: Информация дублируется в списке счетов
     totalSavings: number;
     defaultCurrency: string;
+    
+    // onNavigate оставляем, но предполагаем, что он будет расширен в родительском компоненте.
+    // Пока оставляем его для навигации на "savings".
     onNavigate: (screen: 'home' | 'savings' | 'profile') => void;
     onGenerateTips: () => void;
+
+    // НОВЫЕ СВОЙСТВА: Специфичные обработчики для навигации на историю транзакций с фильтром
+    onExpenseClick: () => void;
+    onIncomeClick: () => void;
 }
 
 const formatCurrency = (amount: number, currency: string) => {
+    // В дальнейшем эту функцию следует вынести в отдельный файл src/utils/currency.ts, 
+    // как мы обсуждали ранее, для централизованного форматирования.
     return new Intl.NumberFormat(undefined, {
         style: 'currency',
         currency: currency,
@@ -23,44 +33,55 @@ const formatCurrency = (amount: number, currency: string) => {
 export const FinancialOverview: React.FC<FinancialOverviewProps> = (props) => {
     const { t } = useLocalization();
 
+    const {
+        monthlyIncome,
+        monthlyExpense,
+        totalSavings,
+        defaultCurrency,
+        onNavigate,
+        onExpenseClick, // Деструктурируем новый обработчик
+        onIncomeClick,  // Деструктурируем новый обработчик
+    } = props;
+    
     return (
         <div className="px-6 py-6 space-y-6">
             <h2 className="text-xl font-semibold text-gray-100 px-2">
                 {t('financialOverview')}
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* КАРТОЧКА ДОХОДОВ */}
                 <SummaryCard
                     title={t('monthlyIncome')}
                     subtitle={t('thisMonth')}
-                    amount={formatCurrency(props.monthlyIncome, props.defaultCurrency)}
+                    amount={formatCurrency(monthlyIncome, defaultCurrency)}
                     icon={ArrowUpCircle}
                     gradient="bg-gradient-to-br from-green-start to-green-end"
-                    onClick={() => { /* Can add navigation later */ }}
+                    // ИЗМЕНЕНИЕ: Используем новый обработчик для перехода на "Transactions History" (Доходы)
+                    onClick={onIncomeClick}
                 />
+                
+                {/* КАРТОЧКА РАСХОДОВ */}
                 <SummaryCard
                     title={t('monthlyExpense')}
                     subtitle={t('thisMonth')}
-                    amount={formatCurrency(props.monthlyExpense, props.defaultCurrency)}
+                    amount={formatCurrency(monthlyExpense, defaultCurrency)}
                     icon={ArrowDownCircle}
                     gradient="bg-gradient-to-br from-red-start to-red-end"
-                    onClick={() => { /* Can add navigation later */ }}
+                    // ИЗМЕНЕНИЕ: Используем новый обработчик для перехода на "Transactions History" (Расходы)
+                    onClick={onExpenseClick}
                 />
-                <SummaryCard
-                    title={t('totalBalance')}
-                    subtitle={t('available')}
-                    amount={formatCurrency(props.totalBalance, props.defaultCurrency)}
-                    icon={Wallet}
-                    gradient="bg-gradient-to-br from-blue-start to-blue-end"
-                    onClick={() => { /* Can add navigation later */ }}
-                />
+                
+                {/* КАРТОЧКА TOTAL BALANCE УДАЛЕНА */}
+                
+                {/* КАРТОЧКА НАКОПЛЕНИЙ */}
                 <SummaryCard
                     title={t('savings')}
                     subtitle={t('totalSaved')}
-                    amount={formatCurrency(props.totalSavings, props.defaultCurrency)}
+                    amount={formatCurrency(totalSavings, defaultCurrency)}
                     icon={PiggyBank}
                     gradient="bg-gradient-to-br from-purple-start to-purple-end"
                     onClick={() => {
-                        props.onNavigate('savings');
+                        onNavigate('savings');
                     }}
                 />
             </div>
