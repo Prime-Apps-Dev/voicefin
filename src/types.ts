@@ -35,9 +35,10 @@ export interface ExchangeRates {
   [key: string]: number;
 }
 
-// --- ИЗМЕНЕНИЯ ЗДЕСЬ ---
-// Этот интерфейс теперь отражает данные, которые мы собираем
-// из auth.users и public.profiles
+/**
+ * Интерфейс пользователя, объединяющий данные из auth.users и public.profiles.
+ * Валюта по умолчанию (default_currency) теперь сохраняется здесь.
+ */
 export interface User {
   id: string; // из auth.users
   email: string | undefined; // из auth.users
@@ -49,9 +50,9 @@ export interface User {
   full_name: string | null;
   avatar_url: string | null;
   telegram_id: number | null;
-  has_completed_onboarding: boolean; // Наша новая колонка
+  has_completed_onboarding: boolean; // Флаг завершения обучения
+  default_currency: string; // <-- ДОБАВЛЕНО: Валюта по умолчанию
 }
-// --- КОНЕЦ ИЗМЕНЕНИЙ ---
 
 
 export interface SavingsGoal {

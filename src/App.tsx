@@ -221,10 +221,19 @@ const App: React.FC = () => {
           full_name: profileData.full_name,
           avatar_url: profileData.avatar_url,
           telegram_id: profileData.telegram_id,
-          has_completed_onboarding: profileData.has_completed_onboarding
+          has_completed_onboarding: profileData.has_completed_onboarding,
+          default_currency: profileData.default_currency || 'USD'
       };
       
       setTgUser(appUser); // Сохраняем ПОЛНЫЙ объект пользователя в state
+
+      // Устанавливаем валюту приложения, если она задана в профиле
+      if (profileData.default_currency) {
+        setDefaultCurrency(profileData.default_currency);
+      } else if (defaultCurrency === 'DEFAULT') {
+        // если ранее не была изменена, устанавливаем безопасное значение
+        setDefaultCurrency('USD');
+      }
 
       // 3. Проверяем, нужно ли показать онбординг
       if (!appUser.has_completed_onboarding) {
@@ -680,6 +689,41 @@ const App: React.FC = () => {
   };
 
 
+  // --- НОВЫЙ ХЕНДЛЕР: СОХРАНЕНИЕ ВАЛЮТЫ ПО УМОЛЧАНИЮ ---
+  /**
+   * Обновляет валюту по умолчанию в профиле пользователя в Supabase
+   * и обновляет локальное состояние.
+   */
+  const handleSetDefaultCurrency = async (currency: string) => {
+    if (!tgUser) {
+        setError(t('userNotAuthenticated'));
+        throw new Error("User not authenticated for currency update.");
+    }
+    
+    setError(null);
+    try {
+        // 1. Обновляем базу данных (профиль пользователя)
+        await api.updateDefaultCurrency(tgUser.id, currency); //
+
+        // 2. Обновляем локальное состояние приложения
+        setDefaultCurrency(currency);
+        
+        // 3. Обновляем объект tgUser, чтобы он содержал актуальную валюту
+        setTgUser(prev => prev ? ({ ...prev, default_currency: currency }) : null); //
+
+        // 4. Перезагружаем курсы валют, так как изменилась базовая валюта
+        const exchangeRates = await getExchangeRates();
+        setRates(exchangeRates);
+        
+        console.log(`Default currency updated to: ${currency}`);
+    } catch (err: any) {
+        console.error("Failed to update default currency:", err);
+        setError(err.message || t('connectionError'));
+        throw err; 
+    }
+  };
+
+
   // --- Audio Recording Handlers (без изменений) ---
   const handleStartRecording = async () => {
     if (isRecording) return;
@@ -885,7 +929,8 @@ const App: React.FC = () => {
               full_name: null, 
               avatar_url: null, 
               telegram_id: null, 
-              has_completed_onboarding: true 
+              has_completed_onboarding: true,
+              default_currency: 'USD' 
           }}
           daysActive={daysActive} 
           onNavigate={setActiveScreen} 
@@ -915,7 +960,7 @@ const App: React.FC = () => {
         <SettingsScreen 
           onBack={() => setActiveScreen('profile')} 
           defaultCurrency={defaultCurrency} 
-          onSetDefaultCurrency={setDefaultCurrency}
+          onSetDefaultCurrency={handleSetDefaultCurrency} // <-- ИСПОЛЬЗУЕМ НОВЫЙ ASYNC ХЕНДЛЕР
           onShowOnboarding={handleShowOnboarding}
         />
       );

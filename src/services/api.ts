@@ -383,7 +383,6 @@ export const processAudioTransaction = async (
 };
 
 
-// <-- НАЧАЛО НОВОЙ ФУНКЦИИ -->
 /**
  * Устанавливает флаг has_completed_onboarding в true для пользователя
  */
@@ -397,5 +396,26 @@ export const markOnboardingAsCompleted = async (userId: string): Promise<void> =
     console.error("Ошибка при обновлении статуса онбординга:", error);
     throw error;
   }
+};
+
+// <-- НОВАЯ ФУНКЦИЯ ДЛЯ СОХРАНЕНИЯ ВАЛЮТЫ -->
+/**
+ * Обновляет валюту по умолчанию в профиле пользователя
+ */
+export const updateDefaultCurrency = async (userId: string, currency: string): Promise<void> => {
+  console.log(`API: Обновляем валюту по умолчанию для пользователя ${userId} на ${currency}`);
+  const { error } = await supabase
+    .from('profiles')
+    .update({ 
+      default_currency: currency, 
+      updated_at: new Date().toISOString() 
+    }) // Обновляем default_currency и updated_at
+    .eq('id', userId); // Ищем пользователя по id
+
+  if (error) {
+    console.error("Ошибка при обновлении валюты по умолчанию:", error);
+    throw error;
+  }
+  console.log("API: Валюта по умолчанию успешно обновлена в профиле.");
 };
 // <-- КОНЕЦ НОВОЙ ФУНКЦИИ -->
