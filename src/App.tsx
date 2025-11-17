@@ -33,7 +33,9 @@ import { CategoryForm } from './components/CategoryForm';
 import { ComingSoonScreen } from './components/ComingSoonScreen';
 import { TransactionHistoryScreen } from './components/TransactionHistoryScreen';
 import { OnboardingGuide } from './components/OnboardingGuide';
-import { LoadingScreen } from './components/LoadingScreen'; // <-- ДОБАВЛЕН ИМПОРТ
+import { LoadingScreen } from './components/LoadingScreen'; 
+// --- НОВЫЙ ИМПОРТ ---
+import { AboutScreen } from './components/AboutScreen'; 
 
 // Импорты утилит и сервисов
 import { getExchangeRates, convertCurrency } from './services/currency';
@@ -154,7 +156,8 @@ const App: React.FC = () => {
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [savingsTips, setSavingsTips] = useState<string | null>(null);
   const [isGeneratingTips, setIsGeneratingTips] = useState(false);
-  const [activeScreen, setActiveScreen] = useState<'home' | 'savings' | 'analytics' | 'profile' | 'accounts' | 'budgetPlanning' | 'categories' | 'settings' | 'comingSoon' | 'history'>('home');
+  // --- ОБНОВЛЕНИЕ ТИПА: добавление 'about' ---
+  const [activeScreen, setActiveScreen] = useState<'home' | 'savings' | 'analytics' | 'profile' | 'accounts' | 'budgetPlanning' | 'categories' | 'settings' | 'comingSoon' | 'history' | 'about'>('home');
   const [error, setError] = useState<string | null>(null);
   const [selectedAccountId, setSelectedAccountId] = useState<string>('all');
   const [itemToDelete, setItemToDelete] = useState<Transaction | { type: 'category'; value: Category } | { type: 'account', value: Account } | { type: 'savingsGoal', value: SavingsGoal } | { type: 'budget', value: Budget } | null>(null);
@@ -864,7 +867,7 @@ const App: React.FC = () => {
     /* 3. ОТКЛЮЧЕНИЕ HOVER-ЭФФЕКТОВ ДЛЯ МОБИЛЬНЫХ/СЕНСОРНЫХ УСТРОЙСТВ */
     /* Используем Media Feature (hover: none) для устройств без курсора */
     @media (hover: none) {
-      /* Сброс всех :hover стилей, специфичных для Tailwind */
+      /* Сброс всех :hover стилей, специфических для Tailwind */
       a:hover, 
       button:hover, 
       input:hover,
@@ -962,6 +965,12 @@ const App: React.FC = () => {
           defaultCurrency={defaultCurrency} 
           onSetDefaultCurrency={handleSetDefaultCurrency} // <-- ИСПОЛЬЗУЕМ НОВЫЙ ASYNC ХЕНДЛЕР
           onShowOnboarding={handleShowOnboarding}
+        />
+      );
+      // --- НОВЫЙ КЕЙС ДЛЯ ЭКРАНА "О ПРИЛОЖЕНИИ" ---
+      case 'about': return (
+        <AboutScreen 
+          onBack={() => setActiveScreen('profile')} 
         />
       );
       case 'budgetPlanning': return (
@@ -1068,7 +1077,7 @@ const App: React.FC = () => {
   // --- ОСНОВНОЙ РЕНДЕРИНГ ПРИЛОЖЕНИЯ (ИЗМЕНЕНИЯ ЗДЕСЬ) ---
   const isDev = import.meta.env.DEV;
 
-  // --- ИЗМЕНЕНИЕ: ЛОГИКА ОТСТУПОВ СОГЛАСНО ВАШЕМУ ТРЕБОВАНИЮ ---
+  // --- ИЗМЕНЕННАЯ ЛОГИКА "МАСКИ" (ШИР-МЫ) ---
   let paddingTopClass = '';
   let showMask = false;
   

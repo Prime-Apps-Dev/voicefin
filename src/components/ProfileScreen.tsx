@@ -2,14 +2,15 @@ import React, { useRef } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { User } from '../types';
 import {
-    Target, Wallet, Handshake, Banknote, CalendarDays, CreditCard, LayoutGrid, Settings, ChevronRight
+    Target, Wallet, Handshake, Banknote, CalendarDays, CreditCard, LayoutGrid, Settings, ChevronRight, Info // <-- ДОБАВЛЕНО: Info
 } from 'lucide-react';
 import { useLocalization } from '../context/LocalizationContext';
 
 interface ProfileScreenProps {
     user: User;
     daysActive: number;
-    onNavigate: (screen: 'home' | 'savings' | 'profile' | 'accounts' | 'budgetPlanning' | 'categories' | 'settings' | 'comingSoon' | 'history') => void;
+    // ОБНОВЛЕНИЕ ТИПА: добавление 'about'
+    onNavigate: (screen: 'home' | 'savings' | 'profile' | 'accounts' | 'budgetPlanning' | 'categories' | 'settings' | 'comingSoon' | 'history' | 'about') => void; 
 }
 
 // Animation Variants
@@ -126,6 +127,28 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = (props) => {
                           </motion.button>
                           <motion.button onClick={() => onNavigate('settings')} className="w-full bg-gray-800 p-4 rounded-2xl border border-gray-700 flex items-center justify-between hover:bg-gray-700/50 transition-colors" whileTap={whileTap} whileHover={{ x: 5 }} transition={spring} variants={zoomInOut} whileInView="whileInView" viewport={{ once: true, amount: 0.2 }}>
                               <div className="flex items-center"><div className="w-10 h-10 bg-gray-700 rounded-2xl flex items-center justify-center mr-3"><Settings className="w-5 h-5 text-gray-400" /></div><div className="text-left"><div className="font-medium leading-5 text-gray-100">{t('settings')}</div><div className="text-sm text-gray-400">{t('personalizationAndSecurity')}</div></div></div><ChevronRight className="w-5 h-5 text-gray-400" />
+                          </motion.button>
+                          {/* --- НОВАЯ КНОПКА: О ПРИЛОЖЕНИИ --- */}
+                          <motion.button 
+                              onClick={() => onNavigate('about')} 
+                              className="w-full bg-gray-800 p-4 rounded-2xl border border-gray-700 flex items-center justify-between hover:bg-gray-700/50 transition-colors" 
+                              whileTap={whileTap} 
+                              whileHover={{ x: 5 }} 
+                              transition={spring} 
+                              variants={zoomInOut} 
+                              whileInView="whileInView" 
+                              viewport={{ once: true, amount: 0.2 }}
+                          >
+                              <div className="flex items-center">
+                                  <div className="w-10 h-10 bg-indigo-900/30 rounded-2xl flex items-center justify-center mr-3">
+                                      <Info className="w-5 h-5 text-indigo-400" />
+                                  </div>
+                                  <div className="text-left">
+                                      <div className="font-medium leading-5 text-gray-100">{t('aboutApp')}</div>
+                                      <div className="text-sm text-gray-400">{t('versionInfo')}</div>
+                                  </div>
+                              </div>
+                              <ChevronRight className="w-5 h-5 text-gray-400" />
                           </motion.button>
                       </div>
                   </div>

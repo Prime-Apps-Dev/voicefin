@@ -236,5 +236,14 @@
   "loadingAI": "Warming up the AI brain...",
   "loadingNetWorth": "Calculating your net worth...",
   "loadingSecure": "Securing your data...",
-  "loadingOrganize": "Organizing your transactions..."
+  "loadingOrganize": "Organizing your transactions...",
+  "aboutApp": "About App",
+  "versionInfo": "Version changelog",
+  "yourPersonalFinanceAssistant": "Your Personal Finance Assistant",
+  "version": "Verision",
+  "changelog": "Changelog history",
+  "changelog_v1_0_2_change_1": "Added 'About App' section with version changelog.",
+  "changelog_v1_0_2_change_2": "Fixes and performance improvements.",
+  "changelog_v1_0_1_change_1": "Fixes app interface issues.",
+  "changelog_v1_0_0_change_1":  "First public release of VoiceFin with core features of transaction tracking, savings, budgeting, account allocation, and voice and text transaction input"
 }

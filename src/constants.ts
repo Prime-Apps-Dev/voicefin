@@ -52,3 +52,39 @@ export const ACCOUNT_GRADIENTS = [
     { name: 'Sunset', class: 'from-pink-500 to-rose-500' },
     { name: 'Midnight', class: 'from-gray-800 to-black' },
 ];
+
+// --- НОВЫЕ КОНСТАНТЫ ДЛЯ ЭКРАНА "О ПРИЛОЖЕНИИ" ---
+
+/**
+ * Текущая версия приложения.
+ */
+export const APP_VERSION = '1.2.0';
+
+/**
+ * История изменений в приложении (Changelog).
+ * Changes теперь содержит ключи локализации.
+ */
+export const CHANGELOG = [
+  { 
+    version: '1.0.2', 
+    date: '2025-11-16', 
+    changes: [
+      'changelog_v1_0_2_change_1',
+      'changelog_v1_0_2_change_2', 
+    ] 
+  },
+  { 
+    version: '1.0.1', 
+    date: '2025-11-13', 
+    changes: [
+      'changelog_v1_0_1_change_1',
+    ] 
+  },
+  { 
+    version: '1.0.0', 
+    date: '2025-11-11', 
+    changes: [
+      'changelog_v1_0_0_change_1',
+    ] 
+  },
+];
