@@ -1,5 +1,7 @@
+// src/components/AccountList.tsx
+
 import React from 'react';
-import { Account, ExchangeRates, Transaction } from '../types';
+import { Account, ExchangeRates, Transaction, TransactionType } from '../types'; // Добавил TransactionType
 import { AccountCard } from './AccountCard';
 import { convertCurrency } from '../services/currency';
 import { useLocalization } from '../context/LocalizationContext';
@@ -14,17 +16,37 @@ interface AccountListProps {
   defaultCurrency: string;
 }
 
+// ✅ ИСПРАВЛЕННАЯ ФУНКЦИЯ ПОДСЧЕТА БАЛАНСА
 const calculateAccountBalance = (accountId: string, transactions: Transaction[], rates: ExchangeRates, accountCurrency: string) => {
-    return transactions
-        .filter(t => t.accountId === accountId)
-        .reduce((sum, tx) => {
-            const amountInAccountCurrency = convertCurrency(tx.amount, tx.currency, accountCurrency, rates);
-            return sum + (tx.type === 'INCOME' ? amountInAccountCurrency : -amountInAccountCurrency);
-        }, 0);
+    return transactions.reduce((sum, tx) => {
+        // 1. Конвертируем сумму транзакции в валюту этого счета
+        const amountInAccountCurrency = convertCurrency(tx.amount, tx.currency, accountCurrency, rates);
+
+        // 2. Логика для разных типов транзакций
+        if (tx.type === TransactionType.INCOME && tx.accountId === accountId) {
+            return sum + amountInAccountCurrency;
+        } 
+        else if (tx.type === TransactionType.EXPENSE && tx.accountId === accountId) {
+            return sum - amountInAccountCurrency;
+        }
+        else if (tx.type === TransactionType.TRANSFER) {
+            // Если это перевод, проверяем роль счета
+            if (tx.accountId === accountId) {
+                // Мы отправитель -> вычитаем
+                return sum - amountInAccountCurrency;
+            } else if (tx.toAccountId === accountId) {
+                // Мы получатель -> прибавляем
+                return sum + amountInAccountCurrency;
+            }
+        }
+        
+        return sum;
+    }, 0);
 };
 
 export const AccountList: React.FC<AccountListProps> = ({ accounts, transactions, rates, selectedAccountId, onSelectAccount, totalBalance, defaultCurrency }) => {
   const { t } = useLocalization();
+  
   if (accounts.length === 0) {
     return (
         <div className="px-6 py-8 text-center text-gray-500">
@@ -46,7 +68,7 @@ export const AccountList: React.FC<AccountListProps> = ({ accounts, transactions
       </h2>
       <div className="overflow-x-auto scrollbar-hide">
         <div className="flex space-x-4 px-6 py-4">
-          {/* "All Accounts" Card */}
+          {/* Карточка "Все счета" */}
           <div
             onClick={() => onSelectAccount('all')}
             className={`
@@ -66,11 +88,12 @@ export const AccountList: React.FC<AccountListProps> = ({ accounts, transactions
             </div>
           </div>
 
-          {/* Individual Account Cards */}
+          {/* Карточки отдельных счетов */}
           {accounts.map(account => (
             <AccountCard
               key={account.id}
               account={account}
+              // Используем обновленную функцию подсчета
               balance={calculateAccountBalance(account.id, transactions, rates, account.currency)}
               isActive={selectedAccountId === account.id}
               onClick={() => onSelectAccount(account.id)}

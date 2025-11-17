@@ -3,6 +3,7 @@
 export enum TransactionType {
   INCOME = 'INCOME',
   EXPENSE = 'EXPENSE',
+  TRANSFER = 'TRANSFER', // Новый тип транзакции
 }
 
 export enum AccountType {
@@ -19,8 +20,9 @@ export interface Account {
 }
 
 export interface Transaction {
-  id:string;
+  id: string;
   accountId: string;
+  toAccountId?: string; // ID счета, куда переводятся средства (только для TRANSFER)
   name: string;
   amount: number;
   currency: string;

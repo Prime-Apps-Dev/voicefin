@@ -6,18 +6,19 @@ import { FunctionDeclaration, SchemaType } from "https://esm.sh/@google/generati
 export enum TransactionType {
   INCOME = 'INCOME',
   EXPENSE = 'EXPENSE',
+  TRANSFER = 'TRANSFER',
 }
 
 // Используем правильные типы из официального пакета
 export const addTransactionFunctionDeclaration: FunctionDeclaration = {
   name: 'addTransaction',
-  description: 'Adds a new income or expense transaction to the user\'s financial records. Infer the type (income/expense) from the context.',
+  description: 'Adds a new income, expense, or transfer transaction to the user\'s financial records. Infer the type from the context.',
   parameters: {
     type: SchemaType.OBJECT,
     properties: {
       name: { 
         type: SchemaType.STRING, 
-        description: 'A brief, clear name for the transaction, e.g., "Groceries" or "Monthly Salary".' 
+        description: 'A brief, clear name for the transaction, e.g., "Groceries", "Monthly Salary", or "Transfer to Savings".' 
       },
       amount: { 
         type: SchemaType.NUMBER, 
@@ -29,7 +30,7 @@ export const addTransactionFunctionDeclaration: FunctionDeclaration = {
       },
       category: { 
         type: SchemaType.STRING, 
-        description: 'The category of the transaction. Use one of the existing categories if possible, or create a sensible new one. E.g., "Food", "Transport", "Salary", "Utilities". Use the "Savings" category for deposits to savings goals.' 
+        description: 'The category of the transaction (ONLY for Income/Expense). E.g., "Food", "Transport". Leave empty for Transfers.' 
       },
       date: { 
         type: SchemaType.STRING, 
@@ -37,18 +38,26 @@ export const addTransactionFunctionDeclaration: FunctionDeclaration = {
       },
       type: { 
         type: SchemaType.STRING, 
-        enum: [TransactionType.INCOME, TransactionType.EXPENSE], 
-        description: 'The type of transaction.' 
+        enum: [TransactionType.INCOME, TransactionType.EXPENSE, TransactionType.TRANSFER], 
+        description: 'The type of transaction. Use TRANSFER if the user moves money between their own accounts.' 
       },
       description: { 
         type: SchemaType.STRING, 
-        description: 'Any additional details or context about the transaction, such as location or specific items. For example, from "I bought peaches for 200 som on the corner of my house", this field should be "on the corner of my house".' 
+        description: 'Any additional details or context about the transaction.' 
       },
       savingsGoalName: { 
         type: SchemaType.STRING, 
         description: 'If the category is "Savings", specify the name of the savings goal this transaction is for.' 
       },
+      fromAccountName: {
+        type: SchemaType.STRING,
+        description: 'For TRANSFER: The name of the source account (e.g., "Card", "Cash"). For EXPENSE: The account used to pay.'
+      },
+      toAccountName: {
+        type: SchemaType.STRING,
+        description: 'For TRANSFER: The name of the destination account (e.g., "Cash", "Savings").'
+      }
     },
-    required: ['name', 'amount', 'currency', 'category', 'date', 'type'],
+    required: ['name', 'amount', 'currency', 'date', 'type'],
   },
 };

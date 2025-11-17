@@ -1,6 +1,6 @@
 import React from 'react';
 import { Transaction, TransactionType, Account, ExchangeRates } from '../types';
-import { ArrowUpCircle, ArrowDownCircle, Trash2 } from 'lucide-react';
+import { ArrowUpCircle, ArrowDownCircle, Trash2, ArrowRightLeft } from 'lucide-react';
 import LongPressWrapper from './LongPressWrapper';
 import { useLocalization } from '../context/LocalizationContext';
 import { convertCurrency } from '../services/currency';
@@ -11,11 +11,14 @@ interface TransactionItemProps {
   onSelect: (transaction: Transaction) => void;
   onDelete: (transaction: Transaction) => void;
   rates: ExchangeRates;
+  allAccounts?: Account[]; // Добавляем список всех счетов, чтобы найти имя счета зачисления
 }
 
-export const TransactionItem: React.FC<TransactionItemProps> = ({ transaction, account, onSelect, onDelete, rates }) => {
+export const TransactionItem: React.FC<TransactionItemProps> = ({ transaction, account, onSelect, onDelete, rates, allAccounts }) => {
   const { language } = useLocalization();
   const isIncome = transaction.type === TransactionType.INCOME;
+  const isExpense = transaction.type === TransactionType.EXPENSE;
+  const isTransfer = transaction.type === TransactionType.TRANSFER;
   
   const locale = language === 'ru' ? 'ru-RU' : 'en-US';
 
@@ -49,16 +52,42 @@ export const TransactionItem: React.FC<TransactionItemProps> = ({ transaction, a
       }).format(convertedAmount);
   }
 
-  // FIX: Passing props directly to the generic LongPressWrapper component was causing a type inference failure,
-  // resulting in a "missing children" error. Defining explicit handlers for tap and swipe events
-  // helps TypeScript correctly infer the component's props and types.
+  // Определяем имя целевого счета для перевода
+  const toAccountName = React.useMemo(() => {
+      if (isTransfer && transaction.toAccountId && allAccounts) {
+          const toAccount = allAccounts.find(a => a.id === transaction.toAccountId);
+          return toAccount ? toAccount.name : '...';
+      }
+      return '';
+  }, [isTransfer, transaction.toAccountId, allAccounts]);
+
   const handleTap = (item: Transaction) => onSelect(item);
   const handleSwipeLeft = (item: Transaction) => onDelete(item);
 
+  // Логика отображения иконки и цветов
+  let IconComponent = ArrowDownCircle;
+  let iconBgClass = 'bg-red-500/10 text-red-400';
+  let amountColorClass = 'text-red-400';
+  let sign = '-';
+
+  if (isIncome) {
+      IconComponent = ArrowUpCircle;
+      iconBgClass = 'bg-green-500/10 text-green-400';
+      amountColorClass = 'text-green-400';
+      sign = '+';
+  } else if (isTransfer) {
+      IconComponent = ArrowRightLeft;
+      iconBgClass = 'bg-blue-500/10 text-blue-400'; // Синий/Голубой цвет для переводов
+      amountColorClass = 'text-blue-400';
+      sign = ''; // Для переводов знак можно опустить или использовать стрелку
+  }
+
+  const subtitle = isTransfer 
+    ? `${language === 'ru' ? 'Перевод на' : 'Transfer to'} ${toAccountName}` 
+    : `${transaction.category} • ${account?.name}`;
+
   return (
     <li>
-      {/* FIX: Explicitly provide the generic type argument to the `LongPressWrapper` component to resolve a TypeScript type inference issue. */}
-      {/* FIX: Explicitly pass the `children` prop to the generic `LongPressWrapper` component to resolve a TypeScript type inference issue where the child elements were not being correctly identified, causing a "missing children" error. */}
       <LongPressWrapper<Transaction>
         item={transaction}
         onTap={handleTap}
@@ -70,19 +99,18 @@ export const TransactionItem: React.FC<TransactionItemProps> = ({ transaction, a
             aria-label={`Transaction: ${transaction.name}`}
             role="button"
           >
-            {/* ИСПРАВЛЕНИЕ: Добавлен класс flex-shrink-0, чтобы иконка не сжималась по ширине. */}
-            <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${isIncome ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
-              {isIncome ? <ArrowUpCircle className="w-7 h-7" /> : <ArrowDownCircle className="w-7 h-7" />}
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${iconBgClass}`}>
+              <IconComponent className="w-7 h-7" />
             </div>
             <div className="flex-grow min-w-0">
               <p className="font-semibold text-white truncate">{transaction.name}</p>
-              <p className="text-sm text-gray-400">{transaction.category} • {account?.name}</p>
+              <p className="text-sm text-gray-400">{subtitle}</p>
             </div>
             <div className="text-right flex-shrink-0">
-              <p className={`font-bold text-lg ${isIncome ? 'text-green-400' : 'text-red-400'}`}>{isIncome ? '+' : '-'} {formattedAmount}</p>
+              <p className={`font-bold text-lg ${amountColorClass}`}>{sign} {formattedAmount}</p>
               {isConverted && (
                 <p className="text-xs text-gray-500">
-                  ({isIncome ? '+' : '-'} {formattedConvertedAmount})
+                  ({sign} {formattedConvertedAmount})
                 </p>
               )}
               <p className={`text-sm text-gray-500 ${isConverted ? 'mt-0' : 'mt-1'}`}>{formattedDate} • {formattedTime}</p>

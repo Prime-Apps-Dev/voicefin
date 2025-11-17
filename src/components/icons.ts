@@ -7,6 +7,7 @@ export const ICONS: { [key: string]: React.ElementType } = {
   Airplay: LucideIcons.Airplay,
   AlarmClock: LucideIcons.AlarmClock,
   Apple: LucideIcons.Apple,
+  ArrowRightLeft: LucideIcons.ArrowRightLeft, // <-- Иконка перевода
   Award: LucideIcons.Award,
   Baby: LucideIcons.Baby,
   Banknote: LucideIcons.Banknote,

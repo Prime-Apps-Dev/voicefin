@@ -34,7 +34,6 @@ import { ComingSoonScreen } from './components/ComingSoonScreen';
 import { TransactionHistoryScreen } from './components/TransactionHistoryScreen';
 import { OnboardingGuide } from './components/OnboardingGuide';
 import { LoadingScreen } from './components/LoadingScreen'; 
-// --- НОВЫЙ ИМПОРТ ---
 import { AboutScreen } from './components/AboutScreen'; 
 
 // Импорты утилит и сервисов
@@ -44,13 +43,13 @@ import { useLocalization } from './context/LocalizationContext';
 // --- КОНСТАНТА ДЛЯ ОТСТУПА TELEGRAM MINI APP ---
 const TG_HEADER_OFFSET_CLASS = 'pt-[85px]';
 
-// --- НОВЫЙ КОМПОНЕНТ: ФОРМА ЛОГИНА ДЛЯ РАЗРАБОТКИ ---
+// --- КОМПОНЕНТ: ФОРМА ЛОГИНА ДЛЯ РАЗРАБОТКИ ---
 const DevLoginForm: React.FC<{
   onSubmit: (email: string, pass: string) => Promise<void>;
   error: string | null;
   isLoading: boolean;
 }> = ({ onSubmit, error, isLoading }) => {
-  const [email, setEmail] = useState('test@example.com'); // Можете вписать свой email по умолчанию
+  const [email, setEmail] = useState('test@example.com'); 
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
   const { t } = useLocalization();
@@ -156,7 +155,7 @@ const App: React.FC = () => {
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [savingsTips, setSavingsTips] = useState<string | null>(null);
   const [isGeneratingTips, setIsGeneratingTips] = useState(false);
-  // --- ОБНОВЛЕНИЕ ТИПА: добавление 'about' ---
+  
   const [activeScreen, setActiveScreen] = useState<'home' | 'savings' | 'analytics' | 'profile' | 'accounts' | 'budgetPlanning' | 'categories' | 'settings' | 'comingSoon' | 'history' | 'about'>('home');
   const [error, setError] = useState<string | null>(null);
   const [selectedAccountId, setSelectedAccountId] = useState<string>('all');
@@ -184,7 +183,6 @@ const App: React.FC = () => {
   const [blockMessage, setBlockMessage] = useState('');
   const [isDevLoggingIn, setIsDevLoggingIn] = useState(false); 
 
-  // --- ИЗМЕНЕНИЕ: 2 НОВЫХ СОСТОЯНИЯ ДЛЯ VIEWPORT ---
   const [isAppExpanded, setIsAppExpanded] = useState(false); 
   const [isAppFullscreen, setIsAppFullscreen] = useState(false);
 
@@ -194,16 +192,9 @@ const App: React.FC = () => {
   const audioCtxRef = useRef<AudioContext | null>(null);
 
 
-  // --- НОВАЯ УНИВЕРСАЛЬНАЯ ФУНКЦИЯ ЗАГРУЗКИ ДАННЫХ ---
-  /**
-   * Эта функция вызывается ПОСЛЕ того, как пользователь аутентифицирован
-   * (либо через Telegram, либо через Dev-логин).
-   * @param authUserId - ID пользователя из Supabase Auth (session.user.id)
-   * @param teleUser - Объект пользователя из Telegram (если есть, для имени)
-   */
+  // --- ФУНКЦИЯ ЗАГРУЗКИ ДАННЫХ ---
   const loadAppData = async (authUserId: string, teleUser?: { first_name?: string }) => {
     try {
-      // 1. Загружаем профиль пользователя из таблицы 'profiles'
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
@@ -214,10 +205,9 @@ const App: React.FC = () => {
         throw new Error(`Не удалось загрузить профиль пользователя: ${profileError.message}`);
       }
 
-      // 2. Собираем полный объект User для приложения
       const appUser: User = {
           id: authUserId,
-          email: profileData.email, // Предполагаем, что email есть в профиле
+          email: profileData.email,
           name: profileData.full_name || teleUser?.first_name || profileData.username || 'User',
           updated_at: profileData.updated_at,
           username: profileData.username,
@@ -228,25 +218,21 @@ const App: React.FC = () => {
           default_currency: profileData.default_currency || 'USD'
       };
       
-      setTgUser(appUser); // Сохраняем ПОЛНЫЙ объект пользователя в state
+      setTgUser(appUser);
 
-      // Устанавливаем валюту приложения, если она задана в профиле
       if (profileData.default_currency) {
         setDefaultCurrency(profileData.default_currency);
       } else if (defaultCurrency === 'DEFAULT') {
-        // если ранее не была изменена, устанавливаем безопасное значение
         setDefaultCurrency('USD');
       }
 
-      // 3. Проверяем, нужно ли показать онбординг
       if (!appUser.has_completed_onboarding) {
           setShowOnboarding(true);
       }
       
-      // 4. Загружаем остальные данные приложения (транзакции, счета и т.д.)
       const [exchangeRates, initialData] = await Promise.all([
         getExchangeRates(),
-        api.initializeUser(), // initializeUser теперь просто грузит данные для auth-юзера
+        api.initializeUser(),
       ]);
       
       setRates(exchangeRates);
@@ -260,26 +246,21 @@ const App: React.FC = () => {
       console.error("Data loading failed:", err);
       setError(`Failed to load app data: ${err.message}`);
     } finally {
-      setIsLoading(false); // Загрузка завершена (успешно или с ошибкой)
+      setIsLoading(false);
     }
   };
 
 
-  // --- ОБНОВЛЕННЫЙ ХУК АУТЕНТИФИКАЦИИ И ИНИЦИАЛИЗАЦИИ ---
+  // --- ХУК АУТЕНТИФИКАЦИИ ---
   useEffect(() => {
-    // Vite-переменная, true если `npm run dev`
     const isDev = import.meta.env.DEV;
     
-    // @ts-ignore (Наш mock-файл создаст этот объект в dev-режиме)
+    // @ts-ignore
     const tg = window.Telegram.WebApp;
 
-    // --- ИЗМЕНЕНИЕ: ОБНОВЛЕННЫЙ ОБРАБОТЧИК ---
     const handleViewportChange = () => {
       if (tg) {
-        // Обновляем ОБА состояния 
         setIsAppExpanded(tg.isExpanded);
-        // "tg.isFullscreen" может быть undefined, 
-        // если версия API старая
         setIsAppFullscreen(tg.isFullscreen || false); 
       }
     };
@@ -287,9 +268,7 @@ const App: React.FC = () => {
     const startApp = async () => {
       try {
         if (isDev) {
-          // --- 1. DEV PATH (РЕЖИМ РАЗРАБОТКИ) ---
           console.log('DEV MODE: Checking Supabase session...');
-          
           const { data: { session } } = await supabase.auth.getSession();
           
           if (session) {
@@ -302,8 +281,6 @@ const App: React.FC = () => {
           }
 
         } else {
-          // --- 2. PROD PATH (РЕЖИМ TELEGRAM) ---
-          
           if (!tg) {
               throw new Error(t('telegramErrorNotTelegram'));
           }
@@ -312,30 +289,19 @@ const App: React.FC = () => {
           }
           
           tg.ready();
-          
-          // 1. Просим развернуться (на случай, если fullscreen не сработает)
           tg.expand();
-
-          // 2. ИЗМЕНЕНИЕ: Просим включить полноэкранный режим
           if (tg.requestFullscreen) {
             tg.requestFullscreen();
           }
 
-          // 3. Подписываемся на событие, которое 
-          // скажет нам *реальное* состояние
           tg.onEvent('viewportChanged', handleViewportChange);
-          
-          // 4. Вызываем один раз, чтобы 
-          // получить начальное состояние
           handleViewportChange();
 
-          // Шаг 1: Аутентификация через Telegram
           const authResponse = await api.authenticateWithTelegram(tg.initData);
           if (!authResponse || !authResponse.token || !authResponse.user) {
               throw new Error("Invalid auth response from server");
           }
 
-          // Шаг 2: Установка сессии Supabase
           const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
             access_token: authResponse.token,
             refresh_token: authResponse.token,
@@ -348,7 +314,6 @@ const App: React.FC = () => {
             throw new Error("Auth session missing after setSession!");
           }
           
-          // Шаг 3: Загрузка данных приложения
           await loadAppData(sessionData.user.id, authResponse.user);
         }
 
@@ -368,53 +333,56 @@ const App: React.FC = () => {
 
     startApp();
 
-    // --- ОЧИСТКА ПОДПИСКИ ---
     return () => {
       if (tg) {
         tg.offEvent('viewportChanged', handleViewportChange);
       }
     };
 
-  }, [t]); // t (перевод) добавлен в зависимости
+  }, [t]);
   
 
-  // --- НОВЫЙ ОБРАБОТЧИК: ЛОГИН В РЕЖИМЕ РАЗРАБОТКИ ---
   const handleDevLogin = async (email: string, password: string) => {
-    setIsLoading(true); // Показываем спиннер на кнопке
+    setIsLoading(true);
     setError(null);
     
     try {
-      // Пытаемся войти с помощью email/password
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       
       if (error) throw error;
       if (!data.user) throw new Error("Login successful but no user data returned.");
       
-      // Успех! Загружаем данные приложения
       await loadAppData(data.user.id, { first_name: 'Dev' });
-      
-      // Прячем форму логина
       setIsDevLoggingIn(false);
       
     } catch (err: any) {
       console.error("Dev login failed:", err);
       setError(err.message || t('loginError'));
-      setIsLoading(false); // Выключаем спиннер (т.к. мы остались на форме)
+      setIsLoading(false);
     }
   };
 
   
-  // --- Memoized Calculations (без изменений) ---
+  // --- РАСЧЕТЫ (ИСПРАВЛЕНО ДЛЯ ПЕРЕВОДОВ) ---
   const displayCurrency = useMemo(() => defaultCurrency === 'DEFAULT' ? 'USD' : defaultCurrency, [defaultCurrency]);
 
+  // 1. Фильтрация транзакций
   const filteredTransactions = useMemo(() => {
     if (selectedAccountId === 'all') return transactions;
-    return transactions.filter(tx => tx.accountId === selectedAccountId);
+    // ИСПРАВЛЕНИЕ: Показываем транзакцию, если выбранный счет является ИСТОЧНИКОМ или НАЗНАЧЕНИЕМ
+    return transactions.filter(tx => tx.accountId === selectedAccountId || tx.toAccountId === selectedAccountId);
   }, [transactions, selectedAccountId]);
   
+  // 2. Расчет ОБЩЕГО баланса (Net Worth)
   const totalBalance = useMemo(() => {
     return transactions.reduce((balance, tx) => {
       const amountInDefaultCurrency = convertCurrency(tx.amount, tx.currency, displayCurrency, rates);
+      
+      // ИСПРАВЛЕНИЕ: Переводы между своими счетами не меняют общий баланс
+      if (tx.type === TransactionType.TRANSFER) {
+          return balance; 
+      }
+
       return balance + (tx.type === TransactionType.INCOME ? amountInDefaultCurrency : -amountInDefaultCurrency);
     }, 0);
   }, [transactions, rates, displayCurrency]);
@@ -427,6 +395,7 @@ const App: React.FC = () => {
     }, 0);
   }, [savingsGoals, rates, displayCurrency]);
   
+  // 3. Расчет статистики и баланса выбранного счета
   const summary = useMemo(() => {
     const now = new Date();
     const currentMonth = now.getMonth();
@@ -435,25 +404,53 @@ const App: React.FC = () => {
     let monthlyIncome = 0;
     let monthlyExpense = 0;
 
+    // Считаем доходы/расходы только для отображения статистики
     for (const tx of filteredTransactions) {
       const txDate = new Date(tx.date);
+      // Статистика учитывает только этот месяц
       if (txDate.getMonth() === currentMonth && txDate.getFullYear() === currentYear) {
         const amountInDefaultCurrency = convertCurrency(tx.amount, tx.currency, displayCurrency, rates);
+        
         if (tx.type === TransactionType.INCOME) {
           monthlyIncome += amountInDefaultCurrency;
-        } else {
+        } else if (tx.type === TransactionType.EXPENSE) {
           monthlyExpense += amountInDefaultCurrency;
         }
+        // Переводы (TRANSFER) не включаем в статистику доходов/расходов
       }
     }
     
+    // Считаем текущий баланс (Всех счетов или выбранного)
     const selectedBalance = filteredTransactions.reduce((balance, tx) => {
        const amountInDefaultCurrency = convertCurrency(tx.amount, tx.currency, displayCurrency, rates);
-       return balance + (tx.type === TransactionType.INCOME ? amountInDefaultCurrency : -amountInDefaultCurrency);
+       
+       if (tx.type === TransactionType.INCOME) {
+           return balance + amountInDefaultCurrency;
+       } 
+       else if (tx.type === TransactionType.EXPENSE) {
+           return balance - amountInDefaultCurrency;
+       }
+       else if (tx.type === TransactionType.TRANSFER) {
+           // Логика для переводов
+           if (selectedAccountId === 'all') {
+               // Если смотрим "Все счета", внутренний перевод не меняет сумму
+               return balance;
+           } else {
+               // Если смотрим конкретный счет:
+               if (tx.accountId === selectedAccountId) {
+                   // Если мы отправитель - вычитаем
+                   return balance - amountInDefaultCurrency;
+               } else if (tx.toAccountId === selectedAccountId) {
+                   // Если мы получатель - прибавляем
+                   return balance + amountInDefaultCurrency;
+               }
+           }
+       }
+       return balance;
     }, 0)
 
     return { monthlyIncome, monthlyExpense, selectedBalance };
-  }, [filteredTransactions, rates, displayCurrency]);
+  }, [filteredTransactions, rates, displayCurrency, selectedAccountId]); // Добавил selectedAccountId в зависимости
 
   const daysActive = useMemo(() => {
     if (transactions.length === 0) return 1;
@@ -463,11 +460,10 @@ const App: React.FC = () => {
   }, [transactions]);
   
 
-  // --- Handlers for Data Mutation (без изменений) ---
+  // --- Handlers for Data Mutation ---
 
   const handleConfirmTransaction = async (transactionData: Omit<Transaction, 'id'> | Transaction) => {
     try {
-      // 1. (Авто-создание категории, если ее нет)
       if (transactionData.category && !categories.some(c => c.name.toLowerCase() === transactionData.category.toLowerCase())) {
           const iconName = await api.getIconForCategory(transactionData.category);
           const newCategoryData: Omit<Category, 'id'> = {
@@ -481,7 +477,6 @@ const App: React.FC = () => {
           setCategories(prev => [...prev, newCategory]);
       }
 
-      // 2. (Обновление баланса Копилки, если транзакция к ней привязана)
       const originalTransaction = 'id' in transactionData ? transactions.find(t => t.id === transactionData.id) : null;
       const currentGoalId = (transactionData as Transaction).goalId; 
 
@@ -489,18 +484,15 @@ const App: React.FC = () => {
           setSavingsGoals(prevGoals => prevGoals.map(g => {
               let newCurrentAmount = g.currentAmount;
               if (originalTransaction?.goalId === g.id) {
-                  // Отмена старого депозита (при редактировании)
                   newCurrentAmount -= convertCurrency(originalTransaction.amount, originalTransaction.currency, g.currency, rates);
               }
               if (currentGoalId === g.id && transactionData.type === TransactionType.EXPENSE) {
-                  // Добавление нового депозита
                   newCurrentAmount += convertCurrency(transactionData.amount, transactionData.currency, g.currency, rates);
               }
               return { ...g, currentAmount: Math.max(0, newCurrentAmount) };
           }));
       }
 
-      // 3. (Сохранение самой транзакции - обновление или создание)
       if ('id' in transactionData) {
         const updatedTx = await api.updateTransaction(transactionData);
         setTransactions(prev => prev.map(t => t.id === updatedTx.id ? updatedTx : t));
@@ -513,7 +505,6 @@ const App: React.FC = () => {
         console.error("Transaction save failed:", err);
         setError(err.message || t('connectionError'));
     } finally {
-        // 4. (Закрытие модальных окон)
         setPotentialTransaction(null);
         setEditingTransaction(null);
         setGoalForDeposit(null);
@@ -567,14 +558,14 @@ const App: React.FC = () => {
 
     try {
       if (itemToDelete && 'value' in itemToDelete) {
-          // Удаление Счета, Категории, Копилки или Бюджета
           const { type, value } = itemToDelete as { type: string, value: { id: string, name?: string, category?: string } }; 
           
           switch(type) {
               case 'account':
                   await api.deleteAccount(value.id);
                   setAccounts(prev => prev.filter(a => a.id !== value.id));
-                  setTransactions(prev => prev.filter(tx => tx.accountId !== value.id));
+                  // ИСПРАВЛЕНИЕ: Удаляем транзакции, где этот счет был или отправителем, или получателем
+                  setTransactions(prev => prev.filter(tx => tx.accountId !== value.id && tx.toAccountId !== value.id));
                   if(selectedAccountId === value.id) setSelectedAccountId('all');
                   break;
               case 'category':
@@ -591,10 +582,8 @@ const App: React.FC = () => {
                   break;
           }
       } else { 
-          // Удаление Транзакции
           const transactionToDelete = itemToDelete as Transaction;
           
-          // Если транзакция была вкладом в копилку, откатываем баланс копилки
           if (transactionToDelete.goalId && transactionToDelete.type === TransactionType.EXPENSE) {
              setSavingsGoals(prevGoals => prevGoals.map(g => {
                 if (g.id === transactionToDelete.goalId) {
@@ -613,7 +602,7 @@ const App: React.FC = () => {
        setError(err.message);
     }
     
-    setItemToDelete(null); // Закрываем модальное окно
+    setItemToDelete(null);
   };
 
   const handleSaveCategory = async (categoryData: Omit<Category, 'id'> | Category) => {
@@ -692,11 +681,6 @@ const App: React.FC = () => {
   };
 
 
-  // --- НОВЫЙ ХЕНДЛЕР: СОХРАНЕНИЕ ВАЛЮТЫ ПО УМОЛЧАНИЮ ---
-  /**
-   * Обновляет валюту по умолчанию в профиле пользователя в Supabase
-   * и обновляет локальное состояние.
-   */
   const handleSetDefaultCurrency = async (currency: string) => {
     if (!tgUser) {
         setError(t('userNotAuthenticated'));
@@ -705,16 +689,12 @@ const App: React.FC = () => {
     
     setError(null);
     try {
-        // 1. Обновляем базу данных (профиль пользователя)
-        await api.updateDefaultCurrency(tgUser.id, currency); //
+        await api.updateDefaultCurrency(tgUser.id, currency); 
 
-        // 2. Обновляем локальное состояние приложения
         setDefaultCurrency(currency);
         
-        // 3. Обновляем объект tgUser, чтобы он содержал актуальную валюту
-        setTgUser(prev => prev ? ({ ...prev, default_currency: currency }) : null); //
+        setTgUser(prev => prev ? ({ ...prev, default_currency: currency }) : null); 
 
-        // 4. Перезагружаем курсы валют, так как изменилась базовая валюта
         const exchangeRates = await getExchangeRates();
         setRates(exchangeRates);
         
@@ -727,12 +707,11 @@ const App: React.FC = () => {
   };
 
 
-  // --- Audio Recording Handlers (без изменений) ---
+  // --- Audio Recording Handlers ---
   const handleStartRecording = async () => {
     if (isRecording) return;
     
     try {
-      // 1. (Инициализация AudioContext)
       if (!audioCtxRef.current) {
         audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
         if (audioCtxRef.current.state === 'suspended') {
@@ -740,12 +719,10 @@ const App: React.FC = () => {
         }
       }
 
-      // 2. (Запрос доступа к микрофону)
       const mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
       setStream(mediaStream); 
       setIsRecording(true);
       
-      // 3. (Выбор кодека)
       const mimeType = [
           'audio/webm;codecs=opus',
           'audio/ogg;codecs=opus',
@@ -753,7 +730,6 @@ const App: React.FC = () => {
           'audio/mp4',
         ].find(type => MediaRecorder.isTypeSupported(type)) || 'audio/webm';
         
-      // 4. (Начало записи)
       const recorder = new MediaRecorder(mediaStream, { mimeType });
       mediaRecorderRef.current = recorder;
       audioChunksRef.current = []; 
@@ -762,7 +738,7 @@ const App: React.FC = () => {
         audioChunksRef.current.push(event.data);
       };
 
-      recorder.onstop = handleRecordingStop; // Указываем, что делать после остановки
+      recorder.onstop = handleRecordingStop;
 
       recorder.start();
     } catch (err) {
@@ -773,23 +749,20 @@ const App: React.FC = () => {
 
   const handleStopRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop(); // Это вызовет .onstop и handleRecordingStop
+      mediaRecorderRef.current.stop(); 
     }
     setIsRecording(false);
-    setIsProcessing(true); // Показываем индикатор обработки
+    setIsProcessing(true); 
   };
 
   const handleRecordingStop = async () => {
-    // 1. (Очистка)
     stream?.getTracks().forEach(track => track.stop());
     setStream(null); 
 
-    // 2. (Сборка аудио-файла)
     const mimeType = mediaRecorderRef.current?.mimeType || 'audio/webm';
     const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
     audioChunksRef.current = [];
     
-    // 3. (Отправка в API)
     try {
       const newTransaction = await api.processAudioTransaction(
         audioBlob,
@@ -797,7 +770,6 @@ const App: React.FC = () => {
         savingsGoals,
         language
       );
-      // 4. (Показ окна подтверждения)
       setPotentialTransaction({
           ...newTransaction,
           accountId: newTransaction.accountId || accounts[0].id,
@@ -806,12 +778,12 @@ const App: React.FC = () => {
       console.error('Failed to process audio:', err);
       setError(err.message || t('connectionError'));
     } finally {
-      setIsProcessing(false); // Убираем индикатор обработки
+      setIsProcessing(false); 
     }
   };
 
   
-  // --- UI Handlers (без изменений) ---
+  // --- UI Handlers ---
   const handleCancelTransaction = () => {
     setPotentialTransaction(null);
     setEditingTransaction(null);
@@ -819,7 +791,6 @@ const App: React.FC = () => {
     setIsCategoryLockedInForm(false);
   };
   
-  // --- ONBOARDING HANDLERS (без изменений) ---
   const handleFinishOnboarding = async () => {
     setShowOnboarding(false); 
     if (tgUser) {
@@ -837,26 +808,22 @@ const App: React.FC = () => {
   };
 
 
-  // --- Render Logic (Рендеринг Контента) (ИЗМЕНЕНИЯ ЗДЕСЬ) ---
-  // (Эта функция теперь возвращает *только* компонент экрана)
+  // --- Render Logic ---
   const globalStyle = `
-    /* Отключаем выделение для главного контейнера и всех его потомков */
     .min-h-screen, 
     .min-h-screen * { 
-      -webkit-user-select: none; /* Safari */
-      -moz-user-select: none; /* Firefox */
-      -ms-user-select: none; /* IE10+ */
-      user-select: none; /* Standard syntax */
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
     }
 
-    /* Разрешаем выделение ТОЛЬКО для полей ввода, используя !important для переопределения */
     input[type="text"], 
     input[type="number"], 
     input[type="email"], 
     input[type="password"], 
-    input:not([type]), /* Инпуты без явного типа (по умолчанию text) */
+    input:not([type]),
     textarea,
-    /* Общий класс для кастомных инпутов, если они не нативные */
     .text-input-field {
       -webkit-user-select: text !important;
       -moz-user-select: text !important;
@@ -864,23 +831,18 @@ const App: React.FC = () => {
       user-select: text !important;
     }
     
-    /* 3. ОТКЛЮЧЕНИЕ HOVER-ЭФФЕКТОВ ДЛЯ МОБИЛЬНЫХ/СЕНСОРНЫХ УСТРОЙСТВ */
-    /* Используем Media Feature (hover: none) для устройств без курсора */
     @media (hover: none) {
-      /* Сброс всех :hover стилей, специфических для Tailwind */
       a:hover, 
       button:hover, 
       input:hover,
-      .hover\\:bg-*, /* Отключаем общие классы hover:bg-* */
-      .hover\\:text-*, /* Отключаем общие классы hover:text-* */
-      .hover\\:opacity-*, /* Отключаем общие классы hover:opacity-* */
-      .hover\\:shadow-*, /* Отключаем общие классы hover:shadow-* */
-      .hover\\:border-*, /* Отключаем общие классы hover:border-* */
-      .group:hover .group-hover\\:*, /* Отключаем групповые hover-эффекты */
-      .peer:hover ~ .peer-hover\\:* /* Отключаем peer hover-эффекты */
+      .hover\\:bg-*,
+      .hover\\:text-*,
+      .hover\\:opacity-*,
+      .hover\\:shadow-*,
+      .hover\\:border-*,
+      .group:hover .group-hover\\:*,
+      .peer:hover ~ .peer-hover\\:*
       {
-        /* Сбрасываем все изменения, примененные через псевдокласс :hover */
-        /* Используем !important, чтобы перебить специфичность классов Tailwind */
         color: inherit !important;
         background-color: inherit !important;
         opacity: 1 !important;
@@ -891,10 +853,6 @@ const App: React.FC = () => {
         cursor: default !important;
         text-decoration: none !important;
       }
-      
-      /* Если у нас есть специфический класс для активного состояния (например, :active или :focus-visible) */
-      /* то его нужно оставить, чтобы пользователь видел реакцию на тап. */
-      /* Для имитации hover на мобилках часто используют псевдокласс :active. */
     }
   `;
   
@@ -963,11 +921,10 @@ const App: React.FC = () => {
         <SettingsScreen 
           onBack={() => setActiveScreen('profile')} 
           defaultCurrency={defaultCurrency} 
-          onSetDefaultCurrency={handleSetDefaultCurrency} // <-- ИСПОЛЬЗУЕМ НОВЫЙ ASYNC ХЕНДЛЕР
+          onSetDefaultCurrency={handleSetDefaultCurrency}
           onShowOnboarding={handleShowOnboarding}
         />
       );
-      // --- НОВЫЙ КЕЙС ДЛЯ ЭКРАНА "О ПРИЛОЖЕНИИ" ---
       case 'about': return (
         <AboutScreen 
           onBack={() => setActiveScreen('profile')} 
@@ -1008,8 +965,6 @@ const App: React.FC = () => {
         <ComingSoonScreen onBack={() => setActiveScreen('profile')} />
       );
       case 'home': default: return (
-        // (Обертка с отступом УБРАНА отсюда и перенесена 
-        // в главный рендер)
         <main className="max-w-4xl mx-auto flex flex-col gap-4 pb-32"> 
           <AccountList 
             accounts={accounts} 
@@ -1037,6 +992,8 @@ const App: React.FC = () => {
               onDeleteTransaction={(tx) => setItemToDelete(tx)} 
               onViewAll={() => setActiveScreen('history')} 
               rates={rates} 
+              // ПЕРЕДАЕМ ВСЕ СЧЕТА, ЧТОБЫ ЭЛЕМЕНТ СПИСКА МОГ НАЙТИ ИМЯ ПОЛУЧАТЕЛЯ
+              allAccounts={accounts}
             /> 
           </div> 
           {error && !isDevLoggingIn && <p className="text-center text-red-500 mt-2 px-6" onClick={() => setError(null)}>{error}</p>} 
@@ -1046,21 +1003,16 @@ const App: React.FC = () => {
   }
 
 
-  // --- ЭКРАН ЗАГРУЗКИ ---
-  // (Логика была перенесена в LoadingScreen)
-
-  // --- НОВЫЙ ЭКРАН: ФОРМА ЛОГИНА ДЛЯ РАЗРАБОТКИ ---
   if (isDevLoggingIn) {
       return (
           <DevLoginForm 
               onSubmit={handleDevLogin} 
               error={error} 
-              isLoading={isLoading} // Передаем isLoading для спиннера на кнопке
+              isLoading={isLoading}
           />
       );
   }
 
-  // --- ЭКРАН БЛОКИРОВКИ (Если не в Telegram и не в Dev-режиме) ---
   if (isBlocked) {
     return (
         <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center text-center p-6">
@@ -1074,28 +1026,20 @@ const App: React.FC = () => {
     );
   }
 
-  // --- ОСНОВНОЙ РЕНДЕРИНГ ПРИЛОЖЕНИЯ (ИЗМЕНЕНИЯ ЗДЕСЬ) ---
   const isDev = import.meta.env.DEV;
 
-  // --- ИЗМЕНЕННАЯ ЛОГИКА "МАСКИ" (ШИР-МЫ) ---
   let paddingTopClass = '';
   let showMask = false;
   
   if (!isDev) {
     if (isAppFullscreen) {
-      // 1. РЕЖИМ FULLSCREEN:
-      // Вы просили добавить маску 85px
-      paddingTopClass = TG_HEADER_OFFSET_CLASS; // 'pt-[85px]'
-      showMask = true; // Показать фон для этой "маски"
+      paddingTopClass = TG_HEADER_OFFSET_CLASS;
+      showMask = true;
 
     } else if (isAppExpanded) {
-      // 2. РЕЖИМ EXPANDED:
-      // Вы просили убрать маску
       paddingTopClass = '';
       showMask = false;
-    
     }
-    // 3. В СВЕРНУТОМ режиме отступов тоже не будет
   }
   
   return (
@@ -1103,24 +1047,16 @@ const App: React.FC = () => {
 
       <style>{globalStyle}</style>
       
-      {/* --- НОВЫЙ ЭКРАН ЗАГРУЗKI --- */}
       <LoadingScreen isLoading={isLoading && !isDevLoggingIn} />
 
-      {/* --- РЕНДЕР ONBOARDING (поверх всего) --- */}
       <AnimatePresence>
         {showOnboarding && <OnboardingGuide onFinish={handleFinishOnboarding} />}
       </AnimatePresence>
 
-      {/* --- ИЗМЕНЕННАЯ ЛОГИКА "МАСКИ" (ШИР-МЫ) --- */}
-      {/* Показываем "маску" (фон для отступа) 
-          только если showMask = true */}
       {showMask && (
         <div className="fixed top-0 left-0 right-0 h-[85px] bg-gray-900 z-20"></div>
       )}
 
-      {/* --- ИЗМЕНЕНИЕ: ГЛАВНЫЙ КОНТЕЙНЕР КОНТЕНТА --- */}
-      {/* Этот div теперь оборачивает ВЕСЬ контент и применяет 
-          отступ `paddingTopClass` (85px в fullscreen, 0 в expanded) */}
       {!isLoading && (
         <div className={paddingTopClass}>
           {renderContent()}
@@ -1128,7 +1064,6 @@ const App: React.FC = () => {
       )}
 
 
-      {/* Оверлей записи аудио (поверх всего) */}
       {isRecording && (
         <RecordingOverlay 
           transcription={transcription}
@@ -1139,7 +1074,6 @@ const App: React.FC = () => {
         />
       )}
       
-      {/* Модальное окно/Форма транзакции (поверх всего) */}
       {(potentialTransaction || editingTransaction) && (
         <TransactionForm
           transaction={potentialTransaction || editingTransaction!}
@@ -1159,14 +1093,12 @@ const App: React.FC = () => {
         />
       )}
       
-      {/* Остальные модальные окна (поверх всего) */}
       <AccountForm isOpen={isAccountFormOpen} onClose={() => setIsAccountFormOpen(false)} onSave={handleSaveAccount} account={editingAccount} />
       <SavingsGoalForm isOpen={isGoalFormOpen} onClose={() => { setIsGoalFormOpen(false); setEditingGoal(null); }} onSave={handleSaveGoal} goal={editingGoal} defaultCurrency={displayCurrency} />
       <BudgetForm isOpen={isBudgetFormOpen} onClose={() => { setIsBudgetFormOpen(false); setEditingBudget(null); }} onSave={handleSaveBudget} budget={editingBudget} allCategories={categories} budgetsForMonth={budgets.filter(b => b.monthKey === editingBudget?.monthKey)} onCreateNewCategory={() => setCategoryFormState({ isOpen: true, category: null, context: {type: TransactionType.EXPENSE, from: 'budget'} })} defaultCurrency={displayCurrency} />
       <CategoryForm isOpen={categoryFormState.isOpen} onClose={() => setCategoryFormState({isOpen: false, category: null})} onSave={handleSaveCategory} onDelete={(cat) => setItemToDelete({type: 'category', value: cat})} category={categoryFormState.category} isFavoriteDisabled={!categoryFormState.category?.isFavorite && categories.filter(c => c.isFavorite).length >= 10} categories={categories} />
       <AccountActionsModal isOpen={!!accountForActions} account={accountForActions} onClose={() => setAccountForActions(null)} onAddTransaction={(acc) => { setPotentialTransaction({ accountId: acc.id, name: '', amount: 0, currency: displayCurrency, category: '', date: new Date().toISOString(), type: TransactionType.EXPENSE }); setActiveScreen('home'); setAccountForActions(null); }} onEdit={(acc) => { setEditingAccount(acc); setIsAccountFormOpen(true); setAccountForActions(null); }} onDelete={(acc) => { setItemToDelete({ type: 'account', value: acc }); setAccountForActions(null); }} />
       
-      {/* Модальные окна подтверждения (поверх всего) */}
       <ConfirmationModal 
         isOpen={!!itemToDelete} 
         onCancel={() => setItemToDelete(null)} 
@@ -1188,12 +1120,10 @@ const App: React.FC = () => {
         message={t('carryOverBudgetsMessage')} 
       />
       
-      {/* Модальное окно ввода текста и истории (поверх всего) */}
       <TextInputModal isOpen={isTextInputOpen} isProcessing={isProcessingText} onClose={() => setIsTextInputOpen(false)} onSubmit={handleTextTransactionSubmit} text={textInputValue} onTextChange={setTextInputValue} />
       {goalForHistory && <GoalTransactionsModal isOpen={!!goalForHistory} onClose={() => setGoalForHistory(null)} goal={goalForHistory} transactions={transactions} accounts={accounts} onSelectTransaction={setEditingTransaction} onDeleteTransaction={(tx) => setItemToDelete(tx)} rates={rates} />}
       {budgetForHistory && <BudgetTransactionsModal isOpen={!!budgetForHistory} onClose={() => setBudgetForHistory(null)} budget={budgetForHistory} transactions={transactions} accounts={accounts} onSelectTransaction={setEditingTransaction} onDeleteTransaction={(tx) => setItemToDelete(tx)} rates={rates} />}
       
-      {/* Нижняя навигационная панель (поверх всего) */}
       {!isLoading && (
         <BottomNavBar 
           activeScreen={activeScreen} 

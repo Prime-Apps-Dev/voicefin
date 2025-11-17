@@ -1,6 +1,5 @@
 // src/services/api.ts
 // ВАШЕ "МЕНЮ" ДЛЯ СВЯЗИ С РЕАЛЬНЫМ БЭКЕНДОМ
-// Мы заменяем все "заглушки" (MOCK_DB) на реальные вызовы Supabase.
 
 import { supabase } from './supabase';
 import { Transaction, Account, SavingsGoal, Budget, Category, TransactionType, AccountType } from '../types';
@@ -10,7 +9,6 @@ import { ICON_NAMES } from '../components/icons';
 /**
  * Шаг 1: Аутентификация
  * Вызываем нашу бэкенд-функцию 'telegram-auth'.
- * Она проверяет данные Telegram и возвращает "пропуск" (JWT-токен).
  */
 export async function authenticateWithTelegram(initData: string) {
   const { data, error } = await supabase.functions.invoke('telegram-auth', {
@@ -30,9 +28,6 @@ export async function authenticateWithTelegram(initData: string) {
 
 /**
  * Шаг 2: Загрузка всех данных пользователя
- * После аутентификации, мы запрашиваем ВСЕ данные.
- * SQL-политики (которые мы создали) сами отфильтруют и вернут
- * только те данные, которые принадлежат этому пользователю.
  */
 export const initializeUser = async () => {
   const [transactionsRes, accountsRes, categoriesRes, savingsGoalsRes, budgetsRes] = await Promise.all([
@@ -43,20 +38,17 @@ export const initializeUser = async () => {
     supabase.from('budgets').select('*'),
   ]);
 
-  // Обрабатываем ошибки
   if (transactionsRes.error) throw transactionsRes.error;
   if (accountsRes.error) throw accountsRes.error;
   if (categoriesRes.error) throw categoriesRes.error;
   if (savingsGoalsRes.error) throw savingsGoalsRes.error;
   if (budgetsRes.error) throw budgetsRes.error;
 
-  // Если у пользователя нет категорий (первый вход), создаем стандартные
   let categories = categoriesRes.data as Category[];
   if (categories.length === 0) {
     categories = await createDefaultCategories();
   }
 
-  // Если нет счетов, создаем "Наличные"
   let accounts = accountsRes.data as Account[];
   if (accounts.length === 0) {
     accounts = [await createDefaultAccount()];
@@ -86,13 +78,12 @@ const createDefaultCategories = async (): Promise<Category[]> => {
     { name: 'Подарки', icon: 'Gift', type: TransactionType.INCOME, isDefault: true, isFavorite: false },
   ];
 
-  // Получаем ID пользователя
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Пользователь не аутентифицирован для создания категорий");
   
   const categoriesToInsert = DEFAULT_CATEGORIES.map(c => ({
     ...c,
-    telegram_user_id: user.id, // Связываем с пользователем
+    telegram_user_id: user.id,
   }));
   
   const { data, error } = await supabase.from('categories').insert(categoriesToInsert).select();
@@ -125,36 +116,23 @@ const createDefaultAccount = async (): Promise<Account> => {
 
 // --- Операции CRUD (Создание, Чтение, Обновление, Удаление) ---
 
-// Получаем ID пользователя ОДИН раз, чтобы добавлять его во все запросы
 const getUserId = async () => {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Пользователь не аутентифицирован");
   return user.id;
 };
 
-/**
- * Вызывает Edge Function для генерации финансового анализа
- */
 export async function generateFinancialAnalysis(
   transactions: Transaction[], 
   language: string
 ): Promise<string> {
   
   const { data, error } = await supabase.functions.invoke('generate-financial-analysis', {
-    body: { 
-      transactions, 
-      language 
-    },
+    body: { transactions, language },
   });
 
-  if (error) {
-    throw new Error(`Ошибка генерации финансового анализа: ${error.message}`);
-  }
-
-  // Бэкенд, вероятно, возвращает объект { analysis: "..." }
-  if (!data || !data.analysis) {
-    throw new Error('Некорректный ответ от функции анализа');
-  }
+  if (error) throw new Error(`Ошибка генерации анализа: ${error.message}`);
+  if (!data || !data.analysis) throw new Error('Некорректный ответ от функции анализа');
 
   return data.analysis;
 }
@@ -162,6 +140,7 @@ export async function generateFinancialAnalysis(
 // Транзакции
 export const addTransaction = async (transaction: Omit<Transaction, 'id'>): Promise<Transaction> => {
   const userId = await getUserId();
+  // ОТПРАВЛЯЕМ КАК ЕСТЬ (без маппинга, так как колонка в БД теперь toAccountId)
   const { data, error } = await supabase
     .from('transactions')
     .insert({ ...transaction, telegram_user_id: userId })
@@ -199,17 +178,12 @@ export const addAccount = async (account: Omit<Account, 'id'>): Promise<Account>
   return data;
 };
 
-// *** ИСПРАВЛЕНИЕ ЗДЕСЬ ***
-// Мы отделяем 'id' от 'updateData', чтобы не пытаться обновить 'id' в базе данных.
 export const updateAccount = async (account: Account): Promise<Account> => {
-  // Деструктурируем 'id' из объекта 'account'
-  // 'updateData' будет содержать все остальные поля (name, currency, gradient, type)
   const { id, ...updateData } = account;
-
   const { data, error } = await supabase
     .from('accounts')
-    .update(updateData) // Передаем в update() только 'updateData'
-    .eq('id', id)       // Используем 'id' для .eq()
+    .update(updateData) 
+    .eq('id', id)      
     .select()
     .single();
     
@@ -241,7 +215,7 @@ export const deleteCategory = async (categoryId: string): Promise<void> => {
   if (error) throw error;
 };
 
-// Копилки (Цели накоплений)
+// Копилки
 export const addSavingsGoal = async (goal: Omit<SavingsGoal, 'id'>): Promise<SavingsGoal> => {
   const userId = await getUserId();
   const { data, error } = await supabase.from('savings_goals').insert({ ...goal, telegram_user_id: userId }).select().single();
@@ -280,11 +254,8 @@ export const deleteBudget = async (budgetId: string): Promise<void> => {
 };
 
 
-// --- Вызовы Edge Function (Gemini AI) ---
+// --- Edge Functions ---
 
-/**
- * Парсит (распознает) транзакцию из текста
- */
 export const parseTransactionFromText = async (
   text: string,
   defaultCurrency: string,
@@ -301,9 +272,6 @@ export const parseTransactionFromText = async (
   return data as Omit<Transaction, 'id'>;
 };
 
-/**
- * Получает иконку для категории
- */
 export const getIconForCategory = async (categoryName: string): Promise<string> => {
   const { data, error } = await supabase.functions.invoke('get-icon-for-category', {
     body: { categoryName, iconList: ICON_NAMES }
@@ -313,9 +281,6 @@ export const getIconForCategory = async (categoryName: string): Promise<string> 
   return data.iconName;
 };
 
-/**
- * Генерирует советы по экономии
- */
 export const generateSavingsTips = async (transactions: Transaction[]): Promise<string> => {
   const { data, error } = await supabase.functions.invoke('generate-savings-tips', {
     body: { transactions }
@@ -325,9 +290,6 @@ export const generateSavingsTips = async (transactions: Transaction[]): Promise<
   return data.tips;
 };
 
-/**
- * НОВАЯ: Обрабатывает аудио-файл
- */
 export const processAudioTransaction = async (
   audioBlob: Blob,
   categories: Category[],
@@ -335,87 +297,56 @@ export const processAudioTransaction = async (
   language: string
 ): Promise<Omit<Transaction, 'id'>> => {
 
-  console.log('API: Начинаем processAudioTransaction...'); // LOG 1: Начало
+  console.log('API: Начинаем processAudioTransaction...'); 
 
   const formData = new FormData();
   formData.append('audio', audioBlob, 'transaction.webm');
   
   const context = { categories, savingsGoals, language };
-  console.log('API: Контекст для ИИ:', context); // LOG 2: Контекст для ИИ
-  
   formData.append('context', JSON.stringify(context));
 
-  // Используем прямой fetch вместо supabase.functions.invoke
   const { data: { session } } = await supabase.auth.getSession();
-  
   const SUPABASE_URL: string = import.meta.env.VITE_SUPABASE_URL || '';
 
-  if (!SUPABASE_URL) {
-    throw new Error("VITE_SUPABASE_URL переменная окружения отсутствует или пуста.");
-  }
+  if (!SUPABASE_URL) throw new Error("VITE_SUPABASE_URL не задана.");
 
   const url = `${SUPABASE_URL}/functions/v1/process-audio-transaction`;
-  console.log('API: Запрос на URL:', url); // LOG 3: URL запроса
-  console.log(`API: Размер аудио Blob: ${audioBlob.size} байт, тип: ${audioBlob.type}`); // LOG 4: Детали Blob
-
-  const response = await fetch(
-    url,
-    {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${session?.access_token || ''}`,
-      },
-      body: formData,
-    }
-  );
-
-  console.log('API: Статус ответа:', response.status); // LOG 5: Статус ответа
+  
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${session?.access_token || ''}`,
+    },
+    body: formData,
+  });
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error('API: Ошибка вызова функции. Текст ошибки:', errorText); // LOG 6: Текст ошибки
     throw new Error(`Ошибка вызова функции (Статус: ${response.status}): ${errorText}`);
   }
 
   const data = await response.json();
-  console.log('API: Успешно получены данные:', data); // LOG 7: Успешный ответ
   return data as Omit<Transaction, 'id'>;
 };
 
 
-/**
- * Устанавливает флаг has_completed_onboarding в true для пользователя
- */
 export const markOnboardingAsCompleted = async (userId: string): Promise<void> => {
   const { error } = await supabase
     .from('profiles')
-    .update({ has_completed_onboarding: true, updated_at: new Date().toISOString() }) // Также обновим updated_at
-    .eq('id', userId); // 'id' в таблице profiles совпадает с auth.users 'id'
+    .update({ has_completed_onboarding: true, updated_at: new Date().toISOString() }) 
+    .eq('id', userId); 
 
-  if (error) {
-    console.error("Ошибка при обновлении статуса онбординга:", error);
-    throw error;
-  }
+  if (error) throw error;
 };
 
-// <-- НОВАЯ ФУНКЦИЯ ДЛЯ СОХРАНЕНИЯ ВАЛЮТЫ -->
-/**
- * Обновляет валюту по умолчанию в профиле пользователя
- */
 export const updateDefaultCurrency = async (userId: string, currency: string): Promise<void> => {
-  console.log(`API: Обновляем валюту по умолчанию для пользователя ${userId} на ${currency}`);
   const { error } = await supabase
     .from('profiles')
     .update({ 
       default_currency: currency, 
       updated_at: new Date().toISOString() 
-    }) // Обновляем default_currency и updated_at
-    .eq('id', userId); // Ищем пользователя по id
+    }) 
+    .eq('id', userId); 
 
-  if (error) {
-    console.error("Ошибка при обновлении валюты по умолчанию:", error);
-    throw error;
-  }
-  console.log("API: Валюта по умолчанию успешно обновлена в профиле.");
+  if (error) throw error;
 };
-// <-- КОНЕЦ НОВОЙ ФУНКЦИИ -->

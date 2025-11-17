@@ -7,7 +7,7 @@ import { COMMON_CURRENCIES } from '../constants';
 import { useLocalization } from '../context/LocalizationContext';
 import { DatePicker } from './DatePicker';
 import { TimePicker } from './TimePicker';
-import { Calendar, Clock, ChevronDown, PlusCircle } from 'lucide-react';
+import { Calendar, Clock, ChevronDown, PlusCircle, ArrowRightLeft } from 'lucide-react';
 import { ICONS } from './icons';
 import { convertCurrency } from '../services/currency';
 
@@ -71,38 +71,29 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
   });
   const isEditing = 'id' in transaction;
   const isSavingsTransaction = formData.category === 'Savings';
+  const isTransfer = formData.type === TransactionType.TRANSFER;
 
   React.useEffect(() => {
-    // ----------------------------------------------------------------------------------
-    // ИСПРАВЛЕНИЕ ОШИБКИ ФИКСИРОВАННОЙ ДАТЫ:
-    // Для новой транзакции (когда нет 'id'), всегда устанавливаем текущую дату и время,
-    // игнорируя любую фиксированную дату, которая могла быть передана в пропсах.
-    // ----------------------------------------------------------------------------------
     const isNewTransaction = !('id' in transaction);
     
     let newFormData = transaction;
 
     if (isNewTransaction) {
-      // Для новой транзакции (не редактирование) всегда устанавливаем текущую дату и время.
       newFormData = {
         ...transaction,
-        // Используем new Date().toISOString() для установки текущего времени, дня, месяца и года.
         date: new Date().toISOString(),
       };
     }
     
     setFormData(newFormData);
-    
-    // Также устанавливаем строку для суммы
     setAmountStr(String(transaction.amount || ''));
-    
-  }, [transaction]); // Этот хук запускается, когда открывается форма
+  }, [transaction]);
 
   React.useEffect(() => {
-    if (isSavingsTransaction) {
+    if (isSavingsTransaction && !isTransfer) {
         setFormData(prev => ({...prev, type: TransactionType.EXPENSE}));
     }
-  }, [isSavingsTransaction]);
+  }, [isSavingsTransaction, isTransfer]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -114,9 +105,24 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
       setFormData(prev => ({ ...prev, [name]: value }));
     }
   };
+
+  // Обработчик смены типа транзакции. Если выбрали перевод - сбрасываем категорию.
+  const handleTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newType = e.target.value as TransactionType;
+    setFormData(prev => ({
+        ...prev,
+        type: newType,
+        category: newType === TransactionType.TRANSFER ? '' : (prev.category || categories[0]?.name || ''),
+        toAccountId: newType === TransactionType.TRANSFER ? (prev.toAccountId || accounts.find(a => a.id !== prev.accountId)?.id) : undefined
+    }));
+  };
   
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isTransfer && formData.accountId === formData.toAccountId) {
+        alert("Source and destination accounts must be different");
+        return;
+    }
     onConfirm(formData);
   };
   
@@ -128,12 +134,12 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
       return Array.from(categoryNameSet).sort();
   }, [categories, formData.category]);
 
+  // Логика бюджета (не активна для переводов)
   const budgetInfo = React.useMemo(() => {
-    if (!formData.category || formData.type === TransactionType.INCOME) {
+    if (!formData.category || formData.type === TransactionType.INCOME || isTransfer) {
       return null;
     }
-
-    // formData.date теперь всегда будет валидной строкой
+    
     const transactionDate = new Date(formData.date); 
     const monthKey = `${transactionDate.getFullYear()}-${String(transactionDate.getMonth() + 1).padStart(2, '0')}`;
 
@@ -147,7 +153,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
                  t.type === TransactionType.EXPENSE &&
                  tDate.getFullYear() === transactionDate.getFullYear() &&
                  tDate.getMonth() === transactionDate.getMonth() &&
-                 ('id' in transaction ? t.id !== transaction.id : true); // Exclude current transaction if editing
+                 ('id' in transaction ? t.id !== transaction.id : true);
         })
         .reduce((sum, t) => {
           const amountInBudgetCurrency = convertCurrency(t.amount, t.currency, budgetForCategory.currency, rates);
@@ -170,10 +176,10 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
         monthKey: monthKey,
       };
     }
-  }, [formData.category, formData.date, formData.type, formData.amount, formData.currency, budgets, transactions, rates, defaultCurrency, transaction]);
+  }, [formData.category, formData.date, formData.type, formData.amount, formData.currency, budgets, transactions, rates, defaultCurrency, transaction, isTransfer]);
 
   const savingsGoalInfo = React.useMemo(() => {
-    if (!formData.goalId || !isSavingsTransaction) {
+    if (!formData.goalId || !isSavingsTransaction || isTransfer) {
         return null;
     }
 
@@ -198,7 +204,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
         baseAmount: Math.max(0, baseAmount),
         progress: selectedGoal.targetAmount > 0 ? (totalAmountWithCurrent / selectedGoal.targetAmount) * 100 : 0,
     };
-  }, [formData.goalId, formData.amount, formData.currency, isSavingsTransaction, savingsGoals, rates, transaction]);
+  }, [formData.goalId, formData.amount, formData.currency, isSavingsTransaction, savingsGoals, rates, transaction, isTransfer]);
 
 
   const formatCurrencyLocal = (amount: number, currency: string) => {
@@ -210,20 +216,25 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
     }).format(amount);
   };
 
-  // Проверка, чтобы избежать "Invalid Date" перед рендерингом
   const safeDate = React.useMemo(() => {
     try {
       const d = new Date(formData.date);
-      // Проверяем, валидна ли дата
       if (isNaN(d.getTime())) {
-        // Если нет, возвращаем текущую дату (хотя useEffect должен это предотвратить)
         return new Date();
       }
       return d;
     } catch (e) {
-      return new Date(); // Fallback
+      return new Date();
     }
   }, [formData.date]);
+
+  // Перевод текстов для UI
+  const getTypeLabel = (type: string) => {
+    if (type === TransactionType.INCOME) return t('income');
+    if (type === TransactionType.EXPENSE) return t('expense');
+    if (type === TransactionType.TRANSFER) return language === 'ru' ? 'Перевод' : 'Transfer';
+    return type;
+  };
 
   return (
     <>
@@ -243,13 +254,42 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
           onClick={(e) => e.stopPropagation()}
         >
           <div className="sticky top-0 bg-zinc-900/95 backdrop-blur-xl px-6 py-5 border-b border-zinc-800/60 z-10 flex-shrink-0">
-            <h2 className="text-xl font-semibold text-white tracking-tight">{isSavingsDeposit ? `Add to "${goalName}"` : isEditing ? t('editTransaction') : t('confirmTransaction')}</h2>
+            <div className="flex items-center gap-3">
+                {isTransfer && <div className="p-2 bg-blue-500/20 rounded-full"><ArrowRightLeft className="w-5 h-5 text-blue-400"/></div>}
+                <h2 className="text-xl font-semibold text-white tracking-tight">
+                    {isSavingsDeposit ? `Add to "${goalName}"` : isEditing ? t('editTransaction') : isTransfer ? (language === 'ru' ? 'Новый перевод' : 'New Transfer') : t('confirmTransaction')}
+                </h2>
+            </div>
           </div>
 
           <form onSubmit={handleSubmit} className="overflow-y-auto">
             <div className="px-6 py-6 space-y-4">
+              
+              {/* TYPE SELECTION */}
               <div>
-                <label htmlFor="accountId" className="block text-sm font-medium text-zinc-300 mb-1.5">{t('account')}</label>
+                <label htmlFor="type" className="block text-sm font-medium text-zinc-300 mb-1.5">{t('type')}</label>
+                <div className="relative">
+                  <select
+                    id="type"
+                    name="type"
+                    value={formData.type}
+                    onChange={handleTypeChange}
+                    disabled={isSavingsDeposit || isCategoryLocked || isSavingsTransaction}
+                    className="appearance-none w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 pr-10 disabled:bg-zinc-700/50 disabled:cursor-not-allowed"
+                  >
+                    <option value={TransactionType.EXPENSE}>{t('expense')}</option>
+                    <option value={TransactionType.INCOME}>{t('income')}</option>
+                    <option value={TransactionType.TRANSFER}>{language === 'ru' ? 'Перевод' : 'Transfer'}</option>
+                  </select>
+                  <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 pointer-events-none" />
+                </div>
+              </div>
+
+              {/* FROM ACCOUNT */}
+              <div>
+                <label htmlFor="accountId" className="block text-sm font-medium text-zinc-300 mb-1.5">
+                    {isTransfer ? (language === 'ru' ? 'Списать со счета' : 'From Account') : t('account')}
+                </label>
                 <div className="relative">
                   <select id="accountId" name="accountId" value={formData.accountId} onChange={handleChange} required className="appearance-none w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 pr-10">
                     {accounts.map((acc) => (
@@ -261,7 +301,45 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
                   <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 pointer-events-none" />
                 </div>
               </div>
+
+              {/* TO ACCOUNT (ONLY FOR TRANSFER) */}
+              <AnimatePresence>
+                  {isTransfer && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="overflow-hidden"
+                      >
+                          <div className="mb-4">
+                            <label htmlFor="toAccountId" className="block text-sm font-medium text-zinc-300 mb-1.5">
+                                {language === 'ru' ? 'Зачислить на счет' : 'To Account'}
+                            </label>
+                            <div className="relative">
+                            <select 
+                                id="toAccountId" 
+                                name="toAccountId" 
+                                value={formData.toAccountId || ''} 
+                                onChange={handleChange} 
+                                required={isTransfer}
+                                className="appearance-none w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 pr-10"
+                            >
+                                <option value="" disabled>{language === 'ru' ? 'Выберите счет' : 'Select Account'}</option>
+                                {accounts.filter(acc => acc.id !== formData.accountId).map((acc) => (
+                                <option key={acc.id} value={acc.id}>
+                                    {acc.name} ({acc.currency})
+                                </option>
+                                ))}
+                            </select>
+                            <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 pointer-events-none" />
+                            </div>
+                        </div>
+                      </motion.div>
+                  )}
+              </AnimatePresence>
+
               <InputField label={t('name')} name="name" value={formData.name} onChange={handleChange} required disabled={isSavingsDeposit} />
+              
               <div className="grid grid-cols-2 gap-4">
                 <InputField label={t('amount')} name="amount" value={amountStr} onChange={handleChange} type="text" inputMode="decimal" required />
                 <div>
@@ -285,30 +363,34 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
                   </div>
                 </div>
               </div>
-              <div>
-                  <label htmlFor="category" className="block text-sm font-medium text-zinc-300 mb-1.5">{t('category')}</label>
-                  <div className="relative">
-                    <select
-                      id="category"
-                      name="category"
-                      value={formData.category}
-                      onChange={handleChange}
-                      required
-                      disabled={isSavingsDeposit || isCategoryLocked}
-                      className="appearance-none w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 pr-10 disabled:bg-zinc-700/50 disabled:cursor-not-allowed"
-                    >
-                      {allCategoryNames.map((c) => (
-                        <option key={c} value={c}>
-                          {c}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 pointer-events-none" />
+              
+              {/* CATEGORY (HIDDEN FOR TRANSFER) */}
+              {!isTransfer && (
+                  <div>
+                      <label htmlFor="category" className="block text-sm font-medium text-zinc-300 mb-1.5">{t('category')}</label>
+                      <div className="relative">
+                        <select
+                          id="category"
+                          name="category"
+                          value={formData.category}
+                          onChange={handleChange}
+                          required={!isTransfer}
+                          disabled={isSavingsDeposit || isCategoryLocked}
+                          className="appearance-none w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 pr-10 disabled:bg-zinc-700/50 disabled:cursor-not-allowed"
+                        >
+                          {allCategoryNames.map((c) => (
+                            <option key={c} value={c}>
+                              {c}
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 pointer-events-none" />
+                      </div>
                   </div>
-              </div>
+              )}
 
                <AnimatePresence>
-                {isSavingsTransaction && (
+                {isSavingsTransaction && !isTransfer && (
                     <motion.div
                         initial={{ opacity: 0, height: 0, y: -10 }}
                         animate={{ opacity: 1, height: 'auto', y: 0 }}
@@ -379,7 +461,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
                </AnimatePresence>
               
                <AnimatePresence>
-                    {budgetInfo && !isSavingsTransaction && (
+                    {budgetInfo && !isSavingsTransaction && !isTransfer && (
                         <motion.div
                             layout
                             initial={{ opacity: 0, height: 0, y: -10 }}
@@ -446,7 +528,6 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
                     onClick={() => setIsDatePickerOpen(true)}
                     className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white text-left flex justify-between items-center focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200"
                   >
-                    {/* Используем 'safeDate' для отображения */}
                     <span>{safeDate.toLocaleDateString(language === 'ru' ? 'ru-RU' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
                     <Calendar className="w-5 h-5 text-zinc-400" />
                   </button>
@@ -459,29 +540,12 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
                     onClick={() => setIsTimePickerOpen(true)}
                     className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white text-left flex justify-between items-center focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200"
                   >
-                    {/* Используем 'safeDate' для отображения */}
                     <span>{safeDate.toTimeString().slice(0, 5)}</span>
                     <Clock className="w-5 h-5 text-zinc-400" />
                   </button>
                 </div>
               </div>
-              <div>
-                <label htmlFor="type" className="block text-sm font-medium text-zinc-300 mb-1.5">{t('type')}</label>
-                <div className="relative">
-                  <select
-                    id="type"
-                    name="type"
-                    value={formData.type}
-                    onChange={handleChange}
-                    disabled={isSavingsDeposit || isCategoryLocked || isSavingsTransaction}
-                    className="appearance-none w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 pr-10 disabled:bg-zinc-700/50 disabled:cursor-not-allowed"
-                  >
-                    <option value={TransactionType.EXPENSE}>{t('expense')}</option>
-                    <option value={TransactionType.INCOME}>{t('income')}</option>
-                  </select>
-                  <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 pointer-events-none" />
-                </div>
-              </div>
+
               <div>
                 <label htmlFor="description" className="block text-sm font-medium text-zinc-300 mb-1.5">{t('descriptionOptional')}</label>
                 <textarea
@@ -529,8 +593,8 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
               setFormData(prev => ({ ...prev, date: newDate.toISOString() }));
               setIsDatePickerOpen(false);
             }}
-            initialStartDate={safeDate} // Используем safeDate
-            initialEndDate={safeDate}   // Используем safeDate
+            initialStartDate={safeDate}
+            initialEndDate={safeDate}
             selectionMode="single"
           />
         }
@@ -542,7 +606,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
                 setFormData(prev => ({...prev, date: newTime.toISOString()}));
                 setIsTimePickerOpen(false);
             }}
-            initialTime={safeDate} // Используем safeDate
+            initialTime={safeDate}
           />
         }
       </AnimatePresence>

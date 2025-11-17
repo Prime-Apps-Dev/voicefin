@@ -1,9 +1,12 @@
+// src/components/AccountsScreen.tsx
+
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Account, Transaction, ExchangeRates } from '../types';
+import { Account, Transaction, ExchangeRates, TransactionType } from '../types'; // Добавил TransactionType
 import { AccountListItem } from './AccountListItem';
 import { useLocalization } from '../context/LocalizationContext';
 import { ChevronLeft, Plus, Wallet } from 'lucide-react';
+import { convertCurrency } from '../services/currency'; // Добавил импорт конвертации
 
 interface AccountsScreenProps {
   accounts: Account[];
@@ -24,17 +27,34 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({
 }) => {
   const { t } = useLocalization();
 
+  // ✅ ИСПРАВЛЕННАЯ ЛОГИКА ПОДСЧЕТА (аналогично AccountList)
   const accountsWithBalances = React.useMemo(() => {
     return accounts.map(account => {
-      const balance = transactions
-        .filter(t => t.accountId === account.id)
-        .reduce((sum, tx) => {
-          // Assuming direct calculation in account's currency for simplicity here
-          return sum + (tx.type === 'INCOME' ? tx.amount : -tx.amount);
-        }, 0);
+      const balance = transactions.reduce((sum, tx) => {
+          // Конвертируем сумму транзакции в валюту текущего счета
+          const amountInAccountCurrency = convertCurrency(tx.amount, tx.currency, account.currency, rates);
+          
+          if (tx.type === TransactionType.INCOME && tx.accountId === account.id) {
+              return sum + amountInAccountCurrency;
+          } 
+          else if (tx.type === TransactionType.EXPENSE && tx.accountId === account.id) {
+              return sum - amountInAccountCurrency;
+          }
+          else if (tx.type === TransactionType.TRANSFER) {
+               if (tx.accountId === account.id) {
+                   // Списание (мы отправитель)
+                   return sum - amountInAccountCurrency;
+               } else if (tx.toAccountId === account.id) {
+                   // Зачисление (мы получатель)
+                   return sum + amountInAccountCurrency;
+               }
+          }
+          return sum;
+      }, 0);
+
       return { ...account, balance };
     });
-  }, [accounts, transactions]);
+  }, [accounts, transactions, rates]); // Добавил rates в зависимости
 
   const renderEmptyState = () => (
     <div className="flex flex-col items-center justify-center text-center py-20 px-6">
@@ -47,10 +67,8 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({
   );
 
   return (
-    // Корневой div с отступом для маски
     <div className="min-h-screen bg-gray-900 flex flex-col">
       
-      {/* "Липкий" header */}
       <header className="p-4 flex items-center justify-between sticky top-0 bg-gray-900/80 backdrop-blur-sm z-10">
         <button onClick={onBack} className="p-2 rounded-full hover:bg-gray-700">
           <ChevronLeft className="w-6 h-6 text-white" />
@@ -61,7 +79,6 @@ export const AccountsScreen: React.FC<AccountsScreenProps> = ({
         </button>
       </header>
 
-      {/* Основной контент */}
       <main className="flex-grow pb-24">
         {accounts.length === 0 ? (
           renderEmptyState()
