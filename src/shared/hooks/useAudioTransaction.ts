@@ -1,9 +1,17 @@
-// src/hooks/useAudioTransaction.ts
+// src/shared/hooks/useAudioTransaction.ts
 
 import { useState, useRef } from 'react';
 import * as api from '../../core/services/api';
-import { Transaction, Category, SavingsGoal } from '../../core/types';
+import { Transaction, Category, SavingsGoal, TransactionType } from '../../core/types';
 import { useLocalization } from '../../core/context/LocalizationContext';
+
+// Расширяем тип результата, так как API может вернуть дополнительные поля (имена счетов)
+// которые еще не являются ID.
+interface DraftTransaction extends Omit<Transaction, 'id'> {
+  fromAccountName?: string;
+  toAccountName?: string;
+  savingsGoalName?: string;
+}
 
 interface UseAudioTransactionResult {
   isRecording: boolean;
@@ -16,7 +24,7 @@ interface UseAudioTransactionResult {
   processAudioResult: (
     categories: Category[], 
     savingsGoals: SavingsGoal[]
-  ) => Promise<Omit<Transaction, 'id'> | null>;
+  ) => Promise<DraftTransaction | null>;
 }
 
 export const useAudioTransaction = (
@@ -35,7 +43,7 @@ export const useAudioTransaction = (
 
   const startRecording = async () => {
     if (isRecording) return;
-    setTranscription(''); // Clear previous
+    setTranscription('');
     try {
       if (!audioCtxRef.current) {
         audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -48,8 +56,12 @@ export const useAudioTransaction = (
       setStream(mediaStream);
       setIsRecording(true);
 
+      // Проверяем поддержку кодеков
       const mimeType = [
-        'audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/webm', 'audio/mp4'
+        'audio/webm;codecs=opus', 
+        'audio/ogg;codecs=opus', 
+        'audio/webm', 
+        'audio/mp4'
       ].find(type => MediaRecorder.isTypeSupported(type)) || 'audio/webm';
 
       const recorder = new MediaRecorder(mediaStream, { mimeType });
@@ -57,7 +69,9 @@ export const useAudioTransaction = (
       audioChunksRef.current = [];
 
       recorder.ondataavailable = (event) => {
-        audioChunksRef.current.push(event.data);
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
       };
 
       recorder.start();
@@ -78,7 +92,7 @@ export const useAudioTransaction = (
   const processAudioResult = async (
     categories: Category[], 
     savingsGoals: SavingsGoal[]
-  ): Promise<Omit<Transaction, 'id'> | null> => {
+  ): Promise<DraftTransaction | null> => {
     return new Promise((resolve, reject) => {
         const recorder = mediaRecorderRef.current;
         if (!recorder) {
@@ -86,9 +100,9 @@ export const useAudioTransaction = (
             return resolve(null);
         }
 
-        // The 'stop' event handler for the recorder logic needs to be here 
-        // or we wait for it. Since we stop manually, we can tap into onstop.
+        // Мы используем onstop, чтобы гарантировать, что запись завершена
         recorder.onstop = async () => {
+            // Останавливаем треки микрофона
             stream?.getTracks().forEach(track => track.stop());
             setStream(null);
 
@@ -97,16 +111,26 @@ export const useAudioTransaction = (
             audioChunksRef.current = [];
 
             try {
-                // Note: api.processAudioTransaction might return a transaction object 
-                // but ideally it also returns transcription text. 
-                // Assuming current API structure based on original code.
-                const newTransaction = await api.processAudioTransaction(
+                const result = await api.processAudioTransaction(
                     audioBlob,
                     categories,
                     savingsGoals,
                     language
-                );
-                resolve(newTransaction);
+                ) as DraftTransaction;
+
+                // --- ЛОГИКА ИСПРАВЛЕНИЯ (FALLBACK) ---
+                
+                // Если ИИ определил как РАСХОД, но указал счет ПОЛУЧАТЕЛЯ -> это ПЕРЕВОД
+                if (result.type === TransactionType.EXPENSE && result.toAccountName) {
+                  console.log('Correcting transaction type: EXPENSE -> TRANSFER based on toAccountName presence.');
+                  result.type = TransactionType.TRANSFER;
+                  result.category = ''; // У переводов нет категории
+                }
+
+                // Если ИИ определил как ПЕРЕВОД, но не указал категорию, все ок.
+                // Если ИИ определил как ДОХОД, но указал sourceAccountName, это тоже ок.
+
+                resolve(result);
             } catch (err: any) {
                 console.error('Failed to process audio:', err);
                 reject(err);

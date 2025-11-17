@@ -1,4 +1,4 @@
-// src/components/TransactionForm.tsx
+// src/features/transactions/TransactionForm.tsx
 
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -11,9 +11,14 @@ import { Calendar, Clock, ChevronDown, PlusCircle, ArrowRightLeft } from 'lucide
 import { ICONS } from '../../shared/ui/icons/icons';
 import { convertCurrency } from '../../core/services/currency';
 
+// Расширяем интерфейс, так как API возвращает "сырые" имена счетов для маппинга
+interface DraftTransaction extends Omit<Transaction, 'id'> {
+  fromAccountName?: string;
+  toAccountName?: string;
+}
 
 interface TransactionFormProps {
-  transaction: Omit<Transaction, 'id'> | Transaction;
+  transaction: DraftTransaction | Transaction;
   categories: Category[];
   accounts: Account[];
   savingsGoals: SavingsGoal[];
@@ -58,7 +63,9 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
     budgets, transactions, onCreateBudget, rates, defaultCurrency, savingsGoals
   } = props;
   const { t, language } = useLocalization();
-  const [formData, setFormData] = React.useState(transaction);
+  
+  // Инициализация стейта
+  const [formData, setFormData] = React.useState<DraftTransaction | Transaction>(transaction);
   const [amountStr, setAmountStr] = React.useState(String(transaction.amount || ''));
   const [isDatePickerOpen, setIsDatePickerOpen] = React.useState(false);
   const [isTimePickerOpen, setIsTimePickerOpen] = React.useState(false);
@@ -69,25 +76,67 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
     }
     return Array.from(options).sort();
   });
+  
   const isEditing = 'id' in transaction;
   const isSavingsTransaction = formData.category === 'Savings';
   const isTransfer = formData.type === TransactionType.TRANSFER;
 
+  // --- MAIN INITIALIZATION LOGIC ---
   React.useEffect(() => {
     const isNewTransaction = !('id' in transaction);
     
-    let newFormData = transaction;
+    let newFormData = { ...transaction };
 
     if (isNewTransaction) {
-      newFormData = {
-        ...transaction,
-        date: new Date().toISOString(),
-      };
+      newFormData.date = newFormData.date || new Date().toISOString();
+
+      // --- LOGIC: AUTO-DETECT ACCOUNTS ---
+      // Если это новая транзакция, пробуем найти счета по именам от AI
+      
+      const draft = newFormData as DraftTransaction;
+
+      // 1. Поиск счета списания (Source Account)
+      if (draft.fromAccountName && !draft.accountId) {
+        const found = accounts.find(acc => 
+          acc.name.toLowerCase().includes(draft.fromAccountName!.toLowerCase())
+        );
+        if (found) {
+          newFormData.accountId = found.id;
+        } else if (accounts.length > 0) {
+           // Fallback: если не нашли, но есть 'Card' в ответе, ищем любой счет с типом CARD
+           if (draft.fromAccountName.toLowerCase().includes('card')) {
+              const cardAcc = accounts.find(acc => acc.type === 'CARD');
+              if (cardAcc) newFormData.accountId = cardAcc.id;
+           }
+        }
+      }
+      
+      // 2. Поиск счета пополнения (Destination Account для Transfer)
+      if (newFormData.type === TransactionType.TRANSFER && draft.toAccountName && !draft.toAccountId) {
+        const found = accounts.find(acc => 
+          acc.name.toLowerCase().includes(draft.toAccountName!.toLowerCase())
+        );
+        if (found) {
+          newFormData.toAccountId = found.id;
+        } else {
+           // Fallback: 'Cash' -> ищем счет с типом CASH
+           if (draft.toAccountName.toLowerCase().includes('cash') || draft.toAccountName.toLowerCase().includes('налич')) {
+             const cashAcc = accounts.find(acc => acc.type === 'CASH');
+             if (cashAcc) newFormData.toAccountId = cashAcc.id;
+           }
+        }
+      }
+    }
+    
+    // Если accountId все еще пуст, ставим первый доступный (как было раньше)
+    if (!newFormData.accountId && accounts.length > 0) {
+       newFormData.accountId = accounts[0].id;
     }
     
     setFormData(newFormData);
     setAmountStr(String(transaction.amount || ''));
-  }, [transaction]);
+  }, [transaction, accounts]);
+  // ---------------------------------
 
   React.useEffect(() => {
     if (isSavingsTransaction && !isTransfer) {
@@ -106,7 +155,6 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
     }
   };
 
-  // Обработчик смены типа транзакции. Если выбрали перевод - сбрасываем категорию.
   const handleTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newType = e.target.value as TransactionType;
     setFormData(prev => ({
@@ -120,10 +168,16 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (isTransfer && formData.accountId === formData.toAccountId) {
-        alert("Source and destination accounts must be different");
+        alert(language === 'ru' ? "Счета списания и зачисления должны отличаться" : "Source and destination accounts must be different");
         return;
     }
-    onConfirm(formData);
+    
+    // Очищаем временные поля перед отправкой
+    const finalData = { ...formData };
+    delete (finalData as any).fromAccountName;
+    delete (finalData as any).toAccountName;
+
+    onConfirm(finalData);
   };
   
   const allCategoryNames = React.useMemo(() => {
@@ -134,7 +188,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
       return Array.from(categoryNameSet).sort();
   }, [categories, formData.category]);
 
-  // Логика бюджета (не активна для переводов)
+  // Логика бюджета
   const budgetInfo = React.useMemo(() => {
     if (!formData.category || formData.type === TransactionType.INCOME || isTransfer) {
       return null;
@@ -142,7 +196,6 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
     
     const transactionDate = new Date(formData.date); 
     const monthKey = `${transactionDate.getFullYear()}-${String(transactionDate.getMonth() + 1).padStart(2, '0')}`;
-
     const budgetForCategory = budgets.find(b => b.monthKey === monthKey && b.category === formData.category);
 
     if (budgetForCategory) {
@@ -176,7 +229,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
         monthKey: monthKey,
       };
     }
-  }, [formData.category, formData.date, formData.type, formData.amount, formData.currency, budgets, transactions, rates, defaultCurrency, transaction, isTransfer]);
+  }, [formData.category, formData.date, formData.type, formData.amount, formData.currency, budgets, transactions, rates, transaction, isTransfer]);
 
   const savingsGoalInfo = React.useMemo(() => {
     if (!formData.goalId || !isSavingsTransaction || isTransfer) {
@@ -206,7 +259,6 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
     };
   }, [formData.goalId, formData.amount, formData.currency, isSavingsTransaction, savingsGoals, rates, transaction, isTransfer]);
 
-
   const formatCurrencyLocal = (amount: number, currency: string) => {
     return new Intl.NumberFormat(language, {
       style: 'currency',
@@ -219,22 +271,12 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
   const safeDate = React.useMemo(() => {
     try {
       const d = new Date(formData.date);
-      if (isNaN(d.getTime())) {
-        return new Date();
-      }
+      if (isNaN(d.getTime())) return new Date();
       return d;
     } catch (e) {
       return new Date();
     }
   }, [formData.date]);
-
-  // Перевод текстов для UI
-  const getTypeLabel = (type: string) => {
-    if (type === TransactionType.INCOME) return t('income');
-    if (type === TransactionType.EXPENSE) return t('expense');
-    if (type === TransactionType.TRANSFER) return language === 'ru' ? 'Перевод' : 'Transfer';
-    return type;
-  };
 
   return (
     <>
@@ -274,7 +316,8 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
                     name="type"
                     value={formData.type}
                     onChange={handleTypeChange}
-                    disabled={isSavingsDeposit || isCategoryLocked || isSavingsTransaction}
+                    // --- UPDATED: Only disable for specific savings deposit flow ---
+                    disabled={isSavingsDeposit} 
                     className="appearance-none w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 pr-10 disabled:bg-zinc-700/50 disabled:cursor-not-allowed"
                   >
                     <option value={TransactionType.EXPENSE}>{t('expense')}</option>
@@ -291,7 +334,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
                     {isTransfer ? (language === 'ru' ? 'Списать со счета' : 'From Account') : t('account')}
                 </label>
                 <div className="relative">
-                  <select id="accountId" name="accountId" value={formData.accountId} onChange={handleChange} required className="appearance-none w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 pr-10">
+                  <select id="accountId" name="accountId" value={formData.accountId || ''} onChange={handleChange} required className="appearance-none w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 pr-10">
                     {accounts.map((acc) => (
                       <option key={acc.id} value={acc.id}>
                         {acc.name} ({acc.currency})
@@ -419,43 +462,6 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
                                 <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 pointer-events-none" />
                             </div>
                         </div>
-                        <AnimatePresence>
-                            {savingsGoalInfo && (
-                                <motion.div
-                                    layout
-                                    initial={{ opacity: 0, height: 0, y: -10 }}
-                                    animate={{ opacity: 1, height: 'auto', y: 0 }}
-                                    exit={{ opacity: 0, height: 0, y: -10 }}
-                                    transition={{ duration: 0.3, ease: 'easeInOut' }}
-                                    className="overflow-hidden"
-                                >
-                                    <div className="mt-2 bg-zinc-800 p-3 rounded-xl border border-zinc-700/50 space-y-2">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 flex-shrink-0 flex items-center justify-center bg-zinc-700 rounded-lg">
-                                                <IconDisplay name={savingsGoalInfo.goal.icon} className="w-5 h-5 text-brand-purple" />
-                                            </div>
-                                            <div className="flex-grow min-w-0">
-                                                <p className="text-sm font-medium text-white truncate">{savingsGoalInfo.goal.name} {t('progress')}</p>
-                                                <p className="text-xs text-zinc-400">
-                                                    {formatCurrencyLocal(savingsGoalInfo.baseAmount, savingsGoalInfo.goal.currency)} of {formatCurrencyLocal(savingsGoalInfo.goal.targetAmount, savingsGoalInfo.goal.currency)}
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <div className="w-full bg-zinc-700 rounded-full h-1.5">
-                                            <div
-                                                className={`h-1.5 rounded-full bg-brand-purple`}
-                                                style={{ width: `${Math.min(savingsGoalInfo.progress, 100)}%` }}
-                                            />
-                                        </div>
-                                        {formData.amount > 0 && (
-                                            <p className="text-xs text-center text-brand-purple">
-                                                + {formatCurrencyLocal(convertCurrency(formData.amount, formData.currency, savingsGoalInfo.goal.currency, rates), savingsGoalInfo.goal.currency)} with this transaction
-                                            </p>
-                                        )}
-                                    </div>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
                     </motion.div>
                 )}
                </AnimatePresence>
@@ -489,30 +495,6 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
                                             style={{ width: `${Math.min(budgetInfo.progress, 100)}%` }}
                                         />
                                     </div>
-                                    {formData.amount > 0 && (
-                                        <p className="text-xs text-center text-brand-blue">
-                                            + {formatCurrencyLocal(convertCurrency(formData.amount, formData.currency, budgetInfo.budget.currency, rates), budgetInfo.budget.currency)} with this transaction
-                                        </p>
-                                    )}
-                                </div>
-                            )}
-                            {budgetInfo.type === 'missing' && (
-                               <div className="mt-2 bg-zinc-800 p-3 rounded-xl border border-zinc-700/50 flex items-center justify-between gap-3">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 flex-shrink-0 flex items-center justify-center bg-blue-500/10 rounded-lg">
-                                            <PlusCircle className="w-5 h-5 text-blue-400" />
-                                        </div>
-                                        <p className="text-sm text-zinc-300">
-                                            No budget for <span className="font-semibold text-white">{budgetInfo.category}</span>.
-                                        </p>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => onCreateBudget(budgetInfo.category, budgetInfo.monthKey)}
-                                        className="px-3 py-1.5 bg-brand-blue text-white text-xs font-semibold rounded-lg hover:bg-blue-500 active:scale-95 transition-all"
-                                    >
-                                        Create
-                                    </button>
                                 </div>
                             )}
                         </motion.div>

@@ -1,8 +1,5 @@
 // supabase/functions/_shared/prompts.ts
-// Здесь мы храним все наши "системные инструкции" (промпты) для Gemini.
-// Этот код взят прямо из вашего VoiceFin v0.3.0/App.tsx
 
-//
 export const getSystemInstruction = (
   categories: { name: string }[],
   savingsGoals: { name: string }[],
@@ -11,30 +8,61 @@ export const getSystemInstruction = (
   const categoryNames = categories.map(c => `"${c.name}"`).join(', ');
   const goalNames = savingsGoals.map(g => `"${g.name}"`).join(', ');
   
-  const baseInstruction = `You are a multilingual financial assistant. The user can speak/type in any language. The user interface is currently set to '${language === 'en' ? 'English' : 'Russian'}'. Your task is to extract key details from the user's description of a financial transaction and use the \`addTransaction\` function to record it. Infer the transaction type (income, expense, or transfer) from the context. If a date or time is not mentioned, use the current date and time. Always populate the function arguments in English.`;
-  
-  const transferInstruction = `If the user describes moving money from one account to another (e.g., "Transfer 100 from Card to Cash", "Withdraw 50 from Bank"), set the type to "TRANSFER". Identify the source account in 'fromAccountName' and the destination account in 'toAccountName'. Transfers do NOT have categories.`;
+  const isRussian = language === 'ru';
 
-  const categoryInstruction = `For Income and Expense transactions, choose the most appropriate category from this list: [${categoryNames}]. If the user mentions "car" and a "Transport" category exists, use "Transport". If none fit, suggest a new one. Do NOT set a category for TRANSFERS.`;
+  // Базовая инструкция
+  const baseInstruction = `
+You are a financial AI assistant acting as a data processor. 
+Your sole purpose is to extract structured transaction data from natural language input (voice transcript).
+Input language: ${isRussian ? 'Russian (primarily) or English' : 'English'}.
+`;
 
-  const savingsInstruction = goalNames.length > 0 
-    ? `If the user is making a deposit to a savings account, you MUST use the "Savings" category (unless it is a direct Transfer between accounts). The user has the following savings goals: [${goalNames}]. If specified, match the goal name.`
-    : `If the user mentions saving money, use the "Savings" category.`;
+  // Логика самокоррекции и математики
+  const logicInstruction = `
+### CRITICAL RULES FOR PARSING:
 
-  const examples = `Examples:
-  - "Coffee for 3 euros" -> type="EXPENSE", name="Coffee", amount=3, currency="EUR".
-  - "Salary 1500 USD" -> type="INCOME", name="Salary", amount=1500, currency="USD".
-  - "Перевел 500 рублей с Карты на Наличные" -> type="TRANSFER", name="Transfer to Cash", amount=500, currency="RUB", fromAccountName="Card", toAccountName="Cash".`;
+1. **SELF-CORRECTION (Priority #1)**: 
+   - Users often correct themselves. Always prefer the *last spoken* value for the same entity.
+   - Input: "Bought bread for 50... no wait, 60." -> Result Amount: 60.
+   - Input: "Taxi... actually it was Bus." -> Result Category: Bus.
 
-  return `${baseInstruction}\n\n${transferInstruction}\n\n${categoryInstruction}\n\n${savingsInstruction}\n\n${examples}`;
-};
+2. **MATHEMATICAL EVALUATION**: 
+   - If the user mentions an operation, calculate the final result.
+   - Input: "Half of 1000 for lunch." -> Result Amount: 500.
+   - Input: "Spent 100 plus 50 on taxi." -> Result Amount: 150.
+   - Input: "300 each for me and my friend (2 people)." -> Result Amount: 600.
+   
+3. **IMPLICIT CURRENCY**:
+   - If no currency is specified, assume the user's local default (e.g., KGS/Som if context implies Kyrgyzstan, or RUB/USD).
+   - slang: "5k" = 5000. "5 pieces" (штук) = 5000.
 
-//
-export const getIconPrompt = (categoryName: string, iconList: string[]): string => {
-  return `From the following list of icon names, pick the single best one that represents the category "${categoryName}". Return ONLY the icon name as a single string, exactly as it appears in the list. Do not add any explanation or formatting.\n\nIcon list: ${iconList.join(', ')}`;
-};
+4. **MULTIPLE ITEMS (Split Bill)**:
+   - If input lists distinct items ("Milk 50, Bread 30"), SUM them into ONE transaction unless asked otherwise.
+   - Description: "Milk, Bread". Amount: 80.
+`;
 
-//
-export const getSavingsTipsPrompt = (transactions: any[]): string => {
-  return `You are a friendly and encouraging financial advisor. Based on the following list of the user's transactions, provide 3-5 personalized and actionable tips on how they can save money. Format your response as markdown. Start with a brief, positive summary of their spending habits, then list the tips with clear headings and short explanations.\n\nTransactions:\n${JSON.stringify(transactions, null, 2)}`;
+  // Правила для категорий и сбережений
+  const contextInstruction = `
+### DATA MAPPING:
+
+- **Categories**: Map to one of these specifically: [${categoryNames}]. If nothing fits perfectly, choose "Other" or the closest match.
+- **Savings Goals**: If the user mentions putting money ASIDE or into a goal, check against: [${goalNames}].
+- **Transfers**: If money moves between user's own accounts (e.g., "Cash to Card"), set type="TRANSFER".
+`;
+
+  // Примеры (Few-Shot Learning)
+  const examples = `
+### EXAMPLES:
+
+User: "Купил продукты на 500... ой нет, на 450"
+JSON: {"amount": 450, "category": "Groceries", "type": "EXPENSE", "name": "Продукты"}
+
+User: "Половина от 5000 на бензин"
+JSON: {"amount": 2500, "category": "Transport", "type": "EXPENSE", "name": "Бензин"}
+
+User: "Снял 1000 сом с карты"
+JSON: {"amount": 1000, "type": "TRANSFER", "from_account": "Card", "to_account": "Cash", "name": "Снятие наличных"}
+`;
+
+  return `${baseInstruction}\n${logicInstruction}\n${contextInstruction}\n${examples}`;
 };
