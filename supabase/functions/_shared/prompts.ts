@@ -49,7 +49,8 @@ export const getSystemInstruction = (
 Деньги приходят В кошелёк пользователя **извне**:
 - ✅ Зарплата, премия, гонорар
 - ✅ Подарки, находки
-- ✅ Возврат долга от друга
+- ✅ **Возврат долга от друга** (isDebtRepayment: true)
+- ✅ **Взял в долг у кого-то** (isDebtRepayment: false, category: "Debt: Borrowing")
 - ✅ Продажа вещей
 
 **Ключевые слова:**
@@ -65,7 +66,8 @@ export const getSystemInstruction = (
 Деньги уходят ИЗ кошелька пользователя **вовне**:
 - ✅ Покупки (еда, одежда, техника)
 - ✅ Счета (коммуналка, интернет, подписки)
-- ✅ Услуги (такси, стрижка, ремонт)
+- ✅ **Отдал долг другу** (isDebtRepayment: true, category: "Debt: Repayment Sent")
+- ✅ **Дал в долг кому-то** (isDebtRepayment: false, category: "Debt: Lending")
 - ✅ Перевод другу (деньги покинули твой кошелёк)
 
 **Ключевые слова:**
@@ -198,9 +200,13 @@ export const getSystemInstruction = (
 3. **Нечёткое совпадение:**
    - "продукты" / "groceries" → "Food & Drink"
    - "такси" / "uber" → "Transport"
-   - "netflix" → "Entertainment"
-4. **Нет совпадений** → category: "" (пользователь выберет сам)
-5. **НЕ ПРИДУМЫВАЙ** категории, которых нет в списке!
+4. **СИСТЕМНЫЕ КАТЕГОРИИ ДОЛГОВ (ПРИОРИТЕТ!)**:
+   - "Дал в долг" → category: "Debt: Lending" (EXPENSE)
+   - "Взял в долг" / "Занял" → category: "Debt: Borrowing" (INCOME)
+   - "Вернул долг" / "Отдал долг" → category: "Debt: Repayment Sent" (EXPENSE)
+   - "Мне вернули долг" → category: "Debt: Repayment Received" (INCOME)
+5. **Нет совпадений** → category: ""
+6. **НЕ ПРИДУМЫВАЙ** категории!
 
 ---
 
@@ -450,6 +456,92 @@ export const getSystemInstruction = (
 
 ---
 
+### Пример 11: Дал в долг (Новый долг)
+**Вход:** "Дал в долг 5000 Максиму"
+**Выход:**
+\`\`\`json
+{
+  "name": "Долг Максиму",
+  "amount": 5000,
+  "currency": "${defaultCurrency}",
+  "category": "Debt: Lending",
+  "date": "${new Date().toISOString()}",
+  "type": "EXPENSE",
+  "description": "Дал в долг 5000 Максиму",
+  "fromAccountName": "",
+  "toAccountName": "",
+  "debtName": "Максим",
+  "isDebtRepayment": false
+}
+\`\`\`
+**Комментарий:** Это создание нового долга (EXPENSE). `debtName` извлечено.
+
+---
+
+### Пример 12: Взял в долг (Новый долг)
+**Вход:** "Взял в долг 10000 у Марии на неделю"
+**Выход:**
+\`\`\`json
+{
+  "name": "Долг от Марии",
+  "amount": 10000,
+  "currency": "${defaultCurrency}",
+  "category": "Debt: Borrowing",
+  "date": "${new Date().toISOString()}",
+  "type": "INCOME",
+  "description": "Взял в долг 10000 у Марии на неделю",
+  "fromAccountName": "",
+  "toAccountName": "",
+  "debtName": "Мария",
+  "isDebtRepayment": false
+}
+\`\`\`
+**Комментарий:** Это создание нового долга (INCOME). `debtName` извлечено.
+
+---
+
+### Пример 13: Погашение (Я вернул)
+**Вход:** "Отдал долг Марии 500"
+**Выход:**
+\`\`\`json
+{
+  "name": "Возврат долга Марии",
+  "amount": 500,
+  "currency": "${defaultCurrency}",
+  "category": "Debt: Repayment Sent",
+  "date": "${new Date().toISOString()}",
+  "type": "EXPENSE",
+  "description": "",
+  "fromAccountName": "",
+  "toAccountName": "",
+  "debtName": "Мария",
+  "isDebtRepayment": true
+}
+\`\`\`
+**Комментарий:** Это погашение (EXPENSE). `isDebtRepayment: true`.
+
+---
+
+### Пример 14: Погашение (Мне вернули)
+**Вход:** "Максим вернул 1000"
+**Выход:**
+\`\`\`json
+{
+  "name": "Возврат от Максима",
+  "amount": 1000,
+  "currency": "${defaultCurrency}",
+  "category": "Debt: Repayment Received",
+  "date": "${new Date().toISOString()}",
+  "type": "INCOME",
+  "description": "",
+  "fromAccountName": "",
+  "toAccountName": "",
+  "debtName": "Максим",
+  "isDebtRepayment": true
+}
+\`\`\`
+**Комментарий:** Это погашение (INCOME). `isDebtRepayment: true`.
+
 ## ⚙️ ТЕХНИЧЕСКИЕ ТРЕБОВАНИЯ
 
 1. **Формат ответа:** ТОЛЬКО JSON, без пояснений, без Markdown
@@ -459,6 +551,7 @@ export const getSystemInstruction = (
 5. **Сленг:** Всегда преобразуй в числа
 6. **Категория для Transfer:** Всегда пусто
 7. **Счета:** Пытайся найти по частичному совпадению, иначе — пусто
+8. **Долги:** Если упоминается имя ИЛИ категория долга, заполни `debtName` (имя человека) и `isDebtRepayment` (true, если это погашение, false, если это создание).
 
 ---
 
@@ -472,6 +565,7 @@ export const getSystemInstruction = (
 - [ ] amount — это число (не строка)?
 - [ ] date в формате ISO 8601?
 - [ ] Если пользователь исправлялся — взято последнее значение?
+- [ ] Если это операция с долгом, `debtName` и `isDebtRepayment` заполнены?
 
 ---
 

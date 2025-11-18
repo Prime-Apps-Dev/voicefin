@@ -3,7 +3,7 @@
 // Мы заменяем все "заглушки" (MOCK_DB) на реальные вызовы Supabase.
 
 import { supabase } from './supabase';
-import { Transaction, Account, SavingsGoal, Budget, Category, TransactionType, AccountType } from '../types';
+import { Transaction, Account, SavingsGoal, Budget, Category, TransactionType, AccountType, Debt, DebtCategory, DebtStatus } from '../types';
 import { ICON_NAMES } from '../../shared/ui/icons/icons';
 
 // --- Аутентификация ---
@@ -277,6 +277,218 @@ export const updateBudget = async (budget: Budget): Promise<Budget> => {
 export const deleteBudget = async (budgetId: string): Promise<void> => {
   const { error } = await supabase.from('budgets').delete().eq('id', budgetId);
   if (error) throw error;
+};
+
+/**
+ * Получить все долги пользователя
+ */
+export const getDebts = async (): Promise<Debt[]> => {
+  const { data, error } = await supabase
+    .from('debts')
+    .select('*')
+    .order('created_at', { ascending: false });
+  
+  if (error) throw error;
+  return data as Debt[];
+};
+
+/**
+ * Создать новый долг
+ */
+export const addDebt = async (debt: Omit<Debt, 'id' | 'created_at' | 'updated_at'>): Promise<Debt> => {
+  const userId = await getUserId();
+  
+  const { data, error } = await supabase
+    .from('debts')
+    .insert({
+      ...debt,
+      telegram_user_id: userId,
+      status: 'ACTIVE',
+    })
+    .select()
+    .single();
+  
+  if (error) throw error;
+  return data as Debt;
+};
+
+/**
+ * Обновить долг
+ */
+export const updateDebt = async (debt: Debt): Promise<Debt> => {
+  const { id, created_at, updated_at, ...updateData } = debt;
+  
+  const { data, error } = await supabase
+    .from('debts')
+    .update(updateData)
+    .eq('id', id)
+    .select()
+    .single();
+  
+  if (error) throw error;
+  return data as Debt;
+};
+
+/**
+ * Удалить долг
+ */
+export const deleteDebt = async (debtId: string): Promise<void> => {
+  const { error } = await supabase
+    .from('debts')
+    .delete()
+    .eq('id', debtId);
+  
+  if (error) throw error;
+};
+
+/**
+ * Архивировать долг (переместить в архив)
+ */
+export const archiveDebt = async (debtId: string): Promise<Debt> => {
+  const { data, error } = await supabase
+    .from('debts')
+    .update({ status: 'ARCHIVED' as DebtStatus })
+    .eq('id', debtId)
+    .select()
+    .single();
+  
+  if (error) throw error;
+  return data as Debt;
+};
+
+/**
+ * Восстановить долг из архива
+ */
+export const unarchiveDebt = async (debtId: string): Promise<Debt> => {
+  const { data, error } = await supabase
+    .from('debts')
+    .update({ status: 'ACTIVE' as DebtStatus })
+    .eq('id', debtId)
+    .select()
+    .single();
+  
+  if (error) throw error;
+  return data as Debt;
+};
+
+/**
+ * Обновить остаток долга (вызывается при создании/удалении транзакции)
+ */
+export const updateDebtBalance = async (
+  debtId: string,
+  amountChange: number // Положительное значение = увеличение остатка, отрицательное = уменьшение
+): Promise<Debt> => {
+  // Получаем текущий долг
+  const { data: debt, error: fetchError } = await supabase
+    .from('debts')
+    .select('*')
+    .eq('id', debtId)
+    .single();
+  
+  if (fetchError) throw fetchError;
+  
+  const newCurrentAmount = Math.max(0, (debt.current_amount || 0) + amountChange);
+  
+  const { data, error } = await supabase
+    .from('debts')
+    .update({ current_amount: newCurrentAmount })
+    .eq('id', debtId)
+    .select()
+    .single();
+  
+  if (error) throw error;
+  return data as Debt;
+};
+
+// --- DEBT CATEGORIES CRUD ---
+
+/**
+ * Получить категории долгов пользователя
+ */
+export const getDebtCategories = async (): Promise<DebtCategory[]> => {
+  const { data, error } = await supabase
+    .from('debt_categories')
+    .select('*')
+    .order('name', { ascending: true });
+  
+  if (error) throw error;
+  return data as DebtCategory[];
+};
+
+/**
+ * Создать категорию долга
+ */
+export const addDebtCategory = async (category: Omit<DebtCategory, 'id'>): Promise<DebtCategory> => {
+  const userId = await getUserId();
+  
+  const { data, error } = await supabase
+    .from('debt_categories')
+    .insert({
+      ...category,
+      telegram_user_id: userId,
+    })
+    .select()
+    .single();
+  
+  if (error) throw error;
+  return data as DebtCategory;
+};
+
+/**
+ * Обновить категорию долга
+ */
+export const updateDebtCategory = async (category: DebtCategory): Promise<DebtCategory> => {
+  const { id, ...updateData } = category;
+  
+  const { data, error } = await supabase
+    .from('debt_categories')
+    .update(updateData)
+    .eq('id', id)
+    .select()
+    .single();
+  
+  if (error) throw error;
+  return data as DebtCategory;
+};
+
+/**
+ * Удалить категорию долга
+ */
+export const deleteDebtCategory = async (categoryId: string): Promise<void> => {
+  const { error } = await supabase
+    .from('debt_categories')
+    .delete()
+    .eq('id', categoryId);
+  
+  if (error) throw error;
+};
+
+/**
+ * Создать дефолтные категории долгов (вызывается при первом входе)
+ */
+export const createDefaultDebtCategories = async (): Promise<DebtCategory[]> => {
+  const userId = await getUserId();
+  
+  const defaultCategories = [
+    { name: 'Personal', icon: 'User', color: '#3B82F6' },
+    { name: 'Family', icon: 'Users', color: '#10B981' },
+    { name: 'Friends', icon: 'Heart', color: '#F59E0B' },
+    { name: 'Business', icon: 'Briefcase', color: '#8B5CF6' },
+    { name: 'Emergency', icon: 'AlertCircle', color: '#EF4444' },
+  ];
+  
+  const categoriesToInsert = defaultCategories.map(c => ({
+    ...c,
+    telegram_user_id: userId,
+  }));
+  
+  const { data, error } = await supabase
+    .from('debt_categories')
+    .insert(categoriesToInsert)
+    .select();
+  
+  if (error) throw error;
+  return data as DebtCategory[];
 };
 
 

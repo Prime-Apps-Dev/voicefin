@@ -12,8 +12,14 @@ export enum AccountType {
 }
 
 export enum DebtType {
-  I_OWE = 'I_OWE',       // Я должен
+  I_OWE = 'I_OWE',           // Я должен
   OWED_TO_ME = 'OWED_TO_ME', // Мне должны
+}
+
+export enum DebtStatus {
+  ACTIVE = 'ACTIVE',         // Активный долг
+  COMPLETED = 'COMPLETED',   // Погашен (автоматически)
+  ARCHIVED = 'ARCHIVED',     // В архиве (вручную)
 }
 
 export interface Account {
@@ -93,13 +99,24 @@ export interface Category {
 
 export interface Debt {
   id: string;
-  person: string; // Имя человека или название организации
-  amount: number; // Общая сумма долга
-  currentAmount: number; // Остаток долга (сколько еще нужно вернуть/получить)
-  currency: string;
-  type: DebtType;
-  date: string; // Дата создания/возникновения долга
-  description?: string;
-  dueDate?: string; // Дата возврата
-  color?: string; // Для UI
+  person: string;                    // Имя человека/организации
+  description?: string;              // Комментарий к долгу
+  category?: string;                 // Категория долга (опционально)
+  amount: number;                    // Общая сумма долга
+  current_amount: number;            // Остаток долга
+  currency: string;                  // Валюта долга
+  type: DebtType;                    // Тип долга
+  status: DebtStatus;                // Статус долга
+  date: string;                      // Дата создания (ISO string)
+  due_date?: string;                 // Крайний срок (опционально)
+  initial_transaction_id?: string;   // ID первой транзакции
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface DebtCategory {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
 }

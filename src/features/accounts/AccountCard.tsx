@@ -1,5 +1,5 @@
 import React from 'react';
-import { Account } from '../core/types';
+import { Account } from '../../core/types';
 
 interface AccountCardProps {
   account: Account;
