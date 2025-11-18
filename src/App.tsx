@@ -32,20 +32,20 @@ import { ComingSoonScreen } from './shared/ui/screens/ComingSoonScreen';
 import { AccountList } from './features/accounts/AccountList';
 import { FinancialOverview } from './features/analytics/FinancialOverview';
 import { TransactionList } from './features/transactions/TransactionList';
+import { DebtsScreen } from './features/debts/DebtsScreen'; // ДОБАВЛЕНО: Импорт DebtsScreen
 
 // Types & Hooks
-import { Transaction, TransactionType, Account, SavingsGoal, Budget, Category } from './core/types';
+import { Transaction, TransactionType, Account, SavingsGoal, Budget, Category, Debt } from './core/types'; // ИЗМЕНЕНО: Добавлен Debt
 import { useAudioTransaction } from './shared/hooks/useAudioTransaction';
 
 const TG_HEADER_OFFSET_CLASS = 'pt-[85px]';
 
-// --- Main Content Component (Separate to use Contexts) ---
 const AppContent: React.FC = () => {
   const { t, language } = useLocalization();
   const { 
     user, isLoading: isAuthLoading, isBlocked, blockMessage, 
     isDevLoggingIn, handleDevLogin, isAppExpanded, isAppFullscreen, 
-    refreshUserProfile, setUser, error: authError 
+    setUser, error: authError 
   } = useAuth();
   
   const { 
@@ -57,15 +57,14 @@ const AppContent: React.FC = () => {
     handleSaveCategory, handleDeleteCategory,
     handleSaveGoal, handleDeleteGoal,
     handleSaveBudget, handleDeleteBudget,
-    updateDefaultCurrency
+    updateDefaultCurrency,
+    debts // ДОБАВЛЕНО: Массив долгов
   } = useAppData();
 
-  // UI State
-  const [activeScreen, setActiveScreen] = useState<'home' | 'savings' | 'analytics' | 'profile' | 'accounts' | 'budgetPlanning' | 'categories' | 'settings' | 'comingSoon' | 'history' | 'about'>('home');
+  const [activeScreen, setActiveScreen] = useState<'home' | 'savings' | 'analytics' | 'profile' | 'accounts' | 'budgetPlanning' | 'categories' | 'settings' | 'comingSoon' | 'history' | 'about' | 'debts'>('home'); // ИЗМЕНЕНО: Добавлен 'debts'
   const [error, setError] = useState<string | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
   
-  // Modal & Editing State
   const [potentialTransaction, setPotentialTransaction] = useState<Omit<Transaction, 'id'> | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   
@@ -97,13 +96,11 @@ const AppContent: React.FC = () => {
     startRecording, stopRecording, audioContext, processAudioResult
   } = useAudioTransaction((msg) => setError(msg));
 
-  // Sync Errors
   useEffect(() => {
     if (authError) setError(authError);
     if (dataError) setError(dataError);
   }, [authError, dataError]);
 
-  // Sync Onboarding
   useEffect(() => {
     if (user && !user.has_completed_onboarding) {
       setShowOnboarding(true);
@@ -113,25 +110,52 @@ const AppContent: React.FC = () => {
   // --- Logic Handlers ---
 
   const handleRecordingStopLogic = async () => {
-      stopRecording();
-      // Wait for internal processing in hook, accessed via promise wrapper in hook?
-      // Ideally hook should return promise on stop or provide callback.
-      // Adjusted implementation: we call processAudioResult immediately after stop 
-      // but wait for the 'stop' event inside the hook.
-      
+    stopRecording();
+    
+    try {
+        // ОБНОВЛЕНО: Передаём accounts и displayCurrency
+        const tx = await processAudioResult(
+          categories, 
+          savingsGoals, 
+          accounts, // НОВОЕ
+          displayCurrency // НОВОЕ (из AppDataContext)
+        );
+        
+        if (tx) {
+            setPotentialTransaction({
+                ...tx,
+                // Если accountId не определён, ставим первый счёт
+                accountId: tx.accountId || accounts[0]?.id,
+            });
+        }
+    } catch (e: any) {
+        setError(e.message || t('connectionError'));
+    }
+};
+
+  const handleTextTransactionSubmit = async (text: string) => {
+      if (!text.trim()) return;
+      setIsProcessingText(true);
       try {
-          const tx = await processAudioResult(categories, savingsGoals);
-          if (tx) {
-              setPotentialTransaction({
-                  ...tx,
-                  accountId: tx.accountId || accounts[0]?.id,
-              });
-          }
+        // ✅ Pass accounts to API
+        const newTransaction = await api.parseTransactionFromText(
+          text, displayCurrency, categories, savingsGoals, accounts, language
+        );
+        
+        // Account mapping for Text as well (simple fallback for now, ideally API returns matched name too)
+        const finalAccountId = newTransaction.accountId || (selectedAccountId !== 'all' ? selectedAccountId : accounts[0]?.id);
+
+        setPotentialTransaction({ ...newTransaction, accountId: finalAccountId });
+        setTextInputValue('');
+        setIsTextInputOpen(false);
       } catch (e: any) {
-          setError(e.message || t('connectionError'));
+        setError(e.message);
+      } finally {
+        setIsProcessingText(false);
       }
   };
 
+  // ... (Rest of handlers: handleConfirmTransactionWrapper, etc. remain same) ...
   const handleConfirmTransactionWrapper = async (tx: Transaction | Omit<Transaction, 'id'>) => {
     try {
         if ('id' in tx) await handleUpdateTransaction(tx);
@@ -150,7 +174,6 @@ const AppContent: React.FC = () => {
       if (!itemToDelete) return;
       try {
           if ('value' in itemToDelete) {
-              // It's a wrapped object {type, value}
               const { type, value } = itemToDelete;
               switch(type) {
                   case 'account': await handleDeleteAccount(value.id); break;
@@ -159,30 +182,12 @@ const AppContent: React.FC = () => {
                   case 'budget': await handleDeleteBudget(value.id); break;
               }
           } else {
-              // It's a transaction
               await handleDeleteTransaction(itemToDelete.id);
           }
       } catch (e: any) {
           setError(e.message);
       }
       setItemToDelete(null);
-  };
-
-  const handleTextTransactionSubmit = async (text: string) => {
-      if (!text.trim()) return;
-      setIsProcessingText(true);
-      try {
-        const newTransaction = await api.parseTransactionFromText(
-          text, displayCurrency, categories, savingsGoals, language
-        );
-        setPotentialTransaction({ ...newTransaction, accountId: newTransaction.accountId || accounts[0].id });
-        setTextInputValue('');
-        setIsTextInputOpen(false);
-      } catch (e: any) {
-        setError(e.message);
-      } finally {
-        setIsProcessingText(false);
-      }
   };
 
   const handleFinishOnboarding = async () => {
@@ -199,8 +204,6 @@ const AppContent: React.FC = () => {
       await handleSaveCategory(catData);
       setCategoryFormState({ isOpen: false, category: null });
       if (categoryFormState.context?.from === 'budget') {
-          // Simple logic to update local budget form state if needed, 
-          // though usually categories update globally.
           const catName = 'id' in catData ? catData.name : catData.name; 
           setEditingBudget(prev => ({...prev, category: catName}));
       }
@@ -218,7 +221,6 @@ const AppContent: React.FC = () => {
             <AlertTriangle className="w-16 h-16 text-red-500 mb-6" />
             <h1 className="text-2xl font-bold text-white mb-2">{t('error')}</h1>
             <p className="text-lg text-gray-300 max-w-sm">{blockMessage}</p>
-            <p className="text-sm text-gray-500 mt-6 max-w-sm">{t('telegramErrorHint')}</p>
         </div>
     );
   }
@@ -257,6 +259,10 @@ const AppContent: React.FC = () => {
           case 'budgetPlanning': return <BudgetPlanningScreen budgets={budgets} transactions={transactions} categories={categories} onBack={() => setActiveScreen('profile')} onAddBudget={(monthKey) => { setEditingBudget({ monthKey, currency: displayCurrency }); setIsBudgetFormOpen(true); }} onEditBudget={(b) => { setEditingBudget(b); setIsBudgetFormOpen(true); }} onDeleteBudget={(b) => setItemToDelete({ type: 'budget', value: b })} onAddTransaction={(b) => { setIsCategoryLockedInForm(true); setPotentialTransaction({ accountId: accounts[0]?.id, name: '', amount: 0, currency: displayCurrency, category: b.category, date: new Date().toISOString(), type: TransactionType.EXPENSE }); }} onViewHistory={setBudgetForHistory} onCarryOver={(from, to) => setCarryOverInfo({ from, to })} rates={rates} defaultCurrency={displayCurrency} />;
           case 'history': return <TransactionHistoryScreen transactions={transactions} accounts={accounts} categories={categories} rates={rates} defaultCurrency={displayCurrency} onSelectTransaction={setEditingTransaction} onDeleteTransaction={setItemToDelete} onBack={() => setActiveScreen('home')} />;
           case 'comingSoon': return <ComingSoonScreen onBack={() => setActiveScreen('profile')} />;
+          
+          // НОВЫЙ ЭКРАН
+          case 'debts': return <DebtsScreen debts={debts} onBack={() => setActiveScreen('profile')} />;
+
           case 'home': default: return (
               <main className="max-w-4xl mx-auto flex flex-col gap-4 pb-32">
                   <AccountList accounts={accounts} transactions={transactions} rates={rates} selectedAccountId={selectedAccountId} onSelectAccount={setSelectedAccountId} totalBalance={totalBalance} defaultCurrency={displayCurrency} />
@@ -288,7 +294,6 @@ const AppContent: React.FC = () => {
       )}
 
       <AppModals 
-        // Passing all states and handlers to the monolithic modal wrapper
         potentialTransaction={potentialTransaction} editingTransaction={editingTransaction} onConfirmTransaction={handleConfirmTransactionWrapper} onCancelTransaction={() => { setPotentialTransaction(null); setEditingTransaction(null); setIsCategoryLockedInForm(false); setGoalForDeposit(null); }}
         goalForDeposit={goalForDeposit} isCategoryLockedInForm={isCategoryLockedInForm}
         isAccountFormOpen={isAccountFormOpen} setIsAccountFormOpen={setIsAccountFormOpen} editingAccount={editingAccount} onSaveAccount={async (a) => { await handleSaveAccount(a); setIsAccountFormOpen(false); setEditingAccount(null); }}
@@ -301,6 +306,7 @@ const AppContent: React.FC = () => {
         goalForHistory={goalForHistory} setGoalForHistory={setGoalForHistory} budgetForHistory={budgetForHistory} setBudgetForHistory={setBudgetForHistory} onDeleteTransaction={setItemToDelete} onSelectTransaction={setEditingTransaction}
         carryOverInfo={carryOverInfo} setCarryOverInfo={setCarryOverInfo} onConfirmCarryOver={() => { if(carryOverInfo){ budgets.filter(b => b.monthKey === carryOverInfo.from).forEach(b => handleSaveBudget({...b, monthKey: carryOverInfo.to})); setCarryOverInfo(null); } }}
         categories={categories} accounts={accounts} savingsGoals={savingsGoals} budgets={budgets} transactions={transactions} rates={rates} displayCurrency={displayCurrency}
+        debts={debts} // ДОБАВЛЕНО: Передача массива долгов
       />
 
       {!(isAuthLoading || isDataLoading) && (
@@ -315,7 +321,6 @@ const AppContent: React.FC = () => {
   );
 };
 
-// --- App Entry Point ---
 const App: React.FC = () => {
   return (
     <AuthProvider>

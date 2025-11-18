@@ -22,7 +22,8 @@ serve(async (req) => {
     const { 
       text, 
       categories, 
-      savingsGoals, 
+      savingsGoals,
+      accounts, 
       language 
     } = await req.json();
 
@@ -36,7 +37,7 @@ serve(async (req) => {
     // Создаём модель с инструкцией и функцией
     const model = genAI.getGenerativeModel({
       model: "gemini-2.5-flash", // Оптимальная модель для парсинга текста
-      systemInstruction: getSystemInstruction(categories, savingsGoals, language),
+      systemInstruction: getSystemInstruction(categories, savingsGoals, accounts, language),
       tools: [{ functionDeclarations: [addTransactionFunctionDeclaration] }],
     });
 

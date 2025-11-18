@@ -1,26 +1,26 @@
 // supabase/functions/process-audio-transaction/index.ts
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { GoogleGenerativeAI } from "npm:@google/generative-ai@0.1.3";
-import { corsHeaders } from "../_shared/cors.ts";
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { CORS_HEADERS, handleCors } from "../_shared/cors.ts";
+import { GoogleGenerativeAI } from "https://esm.sh/@google/generative-ai@0.21.0";
 import { getSystemInstruction } from "../_shared/prompts.ts";
+import { addTransactionFunctionDeclaration } from "../_shared/types.ts";
 
-console.log("Hello from process-audio-transaction!");
+console.log("process-audio-transaction function started");
 
 serve(async (req) => {
-  // 1. Обработка CORS (разрешаем запросы с фронтенда)
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+  // 1. CORS
+  if (req.method === 'OPTIONS') {
+    return handleCors();
   }
 
   try {
-    const apiKey = Deno.env.get("GEMINI_API_KEY");
-    if (!apiKey) {
-      throw new Error("GEMINI_API_KEY is not set");
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+    if (!GEMINI_API_KEY) {
+      throw new Error("GEMINI_API_KEY not set in Edge Function secrets.");
     }
 
     // 2. Получаем данные из FormData
-    // Фронтенд отправляет 'audio' (файл) и 'context' (JSON строка)
     const formData = await req.formData();
     const audioFile = formData.get("audio") as File;
     const contextStr = formData.get("context") as string;
@@ -29,10 +29,18 @@ serve(async (req) => {
       throw new Error("Missing audio file or context data");
     }
 
-    const { categories, savingsGoals, language } = JSON.parse(contextStr);
+    const context = JSON.parse(contextStr);
+    const { categories, savingsGoals, accounts, language, defaultCurrency } = context;
 
-    // 3. Подготовка аудио для Gemini
-    // Gemini принимает base64 для аудио
+    console.log("Context received:", { 
+      categoriesCount: categories?.length || 0, 
+      goalsCount: savingsGoals?.length || 0,
+      accountsCount: accounts?.length || 0,
+      language, 
+      defaultCurrency 
+    });
+
+    // 3. Подготовка аудио
     const arrayBuffer = await audioFile.arrayBuffer();
     const base64Audio = btoa(
       new Uint8Array(arrayBuffer).reduce(
@@ -41,76 +49,27 @@ serve(async (req) => {
       )
     );
 
-    // 4. Инициализация Gemini
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
-    // 5. Формируем промпт
-    const systemInstruction = getSystemInstruction(categories, savingsGoals, language);
+    // 4. Инициализация Gemini с ОБНОВЛЁННЫМ промптом
+    const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
     
-    // Определяем инструменты (Function Calling)
-    // Мы описываем функцию addTransaction, которую ИИ должен "вызвать"
-    const tools = {
-      function_declarations: [
-        {
-          name: "addTransaction",
-          description: "Extracts transaction details from user input to add to the finance tracker.",
-          parameters: {
-            type: "OBJECT",
-            properties: {
-              type: {
-                type: "STRING",
-                enum: ["INCOME", "EXPENSE", "TRANSFER"],
-                description: "Type of the transaction.",
-              },
-              amount: {
-                type: "NUMBER",
-                description: "The monetary amount.",
-              },
-              currency: {
-                type: "STRING",
-                description: "Currency code (e.g., USD, RUB, EUR).",
-              },
-              category: {
-                type: "STRING",
-                description: "Category for expenses/income. Leave empty for transfers.",
-              },
-              name: {
-                type: "STRING",
-                description: "A short title for the transaction.",
-              },
-              fromAccountName: {
-                type: "STRING",
-                description: "Name of the source account (e.g., 'Card', 'Cash'). Important for Transfers.",
-              },
-              toAccountName: {
-                type: "STRING",
-                description: "Name of the destination account (e.g., 'Savings', 'Cash'). Important for Transfers.",
-              },
-              savingsGoalName: {
-                type: "STRING",
-                description: "Name of the savings goal if applicable.",
-              },
-              date: {
-                type: "STRING",
-                description: "ISO date string if mentioned, otherwise current date.",
-              }
-            },
-            required: ["type", "amount", "currency", "name"],
-          },
-        },
-      ],
-    };
+    const systemInstruction = getSystemInstruction(
+      categories || [], 
+      savingsGoals || [], 
+      accounts || [], // НОВОЕ: передаём счета
+      language || 'en',
+      defaultCurrency || 'USD'
+    );
 
-    // 6. Отправляем запрос в Gemini
-    const chat = model.startChat({
-      tools: [tools],
+    const model = genAI.getGenerativeModel({
+      model: "gemini-2.5-flash", // Используем быструю модель для аудио
+      systemInstruction: systemInstruction,
+      tools: [{ functionDeclarations: [addTransactionFunctionDeclaration] }],
     });
 
-    const prompt = `${systemInstruction} \n\n Audio input is attached. Extract the transaction.`;
+    // 5. Отправка запроса
+    console.log("Sending audio to Gemini...");
     
-    const result = await chat.sendMessage([
-      prompt,
+    const result = await model.generateContent([
       {
         inlineData: {
           mimeType: audioFile.type || "audio/webm",
@@ -122,27 +81,101 @@ serve(async (req) => {
     const response = result.response;
     const functionCalls = response.functionCalls();
 
-    if (functionCalls && functionCalls.length > 0) {
-      const call = functionCalls[0];
-      const args = call.args;
-      
-      console.log("Gemini extracted args:", args);
-
-      return new Response(JSON.stringify(args), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    } else {
-      // Если ИИ не вернул вызов функции, пробуем вернуть текст
+    if (!functionCalls || functionCalls.length === 0) {
+      // Если AI не вернул function call, пытаемся получить текст
       const text = response.text();
-      console.warn("Gemini did not return a function call. Text:", text);
-      throw new Error("Could not extract transaction details. Please try again clearly.");
+      console.warn("No function call returned. AI text response:", text);
+      
+      // Возвращаем пустую транзакцию с amount = 0
+      return new Response(JSON.stringify({
+        name: "Транзакция",
+        amount: 0,
+        currency: defaultCurrency || "USD",
+        category: "",
+        date: new Date().toISOString(),
+        type: "EXPENSE",
+        description: text || "",
+        fromAccountName: "",
+        toAccountName: ""
+      }), {
+        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        status: 200,
+      });
     }
 
-  } catch (error) {
+    const functionCall = functionCalls[0];
+    const args = functionCall.args;
+
+    console.log("AI extracted args:", JSON.stringify(args, null, 2));
+
+    // 6. Валидация и очистка
+    const cleanedArgs = {
+      name: args.name || "Транзакция",
+      amount: typeof args.amount === 'number' ? args.amount : 0,
+      currency: args.currency || defaultCurrency || "USD",
+      category: args.category || "",
+      date: args.date || new Date().toISOString(),
+      type: args.type || "EXPENSE",
+      description: args.description || "",
+      fromAccountName: args.fromAccountName || "",
+      toAccountName: args.toAccountName || "",
+      savingsGoalName: args.savingsGoalName || "",
+    };
+
+    // 7. Дополнительная логика на случай ошибок AI
+    
+    // Если это TRANSFER, но нет fromAccount/toAccount — попытка исправить
+    if (cleanedArgs.type === "TRANSFER") {
+      // category всегда пусто для переводов
+      cleanedArgs.category = "";
+      
+      // Если fromAccount не указан, попробуем найти CARD
+      if (!cleanedArgs.fromAccountName && accounts && accounts.length > 0) {
+        const cardAccount = accounts.find((a: any) => a.type === 'CARD');
+        cleanedArgs.fromAccountName = cardAccount ? cardAccount.name : accounts[0].name;
+      }
+      
+      // Если toAccount не указан, попробуем найти CASH
+      if (!cleanedArgs.toAccountName && accounts && accounts.length > 0) {
+        const cashAccount = accounts.find((a: any) => a.type === 'CASH');
+        cleanedArgs.toAccountName = cashAccount ? cashAccount.name : accounts[1]?.name || "";
+      }
+    }
+    
+    // Если это EXPENSE с toAccountName — это ошибка, убираем
+    if (cleanedArgs.type === "EXPENSE" && cleanedArgs.toAccountName) {
+      cleanedArgs.toAccountName = "";
+    }
+    
+    // Если это INCOME с fromAccountName — ошибка, убираем
+    if (cleanedArgs.type === "INCOME" && cleanedArgs.fromAccountName) {
+      cleanedArgs.fromAccountName = "";
+    }
+
+    console.log("Cleaned and validated args:", JSON.stringify(cleanedArgs, null, 2));
+
+    return new Response(JSON.stringify(cleanedArgs), {
+      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      status: 200,
+    });
+
+  } catch (error: any) {
     console.error("Error processing audio transaction:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ 
+      error: error.message,
+      // Fallback транзакция
+      name: "Ошибка обработки",
+      amount: 0,
+      currency: "USD",
+      category: "",
+      date: new Date().toISOString(),
+      type: "EXPENSE",
+      description: error.message,
+      fromAccountName: "",
+      toAccountName: ""
+    }), {
       status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
     });
   }
 });

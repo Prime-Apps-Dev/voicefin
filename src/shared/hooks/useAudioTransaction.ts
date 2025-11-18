@@ -2,11 +2,9 @@
 
 import { useState, useRef } from 'react';
 import * as api from '../../core/services/api';
-import { Transaction, Category, SavingsGoal, TransactionType } from '../../core/types';
+import { Transaction, Category, SavingsGoal, Account, TransactionType } from '../../core/types';
 import { useLocalization } from '../../core/context/LocalizationContext';
 
-// Расширяем тип результата, так как API может вернуть дополнительные поля (имена счетов)
-// которые еще не являются ID.
 interface DraftTransaction extends Omit<Transaction, 'id'> {
   fromAccountName?: string;
   toAccountName?: string;
@@ -23,7 +21,9 @@ interface UseAudioTransactionResult {
   audioContext: AudioContext | null;
   processAudioResult: (
     categories: Category[], 
-    savingsGoals: SavingsGoal[]
+    savingsGoals: SavingsGoal[],
+    accounts: Account[], // НОВОЕ
+    defaultCurrency: string // НОВОЕ
   ) => Promise<DraftTransaction | null>;
 }
 
@@ -56,7 +56,6 @@ export const useAudioTransaction = (
       setStream(mediaStream);
       setIsRecording(true);
 
-      // Проверяем поддержку кодеков
       const mimeType = [
         'audio/webm;codecs=opus', 
         'audio/ogg;codecs=opus', 
@@ -91,7 +90,9 @@ export const useAudioTransaction = (
 
   const processAudioResult = async (
     categories: Category[], 
-    savingsGoals: SavingsGoal[]
+    savingsGoals: SavingsGoal[],
+    accounts: Account[], // НОВОЕ
+    defaultCurrency: string // НОВОЕ
   ): Promise<DraftTransaction | null> => {
     return new Promise((resolve, reject) => {
         const recorder = mediaRecorderRef.current;
@@ -100,9 +101,7 @@ export const useAudioTransaction = (
             return resolve(null);
         }
 
-        // Мы используем onstop, чтобы гарантировать, что запись завершена
         recorder.onstop = async () => {
-            // Останавливаем треки микрофона
             stream?.getTracks().forEach(track => track.stop());
             setStream(null);
 
@@ -115,20 +114,89 @@ export const useAudioTransaction = (
                     audioBlob,
                     categories,
                     savingsGoals,
-                    language
+                    accounts, // НОВОЕ
+                    language,
+                    defaultCurrency // НОВОЕ
                 ) as DraftTransaction;
 
-                // --- ЛОГИКА ИСПРАВЛЕНИЯ (FALLBACK) ---
+                // --- FALLBACK ЛОГИКА ---
                 
-                // Если ИИ определил как РАСХОД, но указал счет ПОЛУЧАТЕЛЯ -> это ПЕРЕВОД
+                // 1. Маппинг счетов по именам
+                if (result.fromAccountName) {
+                  const foundAccount = accounts.find(a => 
+                    a.name.toLowerCase().includes(result.fromAccountName!.toLowerCase()) ||
+                    result.fromAccountName!.toLowerCase().includes(a.name.toLowerCase())
+                  );
+                  
+                  if (foundAccount) {
+                    result.accountId = foundAccount.id;
+                  } else {
+                    // Пытаемся найти по типу
+                    if (result.fromAccountName.toLowerCase().includes('card') || 
+                        result.fromAccountName.toLowerCase().includes('карт')) {
+                      const cardAccount = accounts.find(a => a.type === 'CARD');
+                      if (cardAccount) result.accountId = cardAccount.id;
+                    } else if (result.fromAccountName.toLowerCase().includes('cash') || 
+                               result.fromAccountName.toLowerCase().includes('налич')) {
+                      const cashAccount = accounts.find(a => a.type === 'CASH');
+                      if (cashAccount) result.accountId = cashAccount.id;
+                    }
+                  }
+                }
+                
+                // 2. Маппинг toAccount для TRANSFER
+                if (result.type === TransactionType.TRANSFER && result.toAccountName) {
+                  const foundToAccount = accounts.find(a => 
+                    a.name.toLowerCase().includes(result.toAccountName!.toLowerCase()) ||
+                    result.toAccountName!.toLowerCase().includes(a.name.toLowerCase())
+                  );
+                  
+                  if (foundToAccount) {
+                    result.toAccountId = foundToAccount.id;
+                  } else {
+                    // Пытаемся найти по типу
+                    if (result.toAccountName.toLowerCase().includes('cash') || 
+                        result.toAccountName.toLowerCase().includes('налич')) {
+                      const cashAccount = accounts.find(a => a.type === 'CASH');
+                      if (cashAccount) result.toAccountId = cashAccount.id;
+                    } else if (result.toAccountName.toLowerCase().includes('card') || 
+                               result.toAccountName.toLowerCase().includes('карт')) {
+                      const cardAccount = accounts.find(a => a.type === 'CARD');
+                      if (cardAccount) result.toAccountId = cardAccount.id;
+                    }
+                  }
+                }
+                
+                // 3. Исправление типа если AI ошибся
+                // Если EXPENSE, но есть toAccountName → скорее всего TRANSFER
                 if (result.type === TransactionType.EXPENSE && result.toAccountName) {
-                  console.log('Correcting transaction type: EXPENSE -> TRANSFER based on toAccountName presence.');
+                  console.log('Correcting: EXPENSE -> TRANSFER (toAccountName present)');
                   result.type = TransactionType.TRANSFER;
-                  result.category = ''; // У переводов нет категории
+                  result.category = '';
+                }
+                
+                // Если TRANSFER, но нет toAccount — ошибка AI, возвращаем EXPENSE
+                if (result.type === TransactionType.TRANSFER && !result.toAccountId && !result.toAccountName) {
+                  console.log('Correcting: TRANSFER -> EXPENSE (no toAccount)');
+                  result.type = TransactionType.EXPENSE;
                 }
 
-                // Если ИИ определил как ПЕРЕВОД, но не указал категорию, все ок.
-                // Если ИИ определил как ДОХОД, но указал sourceAccountName, это тоже ок.
+                // 4. Маппинг savingsGoalName на goalId
+                if (result.savingsGoalName && savingsGoals.length > 0) {
+                  const goal = savingsGoals.find(
+                    g => g.name.toLowerCase() === result.savingsGoalName!.toLowerCase()
+                  );
+                  if (goal) {
+                    result.goalId = goal.id;
+                  }
+                  delete (result as any).savingsGoalName;
+                }
+
+                // 5. Очистка временных полей
+                delete (result as any).fromAccountName;
+                delete (result as any).toAccountName;
+
+                console.log('Final processed transaction:', result);
 
                 resolve(result);
             } catch (err: any) {

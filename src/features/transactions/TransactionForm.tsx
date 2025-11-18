@@ -1,9 +1,9 @@
 // src/features/transactions/TransactionForm.tsx
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Transaction, TransactionType, Account, SavingsGoal, Category, Budget, ExchangeRates } from '../../core/types';
-import { COMMON_CURRENCIES } from '../../utils/constants';
+import { Transaction, TransactionType, Account, SavingsGoal, Category, Budget, ExchangeRates, Debt } from '../../core/types';
+import { COMMON_CURRENCIES, SYSTEM_CATEGORY_NAMES } from '../../utils/constants';
 import { useLocalization } from '../../core/context/LocalizationContext';
 import { DatePicker } from '../../shared/ui/modals/DatePicker';
 import { TimePicker } from '../../shared/ui/modals/TimePicker';
@@ -32,6 +32,7 @@ interface TransactionFormProps {
   onCreateBudget: (category: string, monthKey: string) => void;
   rates: ExchangeRates;
   defaultCurrency: string;
+  debts: Debt[]; // ADDED: Required for the Debt Selector logic
 }
 
 const InputField = ({ label, name, value, onChange, type = 'text', required = false, inputMode, disabled = false }: { label: string, name: keyof Transaction, value: any, onChange: any, type?: string, required?: boolean, inputMode?: 'none' | 'text' | 'tel' | 'url' | 'email' | 'numeric' | 'decimal' | 'search', disabled?: boolean }) => (
@@ -60,7 +61,8 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
   const { 
     transaction, categories, accounts, onConfirm, onCancel, 
     isSavingsDeposit, isCategoryLocked, goalName, 
-    budgets, transactions, onCreateBudget, rates, defaultCurrency, savingsGoals
+    budgets, transactions, onCreateBudget, rates, defaultCurrency, savingsGoals,
+    debts // ADDED: debts prop
   } = props;
   const { t, language } = useLocalization();
   
@@ -80,6 +82,18 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
   const isEditing = 'id' in transaction;
   const isSavingsTransaction = formData.category === 'Savings';
   const isTransfer = formData.type === TransactionType.TRANSFER;
+
+  // Logic to determine if we should show Debt Selector
+  const isDebtRelated = useMemo(() => {
+      if (isTransfer) return false;
+      const cat = formData.category;
+      return (
+          cat === SYSTEM_CATEGORY_NAMES.DEBT_LENDING ||
+          cat === SYSTEM_CATEGORY_NAMES.DEBT_BORROWING ||
+          cat === SYSTEM_CATEGORY_NAMES.DEBT_REPAYMENT_RECEIVED ||
+          cat === SYSTEM_CATEGORY_NAMES.DEBT_REPAYMENT_SENT
+      );
+  }, [formData.category, isTransfer]);
 
   // --- MAIN INITIALIZATION LOGIC ---
   React.useEffect(() => {
@@ -171,6 +185,12 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
         alert(language === 'ru' ? "Счета списания и зачисления должны отличаться" : "Source and destination accounts must be different");
         return;
     }
+
+    // Validation for debt
+    if (isDebtRelated && !formData.debtId) {
+        alert("Please select a debt record for this transaction.");
+        return;
+    }
     
     // Очищаем временные поля перед отправкой
     const finalData = { ...formData };
@@ -180,7 +200,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
     onConfirm(finalData);
   };
   
-  const allCategoryNames = React.useMemo(() => {
+  const allCategoryNames = useMemo(() => {
       const categoryNameSet = new Set(categories.map(c => c.name));
       if(formData.category) {
         categoryNameSet.add(formData.category);
@@ -189,7 +209,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
   }, [categories, formData.category]);
 
   // Логика бюджета
-  const budgetInfo = React.useMemo(() => {
+  const budgetInfo = useMemo(() => {
     if (!formData.category || formData.type === TransactionType.INCOME || isTransfer) {
       return null;
     }
@@ -231,7 +251,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
     }
   }, [formData.category, formData.date, formData.type, formData.amount, formData.currency, budgets, transactions, rates, transaction, isTransfer]);
 
-  const savingsGoalInfo = React.useMemo(() => {
+  const savingsGoalInfo = useMemo(() => {
     if (!formData.goalId || !isSavingsTransaction || isTransfer) {
         return null;
     }
@@ -268,7 +288,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
     }).format(amount);
   };
 
-  const safeDate = React.useMemo(() => {
+  const safeDate = useMemo(() => {
     try {
       const d = new Date(formData.date);
       if (isNaN(d.getTime())) return new Date();
@@ -431,6 +451,33 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
                       </div>
                   </div>
               )}
+
+              {/* DEBT SELECTOR */}
+               <AnimatePresence>
+                {isDebtRelated && !isTransfer && (
+                    <motion.div initial={{ opacity: 0, height: 0, y: -10 }} animate={{ opacity: 1, height: 'auto', y: 0 }} exit={{ opacity: 0, height: 0, y: -10 }} className="overflow-hidden">
+                        <div className="pt-2">
+                            <label htmlFor="debtId" className="block text-sm font-medium text-zinc-300 mb-1.5">Related Debt</label>
+                            <div className="relative">
+                                <select
+                                    id="debtId"
+                                    name="debtId"
+                                    value={formData.debtId || ''}
+                                    onChange={handleChange}
+                                    required
+                                    className="appearance-none w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 pr-10"
+                                >
+                                    <option value="" disabled>Select Debt</option>
+                                    {debts.map((d) => (
+                                        <option key={d.id} value={d.id}>{d.person} ({d.type === 'I_OWE' ? 'I Owe' : 'Owes Me'})</option>
+                                    ))}
+                                </select>
+                                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 pointer-events-none" />
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
+               </AnimatePresence>
 
                <AnimatePresence>
                 {isSavingsTransaction && !isTransfer && (

@@ -1,7 +1,7 @@
-// src/components/AppModals.tsx
+// src/components/AppModals.tsx (actually src/shared/ui/modals/AppModals.tsx)
 
 import React from 'react';
-import { Transaction, Account, Category, SavingsGoal, Budget, TransactionType } from '../../../core/types';
+import { Transaction, Account, Category, SavingsGoal, Budget, TransactionType, Debt } from '../../../core/types'; // ИЗМЕНЕНО: Добавлен Debt
 import { TransactionForm } from '../../../features/transactions/TransactionForm';
 import { AccountForm } from '../../../features/accounts/AccountForm';
 import { SavingsGoalForm } from '../../../features/savings/SavingsGoalForm';
@@ -92,6 +92,7 @@ interface AppModalsProps {
   transactions: Transaction[];
   rates: any;
   displayCurrency: string;
+  debts: Debt[]; // ДОБАВЛЕНО
 }
 
 export const AppModals: React.FC<AppModalsProps> = (props) => {
@@ -109,7 +110,8 @@ export const AppModals: React.FC<AppModalsProps> = (props) => {
       isTextInputOpen, setIsTextInputOpen, textInputValue, setTextInputValue, onTextTransactionSubmit, isProcessingText,
       goalForHistory, setGoalForHistory, budgetForHistory, setBudgetForHistory, onDeleteTransaction, onSelectTransaction,
       carryOverInfo, setCarryOverInfo, onConfirmCarryOver,
-      categories, accounts, savingsGoals, budgets, transactions, rates, displayCurrency
+      categories, accounts, savingsGoals, budgets, transactions, rates, displayCurrency,
+      debts // ДОБАВЛЕНО
   } = props;
 
   return (
@@ -133,6 +135,7 @@ export const AppModals: React.FC<AppModalsProps> = (props) => {
           }}
           rates={rates}
           defaultCurrency={displayCurrency}
+          debts={debts} // ДОБАВЛЕНО
         />
       )}
 

@@ -290,6 +290,7 @@ export const parseTransactionFromText = async (
   defaultCurrency: string,
   categories: Category[],
   savingsGoals: SavingsGoal[],
+  accounts: Account[],
   language: string
 ): Promise<Omit<Transaction, 'id'>> => {
   
@@ -332,20 +333,29 @@ export const processAudioTransaction = async (
   audioBlob: Blob,
   categories: Category[],
   savingsGoals: SavingsGoal[],
-  language: string
+  accounts: Account[], // НОВОЕ: список счетов
+  language: string,
+  defaultCurrency: string // НОВОЕ: валюта по умолчанию
 ): Promise<Omit<Transaction, 'id'>> => {
 
-  console.log('API: Начинаем processAudioTransaction...'); // LOG 1: Начало
+  console.log('API: Начинаем processAudioTransaction...');
 
   const formData = new FormData();
   formData.append('audio', audioBlob, 'transaction.webm');
   
-  const context = { categories, savingsGoals, language };
-  console.log('API: Контекст для ИИ:', context); // LOG 2: Контекст для ИИ
+  const context = { 
+    categories, 
+    savingsGoals, 
+    accounts, // НОВОЕ
+    language,
+    defaultCurrency // НОВОЕ
+  };
+  
+  console.log('API: Контекст для ИИ:', context);
   
   formData.append('context', JSON.stringify(context));
 
-  // Используем прямой fetch вместо supabase.functions.invoke
+  // Используем прямой fetch
   const { data: { session } } = await supabase.auth.getSession();
   
   const SUPABASE_URL: string = import.meta.env.VITE_SUPABASE_URL || '';
@@ -355,30 +365,28 @@ export const processAudioTransaction = async (
   }
 
   const url = `${SUPABASE_URL}/functions/v1/process-audio-transaction`;
-  console.log('API: Запрос на URL:', url); // LOG 3: URL запроса
-  console.log(`API: Размер аудио Blob: ${audioBlob.size} байт, тип: ${audioBlob.type}`); // LOG 4: Детали Blob
+  console.log('API: Запрос на URL:', url);
+  console.log(`API: Размер аудио Blob: ${audioBlob.size} байт, тип: ${audioBlob.type}`);
 
-  const response = await fetch(
-    url,
-    {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${session?.access_token || ''}`,
-      },
-      body: formData,
-    }
-  );
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${session?.access_token || ''}`,
+    },
+    body: formData,
+  });
 
-  console.log('API: Статус ответа:', response.status); // LOG 5: Статус ответа
+  console.log('API: Статус ответа:', response.status);
 
   if (!response.ok) {
     const errorText = await response.text();
-    console.error('API: Ошибка вызова функции. Текст ошибки:', errorText); // LOG 6: Текст ошибки
+    console.error('API: Ошибка вызова функции. Текст ошибки:', errorText);
     throw new Error(`Ошибка вызова функции (Статус: ${response.status}): ${errorText}`);
   }
 
   const data = await response.json();
-  console.log('API: Успешно получены данные:', data); // LOG 7: Успешный ответ
+  console.log('API: Успешно получены данные:', data);
+  
   return data as Omit<Transaction, 'id'>;
 };
 

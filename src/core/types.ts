@@ -11,6 +11,11 @@ export enum AccountType {
   CASH = 'CASH',
 }
 
+export enum DebtType {
+  I_OWE = 'I_OWE',       // Я должен
+  OWED_TO_ME = 'OWED_TO_ME', // Мне должны
+}
+
 export interface Account {
   id: string;
   name: string;
@@ -31,6 +36,7 @@ export interface Transaction {
   type: TransactionType;
   description?: string;
   goalId?: string;
+  debtId?: string;
 }
 
 export interface ExchangeRates {
@@ -82,4 +88,18 @@ export interface Category {
   isFavorite: boolean;
   isDefault: boolean;
   type: TransactionType;
+  isSystem?: boolean;
+}
+
+export interface Debt {
+  id: string;
+  person: string; // Имя человека или название организации
+  amount: number; // Общая сумма долга
+  currentAmount: number; // Остаток долга (сколько еще нужно вернуть/получить)
+  currency: string;
+  type: DebtType;
+  date: string; // Дата создания/возникновения долга
+  description?: string;
+  dueDate?: string; // Дата возврата
+  color?: string; // Для UI
 }

@@ -25,7 +25,15 @@ export const COMMON_CURRENCIES = [
   'TMT', // Turkmenistani Manat
 ];
 
-export const DEFAULT_CATEGORIES: { name: string; icon: string; type: TransactionType }[] = [
+// Используем эти имена для определения логики в UI
+export const SYSTEM_CATEGORY_NAMES = {
+  DEBT_LENDING: 'Lending', // Я дал в долг (Расход)
+  DEBT_REPAYMENT_RECEIVED: 'Debt Repayment Received', // Мне вернули долг (Доход)
+  DEBT_BORROWING: 'Borrowing', // Я взял в долг (Доход)
+  DEBT_REPAYMENT_SENT: 'Debt Repayment Sent', // Я вернул долг (Расход)
+};
+
+export const DEFAULT_CATEGORIES: { name: string; icon: string; type: TransactionType; isSystem?: boolean }[] = [
   // Expenses
   { name: 'Food & Drink', icon: 'UtensilsCrossed', type: TransactionType.EXPENSE },
   { name: 'Shopping', icon: 'ShoppingCart', type: TransactionType.EXPENSE },
@@ -35,12 +43,21 @@ export const DEFAULT_CATEGORIES: { name: string; icon: string; type: Transaction
   { name: 'Entertainment', icon: 'Clapperboard', type: TransactionType.EXPENSE },
   { name: 'Health', icon: 'HeartPulse', type: TransactionType.EXPENSE },
   { name: 'Groceries', icon: 'Apple', type: TransactionType.EXPENSE },
-  { name: 'Savings', icon: 'PiggyBank', type: TransactionType.EXPENSE },
+  { name: 'Savings', icon: 'PiggyBank', type: TransactionType.EXPENSE, isSystem: true },
   { name: 'General', icon: 'LayoutGrid', type: TransactionType.EXPENSE },
+
+  // Debt Related Expenses
+  { name: SYSTEM_CATEGORY_NAMES.DEBT_LENDING, icon: 'ArrowUpCircle', type: TransactionType.EXPENSE, isSystem: true },
+  { name: SYSTEM_CATEGORY_NAMES.DEBT_REPAYMENT_SENT, icon: 'CheckCircle', type: TransactionType.EXPENSE, isSystem: true },
+
   // Incomes
   { name: 'Salary', icon: 'Banknote', type: TransactionType.INCOME },
   { name: 'Gifts', icon: 'Gift', type: TransactionType.INCOME },
   { name: 'Freelance', icon: 'Briefcase', type: TransactionType.INCOME },
+
+  // Debt Related Incomes
+  { name: SYSTEM_CATEGORY_NAMES.DEBT_BORROWING, icon: 'ArrowDownCircle', type: TransactionType.INCOME, isSystem: true },
+  { name: SYSTEM_CATEGORY_NAMES.DEBT_REPAYMENT_RECEIVED, icon: 'CheckCircle', type: TransactionType.INCOME, isSystem: true },
 ];
 
 export const ACCOUNT_GRADIENTS = [
@@ -58,13 +75,22 @@ export const ACCOUNT_GRADIENTS = [
 /**
  * Текущая версия приложения.
  */
-export const APP_VERSION = '1.2.0';
+export const APP_VERSION = '1.1.0';
 
 /**
  * История изменений в приложении (Changelog).
  * Changes теперь содержит ключи локализации.
  */
 export const CHANGELOG = [
+  { 
+    version: '1.0.2', 
+    date: '2025-11-16', 
+    changes: [
+      'changelog_v1_1_0_change_1',
+      'changelog_v1_1_0_change_2', 
+      'changelog_v1_1_0_change_3', 
+    ] 
+  },
   { 
     version: '1.0.2', 
     date: '2025-11-16', 

@@ -4,8 +4,8 @@ import React, { createContext, useContext, useEffect, useMemo, useState, ReactNo
 import * as api from '../services/api';
 import { getExchangeRates, convertCurrency } from '../services/currency';
 import { 
-  Transaction, Account, Category, SavingsGoal, Budget, ExchangeRates, 
-  TransactionType 
+  Transaction, Account, Category, SavingsGoal, Budget, Debt, ExchangeRates, 
+  TransactionType, DebtType
 } from '../types';
 import { useAuth } from './AuthContext';
 import { useLocalization } from './LocalizationContext';
@@ -23,6 +23,7 @@ interface AppDataContextType {
   categories: Category[];
   savingsGoals: SavingsGoal[];
   budgets: Budget[];
+  debts: Debt[]; // <-- NEW
   rates: ExchangeRates;
   isDataLoading: boolean;
   dataError: string | null;
@@ -52,6 +53,9 @@ interface AppDataContextType {
   handleSaveBudget: (budget: Omit<Budget, 'id'> | Budget) => Promise<void>;
   handleDeleteBudget: (budgetId: string) => Promise<void>;
   
+  handleSaveDebt: (debt: Omit<Debt, 'id'> | Debt) => Promise<void>; // <-- NEW
+  handleDeleteDebt: (debtId: string) => Promise<void>; // <-- NEW
+  
   updateDefaultCurrency: (currency: string) => Promise<void>;
   
   // Filters
@@ -76,6 +80,7 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [categories, setCategories] = useState<Category[]>([]);
   const [savingsGoals, setSavingsGoals] = useState<SavingsGoal[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
+  const [debts, setDebts] = useState<Debt[]>([]); // <-- NEW
   const [rates, setRates] = useState<ExchangeRates>({});
   
   const [isDataLoading, setIsDataLoading] = useState(false);
@@ -98,6 +103,8 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
       setCategories(initialData.categories);
       setSavingsGoals(initialData.savingsGoals);
       setBudgets(initialData.budgets);
+      // MOCK DEBTS LOAD (пока нет API)
+      setDebts(initialData.debts || []); 
     } catch (err: any) {
       console.error("AppData: Load failed", err);
       setDataError(err.message || "Failed to load data");
@@ -106,7 +113,6 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
   };
 
-  // Load data when user is ready
   useEffect(() => {
     if (!isAuthLoading && user) {
       loadData();
@@ -144,7 +150,6 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
     let monthlyIncome = 0;
     let monthlyExpense = 0;
 
-    // Calculate Income/Expense for current month (visual stats)
     for (const tx of filteredTransactions) {
       const txDate = new Date(tx.date);
       if (txDate.getMonth() === currentMonth && txDate.getFullYear() === currentYear) {
@@ -154,7 +159,6 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
       }
     }
 
-    // Calculate Current Balance based on Selection
     const selectedBalance = filteredTransactions.reduce((balance, tx) => {
        const val = convertCurrency(tx.amount, tx.currency, displayCurrency, rates);
        if (tx.type === TransactionType.INCOME) return balance + val;
@@ -179,18 +183,15 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   // --- Handlers ---
 
-  // Helper: Handle goal updates when transaction changes
   const updateGoalsFromTransaction = (tx: Transaction | Omit<Transaction, 'id'>, originalTx: Transaction | null = null) => {
     const currentGoalId = 'goalId' in tx ? tx.goalId : undefined;
     
     if (currentGoalId || originalTx?.goalId) {
         setSavingsGoals(prevGoals => prevGoals.map(g => {
             let newCurrentAmount = g.currentAmount;
-            // Revert old transaction effect
             if (originalTx?.goalId === g.id) {
                 newCurrentAmount -= convertCurrency(originalTx.amount, originalTx.currency, g.currency, rates);
             }
-            // Apply new transaction effect
             if (currentGoalId === g.id && tx.type === TransactionType.EXPENSE) {
                 newCurrentAmount += convertCurrency(tx.amount, tx.currency, g.currency, rates);
             }
@@ -199,9 +200,54 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
   };
 
+  // Обновляем долги на основе транзакции
+  const updateDebtsFromTransaction = (tx: Transaction | Omit<Transaction, 'id'>, originalTx: Transaction | null = null) => {
+    const currentDebtId = 'debtId' in tx ? tx.debtId : undefined;
+
+    if (currentDebtId || originalTx?.debtId) {
+      setDebts(prevDebts => prevDebts.map(d => {
+        let newCurrentAmount = d.currentAmount;
+        
+        // Откат старой транзакции
+        if (originalTx?.debtId === d.id) {
+          const amount = convertCurrency(originalTx.amount, originalTx.currency, d.currency, rates);
+          // Логика зависит от типа долга и типа транзакции
+          if (d.type === DebtType.OWED_TO_ME) {
+             // Если мне возвращали (Income), то долг увеличивается обратно
+             if (originalTx.type === TransactionType.INCOME) newCurrentAmount += amount;
+             // Если я давал в долг (Expense), то долг уменьшается обратно (отменяем выдачу)
+             if (originalTx.type === TransactionType.EXPENSE) newCurrentAmount -= amount;
+          } else { // I_OWE
+             // Если я возвращал (Expense), долг увеличивается обратно
+             if (originalTx.type === TransactionType.EXPENSE) newCurrentAmount += amount;
+             // Если я брал (Income), долг уменьшается обратно
+             if (originalTx.type === TransactionType.INCOME) newCurrentAmount -= amount;
+          }
+        }
+
+        // Применение новой транзакции
+        if (currentDebtId === d.id) {
+           const amount = convertCurrency(tx.amount, tx.currency, d.currency, rates);
+           if (d.type === DebtType.OWED_TO_ME) {
+               // Мне возвращают (Income) -> долг уменьшается
+               if (tx.type === TransactionType.INCOME) newCurrentAmount -= amount;
+               // Я даю еще (Expense) -> долг увеличивается
+               if (tx.type === TransactionType.EXPENSE) newCurrentAmount += amount;
+           } else { // I_OWE
+               // Я возвращаю (Expense) -> долг уменьшается
+               if (tx.type === TransactionType.EXPENSE) newCurrentAmount -= amount;
+               // Я беру еще (Income) -> долг увеличивается
+               if (tx.type === TransactionType.INCOME) newCurrentAmount += amount;
+           }
+        }
+
+        return { ...d, currentAmount: Math.max(0, newCurrentAmount) };
+      }));
+    }
+  };
+
   const handleAddTransaction = async (transactionData: Omit<Transaction, 'id'>) => {
     try {
-        // Auto-create category if needed
         if (transactionData.category && !categories.some(c => c.name.toLowerCase() === transactionData.category.toLowerCase())) {
             const iconName = await api.getIconForCategory(transactionData.category);
             const newCategory = await api.addCategory({
@@ -215,6 +261,7 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
         }
 
         updateGoalsFromTransaction(transactionData);
+        updateDebtsFromTransaction(transactionData);
 
         const newTx = await api.addTransaction(transactionData);
         setTransactions(prev => [newTx, ...prev]);
@@ -228,6 +275,7 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
       try {
         const originalTransaction = transactions.find(t => t.id === transactionData.id) || null;
         updateGoalsFromTransaction(transactionData, originalTransaction);
+        updateDebtsFromTransaction(transactionData, originalTransaction);
         
         const updatedTx = await api.updateTransaction(transactionData);
         setTransactions(prev => prev.map(t => t.id === updatedTx.id ? updatedTx : t));
@@ -242,7 +290,6 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
           const txToDelete = transactions.find(t => t.id === txId);
           if (!txToDelete) return;
 
-          // Revert goal amount if needed
           if (txToDelete.goalId && txToDelete.type === TransactionType.EXPENSE) {
              setSavingsGoals(prevGoals => prevGoals.map(g => {
                 if (g.id === txToDelete.goalId) {
@@ -251,6 +298,12 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
                 }
                 return g;
              }));
+          }
+          
+          // Revert Debt changes on delete
+          if (txToDelete.debtId) {
+             // Passing null as new tx acts as just reverting the original
+              updateDebtsFromTransaction({} as any, txToDelete);
           }
 
           await api.deleteTransaction(txId);
@@ -323,6 +376,29 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
       setBudgets(prev => prev.filter(b => b.id !== id));
   };
 
+  // --- DEBT HANDLERS (Mock API calls for now) ---
+  const handleSaveDebt = async (data: Omit<Debt, 'id'> | Debt) => {
+      // MOCK: В реальности здесь вызовы api.addDebt / api.updateDebt
+      if ('id' in data) {
+          const updated = data as Debt; // Mock update
+          setDebts(prev => prev.map(d => d.id === updated.id ? updated : d));
+      } else {
+          const newDebt: Debt = {
+             ...data,
+             id: Math.random().toString(36).substr(2, 9),
+             currentAmount: data.currentAmount // Usually equals initial amount
+          };
+          setDebts(prev => [...prev, newDebt]);
+      }
+  };
+
+  const handleDeleteDebt = async (id: string) => {
+      // MOCK
+      setDebts(prev => prev.filter(d => d.id !== id));
+      // В реальности еще нужно отвязать транзакции или предупредить пользователя
+  };
+
+
   const updateDefaultCurrency = async (currency: string) => {
       if (!user) return;
       try {
@@ -338,7 +414,7 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   return (
     <AppDataContext.Provider value={{
-        transactions, accounts, categories, savingsGoals, budgets, rates, isDataLoading, dataError,
+        transactions, accounts, categories, savingsGoals, budgets, debts, rates, isDataLoading, dataError,
         displayCurrency, totalBalance, totalSavings, summary, daysActive,
         refreshData: loadData,
         handleAddTransaction, handleUpdateTransaction, handleDeleteTransaction,
@@ -346,6 +422,7 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
         handleSaveCategory, handleDeleteCategory,
         handleSaveGoal, handleDeleteGoal,
         handleSaveBudget, handleDeleteBudget,
+        handleSaveDebt, handleDeleteDebt,
         updateDefaultCurrency,
         selectedAccountId, setSelectedAccountId
     }}>

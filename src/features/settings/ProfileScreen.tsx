@@ -2,15 +2,15 @@ import React, { useRef } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { User } from '../../core/types';
 import {
-    Target, Wallet, Handshake, Banknote, CalendarDays, CreditCard, LayoutGrid, Settings, ChevronRight, Info // <-- ДОБАВЛЕНО: Info
+    Target, Wallet, Handshake, Banknote, CalendarDays, CreditCard, LayoutGrid, Settings, ChevronRight, Info
 } from 'lucide-react';
 import { useLocalization } from '../../core/context/LocalizationContext';
 
 interface ProfileScreenProps {
     user: User;
     daysActive: number;
-    // ОБНОВЛЕНИЕ ТИПА: добавление 'about'
-    onNavigate: (screen: 'home' | 'savings' | 'profile' | 'accounts' | 'budgetPlanning' | 'categories' | 'settings' | 'comingSoon' | 'history' | 'about') => void; 
+    // ОБНОВЛЕНИЕ ТИПА: добавление 'about' и 'debts'
+    onNavigate: (screen: 'home' | 'savings' | 'profile' | 'accounts' | 'budgetPlanning' | 'categories' | 'settings' | 'comingSoon' | 'history' | 'about' | 'debts') => void; 
 }
 
 // Animation Variants
@@ -104,7 +104,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = (props) => {
                              <div className="relative z-10"><div className="p-2 bg-white/20 rounded-2xl backdrop-blur-sm inline-block"><Wallet className="w-6 h-6" /></div><h3 className="font-semibold mt-2">{t('budgetPlanning')}</h3><p className="text-sm opacity-80">{t('controlSpending')}</p></div>
                           </motion.button>
                       </div>
-                       <motion.button onClick={() => onNavigate('comingSoon')} className="relative overflow-hidden bg-gradient-to-br from-orange-500 to-red-600 rounded-3xl p-6 text-white shadow-lg text-left w-full" variants={zoomInOut} whileInView="whileInView" viewport={{ once: true, amount: 0.2 }}>
+                       {/* ИЗМЕНЕНИЕ: onNavigate('debts') */}
+                       <motion.button onClick={() => onNavigate('debts')} className="relative overflow-hidden bg-gradient-to-br from-orange-500 to-red-600 rounded-3xl p-6 text-white shadow-lg text-left w-full" variants={zoomInOut} whileInView="whileInView" viewport={{ once: true, amount: 0.2 }}>
                          <div className="absolute -top-4 -right-4 w-24 h-24 bg-white/10 rounded-full blur-xl" />
                          <div className="relative z-10"><div className="p-2 bg-white/20 rounded-2xl backdrop-blur-sm inline-block"><Handshake className="w-6 h-6" /></div><h3 className="font-semibold mt-2">{t('debts')}</h3><p className="text-sm opacity-80">{t('manageLiabilities')}</p></div>
                       </motion.button>
