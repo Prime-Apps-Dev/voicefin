@@ -1,16 +1,26 @@
 // src/features/debts/DebtsScreen.tsx
-// ПОЛНОСТЬЮ ОБНОВЛЕННЫЙ ЭКРАН ДОЛГОВ
 
 import React, { useState, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, Plus, ArrowDownCircle, ArrowUpCircle, Scale, Layers, Trash2, Archive, Calendar, AlertCircle } from 'lucide-react';
+import { 
+  ChevronLeft, 
+  Plus, 
+  ArrowDownCircle, 
+  ArrowUpCircle, 
+  Scale, 
+  Trash2, 
+  Calendar, 
+  AlertCircle,
+  Wallet,
+  CheckCircle2,
+  Layers
+} from 'lucide-react';
 import { useAppData } from '../../core/context/AppDataContext';
-import { Debt, DebtType, DebtStatus, TransactionType, Transaction } from '../../core/types';
+import { Debt, DebtType, Transaction } from '../../core/types';
 import LongPressWrapper from '../../shared/layout/LongPressWrapper';
 import { ConfirmationModal } from '../../shared/ui/modals/ConfirmationModal';
-import { useLocalization } from '../../core/context/LocalizationContext';
 import { convertCurrency } from '../../core/services/currency';
-import { getDebtGradient, getDebtTransactionType, getDebtTransactionCategory } from '../../utils/constants';
+import { getDebtTransactionType, getDebtTransactionCategory } from '../../utils/constants';
 
 // Импорты модальных окон
 import { DebtForm } from './DebtForm';
@@ -22,58 +32,96 @@ interface DebtsScreenProps {
 }
 
 // ============================================
-// SUMMARY WIDGET COMPONENT
+// CAROUSEL WIDGET COMPONENT
 // ============================================
-const DebtWidget = ({ 
-  title, subtitle, amount, count, currency, type, onClick 
+const DebtWidgetCard = ({ 
+  title, 
+  subtitle, 
+  amount, 
+  count, 
+  currency, 
+  type, 
+  onClick,
+  active 
 }: { 
   title: string; 
   subtitle: string; 
   amount: number; 
   count: number; 
   currency: string; 
-  type: 'red' | 'green' | 'blue' | 'orange'; 
+  type: 'net' | 'owe' | 'owed'; 
   onClick?: () => void;
+  active?: boolean;
 }) => {
-  const gradients = {
-    red: 'bg-gradient-to-br from-red-500 via-red-600 to-red-700 shadow-red-500/20',
-    green: 'bg-gradient-to-br from-emerald-500 via-emerald-600 to-emerald-800 shadow-emerald-500/20',
-    blue: 'bg-gradient-to-br from-blue-500 via-blue-600 to-blue-800 shadow-blue-500/20',
-    orange: 'bg-gradient-to-br from-orange-500 via-orange-600 to-orange-800 shadow-orange-900/20',
+  // Обновленные градиенты (как в счетах)
+  const styles = {
+    net: {
+      // Ocean vibe (Blue -> Teal)
+      bg: 'bg-gradient-to-br from-blue-500 to-teal-400',
+      shadow: 'shadow-blue-500/20',
+      icon: Scale,
+      iconColor: 'text-white'
+    },
+    owe: {
+      // Sunset/Rose vibe (Pink -> Rose/Red) - яркий акцент для долга
+      bg: 'bg-gradient-to-br from-red-500 to-red-500',
+      shadow: 'shadow-red-500/20',
+      icon: ArrowDownCircle,
+      iconColor: 'text-white'
+    },
+    owed: {
+      // Forest vibe (Green -> Emerald)
+      bg: 'bg-gradient-to-br from-green-500 to-emerald-600',
+      shadow: 'shadow-emerald-500/20',
+      icon: ArrowUpCircle,
+      iconColor: 'text-white'
+    }
   };
 
-  const Icons = {
-    red: ArrowDownCircle,
-    green: ArrowUpCircle,
-    blue: Scale,
-    orange: Scale
-  };
-
-  const Icon = Icons[type];
+  const currentStyle = styles[type];
+  const Icon = currentStyle.icon;
 
   return (
     <motion.div 
       onClick={onClick}
-      whileHover={{ scale: 1.02 }}
-      whileTap={{ scale: 0.98 }}
-      className={`relative overflow-hidden ${gradients[type]} rounded-3xl p-6 text-white shadow-lg min-h-[140px] flex flex-col justify-between cursor-pointer transform transition-transform`}
+      whileTap={{ scale: 0.95 }}
+      className={`
+        relative flex-shrink-0 w-[85%] max-w-[300px] snap-center
+        rounded-3xl p-5 text-white 
+        ${currentStyle.bg} ${currentStyle.shadow} shadow-lg
+        flex flex-col justify-between min-h-[160px]
+        overflow-hidden
+        transition-all duration-300
+        ${active ? 'ring-4 ring-white/20 scale-[1.02]' : 'opacity-100 scale-100'}
+      `}
     >
-      <div className="absolute -top-4 -right-4 w-24 h-24 bg-white/10 rounded-full blur-xl" />
+      {/* Декоративные элементы фона (блики) */}
+      <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/20 rounded-full blur-2xl" />
+      <div className="absolute bottom-0 left-0 w-full h-1/2 bg-gradient-to-t from-black/10 to-transparent" />
+
       <div className="relative z-10">
-        <div className="flex items-center justify-between mb-4">
-          <div className="p-2 bg-white/20 rounded-2xl backdrop-blur-sm">
-            <Icon className="w-6 h-6" />
+        <div className="flex items-start justify-between mb-6">
+          <div>
+            <h3 className="text-lg font-bold opacity-100 tracking-wide">{title}</h3>
+            <p className="text-xs text-white/80 font-medium">{subtitle}</p>
           </div>
-          <div className="text-right">
-            <div className="text-sm font-medium opacity-90">{title}</div>
-            <div className="text-xs opacity-70">{count} {count === 1 ? 'item' : 'items'}</div>
+          <div className="p-2 bg-white/20 rounded-xl backdrop-blur-md border border-white/10">
+            <Icon className={`w-6 h-6 ${currentStyle.iconColor}`} />
           </div>
         </div>
+
         <div>
-          <div className="text-2xl font-bold mb-1 truncate">
-            {new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount)}
+          <div className="text-3xl font-extrabold tracking-tight drop-shadow-sm">
+             {new Intl.NumberFormat('en-US', { 
+               style: 'currency', 
+               currency,
+               maximumFractionDigits: 0 
+             }).format(amount)}
           </div>
-          <div className="text-sm opacity-80">{subtitle}</div>
+          <div className="mt-2 flex items-center gap-2 text-xs font-medium text-white/90 bg-black/10 w-fit px-3 py-1 rounded-full backdrop-blur-sm">
+            <Layers className="w-3 h-3" />
+            <span>{count} {count === 1 ? 'record' : 'records'}</span>
+          </div>
         </div>
       </div>
     </motion.div>
@@ -81,12 +129,12 @@ const DebtWidget = ({
 };
 
 // ============================================
-// DEBT CARD COMPONENT
+// REDESIGNED DEBT CARD COMPONENT
 // ============================================
 const DebtItem = ({ 
   debt, 
   onPress,
-  onDoublePress, // NEW PROP
+  onDoublePress, 
   onLongPress, 
   onDelete, 
   defaultCurrency 
@@ -98,22 +146,42 @@ const DebtItem = ({
   onDelete: () => void;
   defaultCurrency: string;
 }) => {
-  const { t } = useLocalization();
   const isIOwe = debt.type === DebtType.I_OWE;
-  const progress = debt.amount > 0 ? (debt.current_amount / debt.amount) * 100 : 0;
-  const isOverdue = debt.due_date ? new Date(debt.due_date) < new Date() : false;
-  const isNearDue = debt.due_date 
-    ? (new Date(debt.due_date).getTime() - Date.now()) < 7 * 24 * 60 * 60 * 1000 
-    : false;
-
-  const gradient = getDebtGradient(debt);
+  const totalAmount = debt.amount;
+  const currentDebt = debt.current_amount;
+  const paidAmount = totalAmount - currentDebt;
+  const progressPercent = totalAmount > 0 ? (paidAmount / totalAmount) * 100 : 0;
   
-  // --- DOUBLE TAP LOGIC ---
+  const isOverdue = debt.due_date ? new Date(debt.due_date) < new Date() : false;
+
+  // Цветовая схема
+  const theme = isIOwe ? {
+    border: 'border-red-500/60',
+    bg: 'bg-zinc-900',
+    glow: 'shadow-red-900/10',
+    iconBg: 'bg-red-500/20',
+    iconColor: 'text-red-400',
+    progressFill: 'bg-gradient-to-r from-red-500 to-orange-600',
+    progressTrack: 'bg-zinc-800',
+    amountText: 'text-red-100',
+    labelColor: 'text-red-400'
+  } : {
+    border: 'border-emerald-500/60',
+    bg: 'bg-zinc-900',
+    glow: 'shadow-emerald-900/10',
+    iconBg: 'bg-emerald-500/20',
+    iconColor: 'text-emerald-400',
+    progressFill: 'bg-gradient-to-r from-emerald-500 to-teal-500',
+    progressTrack: 'bg-zinc-800',
+    amountText: 'text-emerald-100',
+    labelColor: 'text-emerald-400'
+  };
+
+  // Обработчик двойного нажатия
   const lastTap = useRef<number>(0);
   const handleTap = () => {
       const now = Date.now();
       const DOUBLE_PRESS_DELAY = 300;
-      
       if (now - lastTap.current < DOUBLE_PRESS_DELAY) {
           onDoublePress();
       } else {
@@ -124,85 +192,91 @@ const DebtItem = ({
 
   return (
     <LongPressWrapper
-      onTap={handleTap} // Use wrapper handler
+      onTap={handleTap}
       onLongPress={onLongPress}
       onSwipeLeft={onDelete}
       swipeDeleteIcon={Trash2}
       item={debt}
     >
-      <div className={`relative overflow-hidden bg-gradient-to-br ${gradient} rounded-2xl p-4 flex flex-col gap-3 mb-3 shadow-lg`}>
-        {/* Progress Bar Background */}
-        <div 
-          className="absolute bottom-0 left-0 h-1 bg-white/30"
-          style={{ width: `${Math.min(progress, 100)}%` }}
-        />
-        
-        {/* Header */}
-        <div className="flex items-start justify-between z-10">
+      <div className={`
+        relative w-full rounded-2xl p-4 mb-3
+        border-2 ${theme.border}
+        ${theme.bg} shadow-lg ${theme.glow}
+        transition-all active:scale-[0.99]
+      `}>
+        {/* Header: Icon + Name + Date */}
+        <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
-            <div className={`p-3 rounded-xl ${isIOwe ? 'bg-red-500/20' : 'bg-emerald-500/20'}`}>
-              {isIOwe ? <ArrowDownCircle className="w-6 h-6 text-white" /> : <ArrowUpCircle className="w-6 h-6 text-white" />}
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${theme.iconBg}`}>
+               {isIOwe ? 
+                 <ArrowDownCircle className={`w-5 h-5 ${theme.iconColor}`} /> : 
+                 <ArrowUpCircle className={`w-5 h-5 ${theme.iconColor}`} />
+               }
             </div>
             <div>
-              <h3 className="text-white font-semibold text-lg">{debt.person}</h3>
-              {debt.category && (
-                <span className="text-xs text-white/70 bg-white/10 px-2 py-0.5 rounded-full">
-                  {debt.category}
-                </span>
-              )}
-            </div>
-          </div>
-          
-          {/* Status Badge */}
-          {debt.status === 'ARCHIVED' && (
-            <span className="text-xs text-white bg-white/20 px-2 py-1 rounded-full flex items-center gap-1">
-              <Archive className="w-3 h-3" />
-              Archived
-            </span>
-          )}
-        </div>
-
-        {/* Amount Info */}
-        <div className="flex items-end justify-between z-10">
-          <div>
-            <p className="text-white/80 text-xs mb-1">{isIOwe ? 'I owe' : 'Owes me'}</p>
-            <p className="font-bold text-2xl text-white">
-              {new Intl.NumberFormat('en-US', { style: 'currency', currency: debt.currency }).format(debt.current_amount)}
-            </p>
-            <p className="text-white/70 text-xs mt-0.5">
-              of {new Intl.NumberFormat('en-US', { style: 'currency', currency: debt.currency }).format(debt.amount)}
-            </p>
-          </div>
-          
-          {/* Due Date */}
-          {debt.due_date && (
-            <div className={`text-right ${isOverdue ? 'text-red-200' : isNearDue ? 'text-yellow-200' : 'text-white/70'}`}>
-              <div className="flex items-center gap-1 text-xs">
-                {isOverdue && <AlertCircle className="w-3 h-3" />}
-                <Calendar className="w-3 h-3" />
+              <h3 className="text-white font-semibold text-base leading-tight">{debt.person}</h3>
+              <div className="flex items-center gap-2 mt-0.5">
+                 {debt.category && (
+                    <span className="text-[10px] uppercase tracking-wider font-medium text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded">
+                      {debt.category}
+                    </span>
+                 )}
+                 <span className={`text-xs ${theme.labelColor}`}>
+                   {isIOwe ? 'You owe' : 'Owes you'}
+                 </span>
               </div>
-              <p className="text-xs font-medium">
-                {isOverdue ? 'Overdue' : 'Due'}
-              </p>
-              <p className="text-xs">
+            </div>
+          </div>
+
+          {debt.due_date && (
+            <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border border-white/5 ${isOverdue ? 'bg-red-500/10 text-red-400' : 'bg-zinc-800 text-zinc-400'}`}>
+              <Calendar className="w-3 h-3" />
+              <span className="text-xs font-medium">
                 {new Date(debt.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-              </p>
+              </span>
+              {isOverdue && <AlertCircle className="w-3 h-3 ml-1" />}
             </div>
           )}
         </div>
 
-        {/* Description */}
-        {debt.description && (
-          <p className="text-white/80 text-sm truncate z-10">{debt.description}</p>
-        )}
-
-        {/* Progress Percentage */}
-        <div className="flex justify-between items-center text-xs text-white/80 z-10">
-          <span>{progress.toFixed(0)}% remaining</span>
-          <span className="font-medium">
-            {new Intl.NumberFormat('en-US', { style: 'currency', currency: debt.currency }).format(debt.amount - debt.current_amount)} paid
-          </span>
+        {/* Main Amount Area - ВЫРОВНЕНО ПО ЛЕВОМУ КРАЮ (без отступа pl-[52px]) */}
+        <div className="mt-4 mb-4">
+          <div className="flex items-baseline gap-2">
+             <span className={`text-2xl font-bold tracking-tight ${theme.amountText}`}>
+               {new Intl.NumberFormat('en-US', { style: 'currency', currency: debt.currency }).format(debt.current_amount)}
+             </span>
+             <span className="text-sm text-zinc-500 font-medium">remaining</span>
+          </div>
+          {debt.description && (
+            <p className="text-zinc-500 text-xs mt-1 truncate max-w-[90%]">
+              "{debt.description}"
+            </p>
+          )}
         </div>
+
+        {/* Progress Bar Section */}
+        <div className="relative pt-1">
+          {/* Labels above bar */}
+          <div className="flex justify-between text-xs mb-1.5 px-1">
+            <span className="text-zinc-400 flex items-center gap-1">
+              <CheckCircle2 className="w-3 h-3" /> Paid: {new Intl.NumberFormat('en-US', { style: 'decimal', minimumFractionDigits: 0 }).format(paidAmount)}
+            </span>
+            <span className="text-zinc-500">
+              Total: {new Intl.NumberFormat('en-US', { style: 'decimal', minimumFractionDigits: 0 }).format(totalAmount)}
+            </span>
+          </div>
+
+          {/* The Bar */}
+          <div className={`h-2 w-full rounded-full overflow-hidden ${theme.progressTrack}`}>
+            <motion.div 
+              initial={{ width: 0 }}
+              animate={{ width: `${progressPercent}%` }}
+              transition={{ duration: 1, ease: "easeOut" }}
+              className={`h-full rounded-full ${theme.progressFill} shadow-[0_0_10px_rgba(0,0,0,0.3)]`}
+            />
+          </div>
+        </div>
+
       </div>
     </LongPressWrapper>
   );
@@ -212,36 +286,29 @@ const DebtItem = ({
 // MAIN SCREEN COMPONENT
 // ============================================
 export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
-  const { t } = useLocalization();
   const { 
     debts, 
     displayCurrency, 
     handleSaveDebt, 
     handleDeleteDebt,
-    handleAddTransaction, // NEEDED
-    handleDeleteTransaction, // NEEDED
+    handleAddTransaction, 
+    handleDeleteTransaction, 
     transactions, 
     rates,
     categories,
     accounts,
-    savingsGoals, // NEEDED for TxForm
-    budgets // NEEDED for TxForm
+    savingsGoals,
+    budgets 
   } = useAppData();
 
   const [activeTab, setActiveTab] = useState<'all' | 'owe' | 'owed' | 'archived'>('all');
   
   // --- MODAL STATES ---
   const [deleteConfirmation, setDeleteConfirmation] = useState<Debt | null>(null);
-  
-  // 1. Debt Form (Create/Edit)
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingDebt, setEditingDebt] = useState<Debt | null>(null);
-
-  // 2. History Modal (View)
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [selectedDebtForHistory, setSelectedDebtForHistory] = useState<Debt | null>(null);
-
-  // 3. Transaction Form (Pay)
   const [isTxFormOpen, setIsTxFormOpen] = useState(false);
   const [prefilledTx, setPrefilledTx] = useState<Partial<Transaction> | null>(null);
 
@@ -266,6 +333,9 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
     else if (activeTab === 'owed') filtered = owed;
     else if (activeTab === 'archived') filtered = debts.filter(d => d.status === 'ARCHIVED' || d.status === 'COMPLETED');
 
+    // Sort by creation
+    filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
     return { 
       iOweTotal: iOweSum, 
       owedTotal: owedSum, 
@@ -281,7 +351,6 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
   // HANDLERS
   // ============================================
   
-  // --- Create/Edit ---
   const handleAddNew = () => {
     setEditingDebt(null);
     setIsFormOpen(true);
@@ -296,18 +365,12 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
     handleEdit(debt);
   };
 
-  // --- History (Double Tap) ---
   const handleOpenHistory = (debt: Debt) => {
     setSelectedDebtForHistory(debt);
     setIsHistoryOpen(true);
   };
 
-  // --- Payment (Single Tap) ---
   const handleDebtPayment = (debt: Debt) => {
-    // Определяем тип транзакции:
-    // Если Я должен -> Погашение = Расход (Expense)
-    // Если Мне должны -> Погашение = Доход (Income)
-    // (Обратная логика к созданию долга)
     const isRepayment = true; 
     const type = getDebtTransactionType(debt.type, !isRepayment); 
     const category = getDebtTransactionCategory(debt.type, !isRepayment);
@@ -318,13 +381,12 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
         debtId: debt.id,
         currency: debt.currency,
         name: `Repayment: ${debt.person}`,
-        amount: 0, // Пользователь вводит сумму сам
+        amount: 0,
         date: new Date().toISOString()
     });
     setIsTxFormOpen(true);
   };
 
-  // --- Delete ---
   const handleDeleteClick = (debt: Debt) => {
     setDeleteConfirmation(debt);
   };
@@ -340,108 +402,134 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
   // RENDER
   // ============================================
   return (
-    <div className="min-h-screen bg-zinc-900 flex flex-col pb-24 relative">
+    <div className="min-h-screen bg-black flex flex-col pb-24 relative">
       {/* Header */}
-      <header className="sticky top-0 z-10 bg-zinc-900/80 backdrop-blur-md border-b border-zinc-800/50 px-4 py-4 flex items-center justify-between">
+      <header className="sticky top-0 z-20 bg-black/80 backdrop-blur-xl border-b border-white/5 px-4 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button 
             onClick={onBack} 
-            className="p-2 -ml-2 rounded-full hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors"
+            className="p-2 -ml-2 rounded-full hover:bg-white/10 text-zinc-400 hover:text-white transition-colors"
           >
             <ChevronLeft className="w-6 h-6" />
           </button>
           <div>
             <h1 className="text-xl font-bold text-white">Debts</h1>
-            <p className="text-xs text-zinc-400">Manage loans and borrowings</p>
+            <p className="text-xs text-zinc-400">Manage loans & borrowings</p>
           </div>
         </div>
         <button 
           onClick={handleAddNew} 
-          className="p-2 rounded-full bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/20 transition-all"
+          className="p-3 rounded-full bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/20 transition-all active:scale-90"
         >
-          <Plus className="w-6 h-6" />
+          <Plus className="w-5 h-5" />
         </button>
       </header>
 
-      <div className="flex-grow px-4 py-6 space-y-6 overflow-y-auto">
-        {/* Summary Widgets */}
-        <div className="space-y-4">
-          <DebtWidget 
-            title="Net Balance" 
-            subtitle={netBalance >= 0 ? "In your favor" : "You owe more"}
-            amount={Math.abs(netBalance)}
-            count={debts.filter(d => d.status === 'ACTIVE').length}
-            currency={displayCurrency}
-            type={netBalance >= 0 ? 'blue' : 'orange'}
-          />
-          <div className="grid grid-cols-2 gap-4">
-            <DebtWidget 
+      <div className="flex-grow flex flex-col space-y-6 overflow-y-auto pt-6">
+        
+        {/* CAROUSEL WIDGETS */}
+        <div className="w-full overflow-x-auto scrollbar-hide snap-x snap-mandatory px-4 pb-4">
+          <div className="flex gap-4 w-max">
+            {/* Widget 1: Net Balance */}
+            <DebtWidgetCard 
+              title="Net Balance" 
+              subtitle={netBalance >= 0 ? "Currently in your favor" : "You owe more overall"}
+              amount={Math.abs(netBalance)}
+              count={debts.filter(d => d.status === 'ACTIVE').length}
+              currency={displayCurrency}
+              type="net"
+            />
+            
+            {/* Widget 2: I Owe */}
+            <DebtWidgetCard 
               title="I Owe" 
-              subtitle="To pay"
+              subtitle="Total you need to pay"
               amount={iOweTotal}
               count={iOweCount}
               currency={displayCurrency}
-              type="red"
+              type="owe"
               onClick={() => setActiveTab('owe')}
+              active={activeTab === 'owe'}
             />
-            <DebtWidget 
+
+            {/* Widget 3: Owed to Me */}
+            <DebtWidgetCard 
               title="Owed to Me" 
-              subtitle="To receive"
+              subtitle="Expecting to receive"
               amount={owedTotal}
               count={owedCount}
               currency={displayCurrency}
-              type="green"
+              type="owed"
               onClick={() => setActiveTab('owed')}
+              active={activeTab === 'owed'}
             />
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="flex p-1 bg-zinc-800 rounded-xl">
-          {(['all', 'owe', 'owed', 'archived'] as const).map(tab => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all capitalize ${
-                activeTab === tab 
-                  ? 'bg-zinc-700 text-white shadow-md' 
-                  : 'text-zinc-400 hover:text-zinc-200'
-              }`}
-            >
-              {tab === 'all' ? 'All' : tab === 'owe' ? 'I Owe' : tab === 'owed' ? 'Owed' : 'Archive'}
-            </button>
-          ))}
+        {/* Tabs Filter (С плавной анимацией "скольжения") */}
+        <div className="px-4">
+            <div className="flex p-1 bg-zinc-900 rounded-xl border border-zinc-800 relative">
+            {(['all', 'owe', 'owed', 'archived'] as const).map(tab => {
+                const isActive = activeTab === tab;
+                return (
+                    <button
+                        key={tab}
+                        onClick={() => setActiveTab(tab)}
+                        className={`relative flex-1 py-2 text-sm font-medium rounded-lg transition-colors capitalize z-10 ${
+                            isActive ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'
+                        }`}
+                    >
+                        {isActive && (
+                            <motion.div
+                                layoutId="activeTabIndicator"
+                                className="absolute inset-0 bg-zinc-800 border border-zinc-700 rounded-lg shadow-sm -z-10"
+                                transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                            />
+                        )}
+                        {tab === 'all' ? 'All' : tab === 'owe' ? 'I Owe' : tab === 'owed' ? 'Owed' : 'Archive'}
+                    </button>
+                );
+            })}
+            </div>
         </div>
 
-        {/* List */}
-        <div className="space-y-2 pb-10">
+        {/* Debt List */}
+        <div className="px-4 space-y-1 pb-20">
+          <h2 className="text-zinc-500 text-xs font-semibold uppercase tracking-wider mb-3 px-1">
+            {activeTab === 'all' ? 'Active Debts' : `${activeTab} List`}
+          </h2>
+          
           <AnimatePresence mode="popLayout">
             {filteredDebts.length > 0 ? (
               filteredDebts.map(debt => (
                 <motion.div
                   key={debt.id}
+                  layout
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{ duration: 0.2 }}
                 >
                   <DebtItem 
                     debt={debt} 
-                    onPress={() => handleDebtPayment(debt)} // Single tap: Pay
-                    onDoublePress={() => handleOpenHistory(debt)} // Double tap: History
-                    onLongPress={() => handleDebtLongPress(debt)} // Long press: Edit
+                    onPress={() => handleDebtPayment(debt)} 
+                    onDoublePress={() => handleOpenHistory(debt)}
+                    onLongPress={() => handleDebtLongPress(debt)}
                     onDelete={() => handleDeleteClick(debt)}
                     defaultCurrency={displayCurrency}
                   />
                 </motion.div>
               ))
             ) : (
-              <div className="flex flex-col items-center justify-center py-12 text-zinc-500">
-                <Layers className="w-12 h-12 mb-3 opacity-50" />
-                <p>No debts found</p>
-                <p className="text-sm text-zinc-600 mt-1">
-                  {activeTab === 'archived' ? 'Your archive is empty' : 'Tap + to add a debt'}
-                </p>
-              </div>
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="flex flex-col items-center justify-center py-16 text-zinc-500 border border-dashed border-zinc-800 rounded-2xl bg-zinc-900/50"
+              >
+                <Wallet className="w-12 h-12 mb-3 opacity-30" />
+                <p>No active debts here</p>
+                <p className="text-xs text-zinc-600 mt-1">Everything is settled!</p>
+              </motion.div>
             )}
           </AnimatePresence>
         </div>
@@ -449,25 +537,24 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
 
       {/* ================= MODALS ================= */}
       
-      {/* 1. Debt Form (Create/Edit) */}
+      {/* Create/Edit Form */}
       <DebtForm 
         isOpen={isFormOpen} 
         onClose={() => setIsFormOpen(false)} 
         onSave={async (data) => {
-            // Если долг новый, передаем флаг создания транзакции (true) и дефолтный аккаунт
             await handleSaveDebt(
                 editingDebt ? { ...data, id: editingDebt.id } : data, 
-                !editingDebt, // Create initial tx only if new
+                !editingDebt, 
                 accounts[0]?.id
             ); 
             setIsFormOpen(false);
         }}
         debt={editingDebt}
         defaultCurrency={displayCurrency}
-        categories={['Personal', 'Family', 'Business', 'Other']} // Можно заменить на динамические категории
+        categories={['Personal', 'Work', 'Family', 'Other']} 
       />
 
-      {/* 2. History Modal */}
+      {/* History Modal */}
       <DebtHistoryModal
         isOpen={isHistoryOpen}
         onClose={() => setIsHistoryOpen(false)}
@@ -477,7 +564,7 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
         currency={selectedDebtForHistory?.currency || displayCurrency}
       />
 
-      {/* 3. Transaction Form (Payment) */}
+      {/* Transaction (Payment) Form */}
       {isTxFormOpen && prefilledTx && (
         <TransactionForm
            transaction={prefilledTx as Transaction}
@@ -495,15 +582,15 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
            }}
            onCancel={() => setIsTxFormOpen(false)}
            onCreateBudget={() => {}}
-           isCategoryLocked={true} // Блокируем категорию, так как это привязано к долгу
+           isCategoryLocked={true} 
         />
       )}
 
-      {/* 4. Delete Confirmation */}
+      {/* Delete Confirmation */}
       <ConfirmationModal
         isOpen={!!deleteConfirmation}
-        title="Delete Debt?"
-        message="This will delete the debt record. Related transactions will remain but will be unlinked."
+        title="Delete Record"
+        message="Are you sure? This will remove the debt card but keep transaction history."
         onConfirm={confirmDelete}
         onCancel={() => setDeleteConfirmation(null)}
       />
