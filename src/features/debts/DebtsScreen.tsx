@@ -16,6 +16,7 @@ import {
   Layers
 } from 'lucide-react';
 import { useAppData } from '../../core/context/AppDataContext';
+import { useLocalization } from '../../core/context/LocalizationContext'; // Импорт локализации
 import { Debt, DebtType, Transaction } from '../../core/types';
 import LongPressWrapper from '../../shared/layout/LongPressWrapper';
 import { ConfirmationModal } from '../../shared/ui/modals/ConfirmationModal';
@@ -53,6 +54,8 @@ const DebtWidgetCard = ({
   onClick?: () => void;
   active?: boolean;
 }) => {
+  const { t, language } = useLocalization(); // Хук внутри компонента
+
   // Обновленные градиенты (как в счетах)
   const styles = {
     net: {
@@ -80,6 +83,10 @@ const DebtWidgetCard = ({
 
   const currentStyle = styles[type];
   const Icon = currentStyle.icon;
+
+  // Для русского языка правильное склонение (запись/записей)
+  // В упрощенном варианте используем record/records из JSON
+  const recordLabel = count === 1 ? t('record') : t('records');
 
   return (
     <motion.div 
@@ -112,7 +119,7 @@ const DebtWidgetCard = ({
 
         <div>
           <div className="text-3xl font-extrabold tracking-tight drop-shadow-sm">
-             {new Intl.NumberFormat('en-US', { 
+             {new Intl.NumberFormat(language === 'ru' ? 'ru-RU' : 'en-US', { 
                style: 'currency', 
                currency,
                maximumFractionDigits: 0 
@@ -120,7 +127,7 @@ const DebtWidgetCard = ({
           </div>
           <div className="mt-2 flex items-center gap-2 text-xs font-medium text-white/90 bg-black/10 w-fit px-3 py-1 rounded-full backdrop-blur-sm">
             <Layers className="w-3 h-3" />
-            <span>{count} {count === 1 ? 'record' : 'records'}</span>
+            <span>{count} {recordLabel}</span>
           </div>
         </div>
       </div>
@@ -146,6 +153,7 @@ const DebtItem = ({
   onDelete: () => void;
   defaultCurrency: string;
 }) => {
+  const { t, language } = useLocalization(); // Хук
   const isIOwe = debt.type === DebtType.I_OWE;
   const totalAmount = debt.amount;
   const currentDebt = debt.current_amount;
@@ -222,7 +230,7 @@ const DebtItem = ({
                     </span>
                  )}
                  <span className={`text-xs ${theme.labelColor}`}>
-                   {isIOwe ? 'You owe' : 'Owes you'}
+                   {isIOwe ? t('youOwe') : t('owesYou')}
                  </span>
               </div>
             </div>
@@ -232,20 +240,20 @@ const DebtItem = ({
             <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border border-white/5 ${isOverdue ? 'bg-red-500/10 text-red-400' : 'bg-zinc-800 text-zinc-400'}`}>
               <Calendar className="w-3 h-3" />
               <span className="text-xs font-medium">
-                {new Date(debt.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                {new Date(debt.due_date).toLocaleDateString(language === 'ru' ? 'ru-RU' : 'en-US', { month: 'short', day: 'numeric' })}
               </span>
               {isOverdue && <AlertCircle className="w-3 h-3 ml-1" />}
             </div>
           )}
         </div>
 
-        {/* Main Amount Area - ВЫРОВНЕНО ПО ЛЕВОМУ КРАЮ (без отступа pl-[52px]) */}
+        {/* Main Amount Area */}
         <div className="mt-4 mb-4">
           <div className="flex items-baseline gap-2">
              <span className={`text-2xl font-bold tracking-tight ${theme.amountText}`}>
-               {new Intl.NumberFormat('en-US', { style: 'currency', currency: debt.currency }).format(debt.current_amount)}
+               {new Intl.NumberFormat(language === 'ru' ? 'ru-RU' : 'en-US', { style: 'currency', currency: debt.currency }).format(debt.current_amount)}
              </span>
-             <span className="text-sm text-zinc-500 font-medium">remaining</span>
+             <span className="text-sm text-zinc-500 font-medium">{t('remaining')}</span>
           </div>
           {debt.description && (
             <p className="text-zinc-500 text-xs mt-1 truncate max-w-[90%]">
@@ -259,10 +267,10 @@ const DebtItem = ({
           {/* Labels above bar */}
           <div className="flex justify-between text-xs mb-1.5 px-1">
             <span className="text-zinc-400 flex items-center gap-1">
-              <CheckCircle2 className="w-3 h-3" /> Paid: {new Intl.NumberFormat('en-US', { style: 'decimal', minimumFractionDigits: 0 }).format(paidAmount)}
+              <CheckCircle2 className="w-3 h-3" /> {t('paid')}: {new Intl.NumberFormat(language === 'ru' ? 'ru-RU' : 'en-US', { style: 'decimal', minimumFractionDigits: 0 }).format(paidAmount)}
             </span>
             <span className="text-zinc-500">
-              Total: {new Intl.NumberFormat('en-US', { style: 'decimal', minimumFractionDigits: 0 }).format(totalAmount)}
+              {t('total')}: {new Intl.NumberFormat(language === 'ru' ? 'ru-RU' : 'en-US', { style: 'decimal', minimumFractionDigits: 0 }).format(totalAmount)}
             </span>
           </div>
 
@@ -286,6 +294,8 @@ const DebtItem = ({
 // MAIN SCREEN COMPONENT
 // ============================================
 export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
+  const { t } = useLocalization(); // Хук
+
   const { 
     debts, 
     displayCurrency, 
@@ -348,6 +358,39 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
   const netBalance = owedTotal - iOweTotal;
 
   // ============================================
+  // HELPER FOR TAB LABELS
+  // ============================================
+  const getTabLabel = (tab: string) => {
+    switch(tab) {
+      case 'all': return t('all');
+      case 'owe': return t('iOwe');
+      case 'owed': return t('owedToMe'); // "owed" ключ занят под заголовок виджета, используем owedToMe для таба если нужно, или создаем отдельный
+      case 'archived': return t('archive');
+      default: return tab;
+    }
+  };
+  
+  // HACK: для табов используем сокращенные названия
+  const getTabDisplay = (tab: string) => {
+      if (tab === 'all') return t('all');
+      if (tab === 'owe') return t('iOwe');
+      if (tab === 'owed') return t('owedToMe'); // Или просто "Мне должны"
+      if (tab === 'archived') return t('archive');
+      return tab;
+  };
+
+  const getListHeader = () => {
+      switch(activeTab) {
+          case 'all': return t('activeDebts');
+          case 'owe': return t('oweList');
+          case 'owed': return t('owedList');
+          case 'archived': return t('archiveList');
+          default: return '';
+      }
+  };
+
+
+  // ============================================
   // HANDLERS
   // ============================================
   
@@ -380,7 +423,7 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
         category: category,
         debtId: debt.id,
         currency: debt.currency,
-        name: `Repayment: ${debt.person}`,
+        name: `${t('repayment') || 'Repayment'}: ${debt.person}`,
         amount: 0,
         date: new Date().toISOString()
     });
@@ -413,8 +456,8 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
             <ChevronLeft className="w-6 h-6" />
           </button>
           <div>
-            <h1 className="text-xl font-bold text-white">Debts</h1>
-            <p className="text-xs text-zinc-400">Manage loans & borrowings</p>
+            <h1 className="text-xl font-bold text-white">{t('debts')}</h1>
+            <p className="text-xs text-zinc-400">{t('debtsSubtitle')}</p>
           </div>
         </div>
         <button 
@@ -432,8 +475,8 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
           <div className="flex gap-4 w-max">
             {/* Widget 1: Net Balance */}
             <DebtWidgetCard 
-              title="Net Balance" 
-              subtitle={netBalance >= 0 ? "Currently in your favor" : "You owe more overall"}
+              title={t('netBalance')}
+              subtitle={netBalance >= 0 ? t('netPositive') : t('netNegative')}
               amount={Math.abs(netBalance)}
               count={debts.filter(d => d.status === 'ACTIVE').length}
               currency={displayCurrency}
@@ -442,8 +485,8 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
             
             {/* Widget 2: I Owe */}
             <DebtWidgetCard 
-              title="I Owe" 
-              subtitle="Total you need to pay"
+              title={t('iOwe')}
+              subtitle={t('iOweSubtitle')}
               amount={iOweTotal}
               count={iOweCount}
               currency={displayCurrency}
@@ -454,8 +497,8 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
 
             {/* Widget 3: Owed to Me */}
             <DebtWidgetCard 
-              title="Owed to Me" 
-              subtitle="Expecting to receive"
+              title={t('owedToMe')}
+              subtitle={t('owedSubtitle')}
               amount={owedTotal}
               count={owedCount}
               currency={displayCurrency}
@@ -486,7 +529,7 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
                                 transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
                             />
                         )}
-                        {tab === 'all' ? 'All' : tab === 'owe' ? 'I Owe' : tab === 'owed' ? 'Owed' : 'Archive'}
+                        {getTabDisplay(tab)}
                     </button>
                 );
             })}
@@ -496,7 +539,7 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
         {/* Debt List */}
         <div className="px-4 space-y-1 pb-20">
           <h2 className="text-zinc-500 text-xs font-semibold uppercase tracking-wider mb-3 px-1">
-            {activeTab === 'all' ? 'Active Debts' : `${activeTab} List`}
+            {getListHeader()}
           </h2>
           
           <AnimatePresence mode="popLayout">
@@ -527,8 +570,8 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
                 className="flex flex-col items-center justify-center py-16 text-zinc-500 border border-dashed border-zinc-800 rounded-2xl bg-zinc-900/50"
               >
                 <Wallet className="w-12 h-12 mb-3 opacity-30" />
-                <p>No active debts here</p>
-                <p className="text-xs text-zinc-600 mt-1">Everything is settled!</p>
+                <p>{t('noDebtsTitle')}</p>
+                <p className="text-xs text-zinc-600 mt-1">{t('noDebtsSubtitle')}</p>
               </motion.div>
             )}
           </AnimatePresence>
@@ -589,8 +632,8 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
       {/* Delete Confirmation */}
       <ConfirmationModal
         isOpen={!!deleteConfirmation}
-        title="Delete Record"
-        message="Are you sure? This will remove the debt card but keep transaction history."
+        title={t('deleteDebtTitle') || t('delete')} // Фолбек на общий delete если что
+        message={t('deleteDebtMessage')}
         onConfirm={confirmDelete}
         onCancel={() => setDeleteConfirmation(null)}
       />

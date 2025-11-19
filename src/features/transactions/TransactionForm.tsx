@@ -1,27 +1,27 @@
-// src/features/transactions/TransactionForm.tsx
-
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Transaction, TransactionType, Account, SavingsGoal, Category, Budget, ExchangeRates, Debt, DebtType 
+  Transaction, TransactionType, Account, SavingsGoal, Category, Budget, ExchangeRates, Debt, DebtType, DebtStatus 
 } from '../../core/types';
 import { 
   COMMON_CURRENCIES, 
   DEBT_SYSTEM_CATEGORIES, 
-  getDebtGradient // ADDED: Import gradient helper
+  getLocalizedCategoryName 
 } from '../../utils/constants';
 import { useLocalization } from '../../core/context/LocalizationContext';
 import { DatePicker } from '../../shared/ui/modals/DatePicker';
 import { TimePicker } from '../../shared/ui/modals/TimePicker';
 import { 
-  Calendar, Clock, ChevronDown, PlusCircle, ArrowRightLeft, 
-  ArrowDownCircle, // ADDED: Icon for widget
-  ArrowUpCircle   // ADDED: Icon for widget
+  Calendar, Clock, ChevronDown, ArrowRightLeft, 
+  ArrowDownCircle, 
+  ArrowUpCircle,
+  UserPlus,
+  Loader2 // Используем для иконки загрузки, если есть, или CSS спиннер
 } from 'lucide-react';
 import { ICONS } from '../../shared/ui/icons/icons';
 import { convertCurrency } from '../../core/services/currency';
 
-// Расширяем интерфейс, так как API возвращает "сырые" имена счетов для маппинга
+// Убрали newDebtPerson из интерфейса, так как храним отдельно
 interface DraftTransaction extends Omit<Transaction, 'id'> {
   fromAccountName?: string;
   toAccountName?: string;
@@ -32,10 +32,11 @@ interface TransactionFormProps {
   categories: Category[];
   accounts: Account[];
   savingsGoals: SavingsGoal[];
-  onConfirm: (transaction: Omit<Transaction, 'id'> | Transaction) => void;
+  // ВАЖНО: Разрешаем передачу newDebtPerson вместе с транзакцией
+  onConfirm: (transaction: (Omit<Transaction, 'id'> | Transaction) & { newDebtPerson?: string }) => Promise<void> | void;
   onCancel: () => void;
   isSavingsDeposit?: boolean;
-  isCategoryLocked?: boolean; // This prop is important for debt flow
+  isCategoryLocked?: boolean; 
   goalName?: string;
   budgets: Budget[];
   transactions: Transaction[];
@@ -45,7 +46,7 @@ interface TransactionFormProps {
   debts: Debt[];
 }
 
-const InputField = ({ label, name, value, onChange, type = 'text', required = false, inputMode, disabled = false }: { label: string, name: keyof Transaction | string, value: any, onChange: any, type?: string, required?: boolean, inputMode?: 'none' | 'text' | 'tel' | 'url' | 'email' | 'numeric' | 'decimal' | 'search', disabled?: boolean }) => (
+const InputField = ({ label, name, value, onChange, type = 'text', required = false, inputMode, disabled = false, placeholder }: { label: string, name: keyof Transaction | string, value: any, onChange: any, type?: string, required?: boolean, inputMode?: 'none' | 'text' | 'tel' | 'url' | 'email' | 'numeric' | 'decimal' | 'search', disabled?: boolean, placeholder?: string }) => (
     <div>
       <label htmlFor={name as string} className="block text-sm font-medium text-zinc-300 mb-1.5">{label}</label>
       <input
@@ -57,6 +58,7 @@ const InputField = ({ label, name, value, onChange, type = 'text', required = fa
         required={required}
         inputMode={inputMode}
         disabled={disabled}
+        placeholder={placeholder}
         className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 disabled:bg-zinc-700/50 disabled:cursor-not-allowed"
       />
     </div>
@@ -71,17 +73,24 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
   const { 
     transaction, categories, accounts, onConfirm, onCancel, 
     isSavingsDeposit, isCategoryLocked, goalName, 
-    budgets, transactions, onCreateBudget, rates, defaultCurrency, savingsGoals,
+    budgets, transactions, rates, savingsGoals,
     debts
   } = props;
   const { t, language } = useLocalization();
   
-  // Инициализация стейта
   const [formData, setFormData] = React.useState<DraftTransaction | Transaction>(transaction);
   const [amountStr, setAmountStr] = React.useState(String(transaction.amount || ''));
   const [isDatePickerOpen, setIsDatePickerOpen] = React.useState(false);
   const [isTimePickerOpen, setIsTimePickerOpen] = React.useState(false);
-  const [currencyOptions, setCurrencyOptions] = React.useState(() => {
+  const [isCreatingDebt, setIsCreatingDebt] = React.useState(false);
+  
+  // ВАЖНО: Отдельное состояние для имени должника
+  const [newDebtPerson, setNewDebtPerson] = React.useState('');
+  
+  // Состояние для блокировки повторной отправки
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const [currencyOptions] = React.useState(() => {
     const options = new Set(COMMON_CURRENCIES);
     if (transaction.currency) {
       options.add(transaction.currency);
@@ -93,11 +102,9 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
   const isSavingsTransaction = formData.category === 'Savings';
   const isTransfer = formData.type === TransactionType.TRANSFER;
 
-  // Logic to determine if we should show Debt Selector
   const isDebtRelated = useMemo(() => {
       if (isTransfer) return false;
-      // UPDATED: Also show if debtId is pre-filled (coming from DebtsScreen)
-      if (formData.debtId) return true; 
+      if (formData.debtId || isCreatingDebt) return true; 
       
       const cat = formData.category;
       return (
@@ -106,9 +113,8 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
           cat === DEBT_SYSTEM_CATEGORIES.REPAYMENT_RECEIVED ||
           cat === DEBT_SYSTEM_CATEGORIES.REPAYMENT_SENT
       );
-  }, [formData.category, formData.debtId, isTransfer]);
+  }, [formData.category, formData.debtId, isTransfer, isCreatingDebt]);
 
-  // --- ADDED: WIDGET LOGIC ---
   const selectedDebt = useMemo(() => {
       return debts.find(d => d.id === formData.debtId);
   }, [formData.debtId, debts]);
@@ -117,36 +123,32 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
       if (!selectedDebt) return null;
       
       const isIOwe = selectedDebt.type === DebtType.I_OWE;
-      const remaining = selectedDebt.current_amount;
-      const gradient = getDebtGradient(selectedDebt);
+      const total = selectedDebt.amount;
+      const current = selectedDebt.current_amount;
       
-      // Calculate projected remaining
-      let projected = remaining;
+      const progress = total > 0 ? ((total - current) / total) * 100 : 0;
+      
+      let projected = current;
       const amountVal = parseFloat(amountStr) || 0;
       
       if (amountVal > 0) {
           const amountInDebtCurrency = convertCurrency(amountVal, formData.currency, selectedDebt.currency, rates);
-          
-          // We assume this form is used for REPAYMENT (reducing the debt balance)
-          // (Creation happens in DebtForm)
-          projected = Math.max(0, remaining - amountInDebtCurrency);
+          projected = Math.max(0, current - amountInDebtCurrency);
       }
 
       return { 
           isIOwe, 
-          remaining, 
-          gradient, 
+          total,
+          current, 
           projected, 
           person: selectedDebt.person,
-          currency: selectedDebt.currency
+          currency: selectedDebt.currency,
+          progress
       };
   }, [selectedDebt, amountStr, formData.currency, rates]);
-  // --- END ADDED ---
 
-  // --- MAIN INITIALIZATION LOGIC (Your code - unchanged) ---
   React.useEffect(() => {
     const isNewTransaction = !('id' in transaction);
-    
     let newFormData = { ...transaction };
 
     if (isNewTransaction) {
@@ -186,7 +188,6 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
        newFormData.accountId = accounts[0].id;
     }
     
-    // ADDED: If debtId is pre-filled, ensure amount is 0 for user input
     if (isNewTransaction && newFormData.debtId && !newFormData.amount) {
         setAmountStr('');
     } else {
@@ -196,7 +197,6 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
     setFormData(newFormData);
 
   }, [transaction, accounts]);
-  // ---------------------------------
 
   React.useEffect(() => {
     if (isSavingsTransaction && !isTransfer) {
@@ -204,12 +204,34 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
     }
   }, [isSavingsTransaction, isTransfer]);
 
+  React.useEffect(() => {
+    if (formData.category === DEBT_SYSTEM_CATEGORIES.LENDING || formData.category === DEBT_SYSTEM_CATEGORIES.BORROWING) {
+      setIsCreatingDebt(true);
+      setFormData(prev => ({ ...prev, debtId: undefined }));
+    }
+  }, [formData.category]);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
+    
+    // ВАЖНО: Обрабатываем поле имени отдельно
+    if (name === 'newDebtPerson') {
+        setNewDebtPerson(value);
+        return;
+    }
+
     if (name === 'amount') {
       const sanitizedValue = value.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1');
       setAmountStr(sanitizedValue);
       setFormData(prev => ({ ...prev, amount: parseFloat(sanitizedValue) || 0 }));
+    } else if (name === 'debtId') {
+        if (value === 'NEW_DEBT') {
+            setIsCreatingDebt(true);
+            setFormData(prev => ({ ...prev, debtId: undefined }));
+        } else {
+            setIsCreatingDebt(false);
+            setFormData(prev => ({ ...prev, [name]: value }));
+        }
     } else {
       setFormData(prev => ({ ...prev, [name]: value }));
     }
@@ -217,44 +239,74 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
 
   const handleTypeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newType = e.target.value as TransactionType;
+    
+    let defaultCategory = '';
+    if (newType !== TransactionType.TRANSFER) {
+        const firstValidCat = categories.find(c => c.type === newType);
+        defaultCategory = firstValidCat ? firstValidCat.name : '';
+    }
+
     setFormData(prev => ({
         ...prev,
         type: newType,
-        category: newType === TransactionType.TRANSFER ? '' : (prev.category || categories[0]?.name || ''),
+        category: defaultCategory,
         toAccountId: newType === TransactionType.TRANSFER ? (prev.toAccountId || accounts.find(a => a.id !== prev.accountId)?.id) : undefined
     }));
   };
   
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+
     if (isTransfer && formData.accountId === formData.toAccountId) {
         alert(language === 'ru' ? "Счета списания и зачисления должны отличаться" : "Source and destination accounts must be different");
         return;
     }
 
-    // Validation for debt
-    if (isDebtRelated && !formData.debtId) {
+    if (isDebtRelated && !isCreatingDebt && !formData.debtId) {
         alert("Please select a debt record for this transaction.");
         return;
     }
-    
-    // Очищаем временные поля перед отправкой
-    const finalData = { ...formData };
-    delete (finalData as any).fromAccountName;
-    delete (finalData as any).toAccountName;
 
-    onConfirm(finalData);
+    if (isCreatingDebt && !newDebtPerson.trim()) {
+        alert(language === 'ru' ? "Введите имя человека" : "Please enter person name");
+        return;
+    }
+    
+    setIsSubmitting(true);
+
+    try {
+        const finalData = { ...formData };
+        delete (finalData as any).fromAccountName;
+        delete (finalData as any).toAccountName;
+        
+        // ДОБАВЛЕНО: Удаляем savingsGoalName перед отправкой
+        delete (finalData as any).savingsGoalName; 
+
+        if (isCreatingDebt) {
+            await onConfirm({ ...finalData, newDebtPerson: newDebtPerson });
+        } else {
+            await onConfirm(finalData);
+        }
+    } catch (error) {
+        console.error("Error submitting transaction:", error);
+        setIsSubmitting(false);
+        alert(language === 'ru' ? "Ошибка сохранения. Попробуйте снова." : "Error saving. Please try again.");
+    }
   };
   
-  const allCategoryNames = useMemo(() => {
-      const categoryNameSet = new Set(categories.map(c => c.name));
-      if(formData.category) {
-        categoryNameSet.add(formData.category);
-      }
-      return Array.from(categoryNameSet).sort();
-  }, [categories, formData.category]);
+  const sortedCategoryNames = useMemo(() => {
+      const filtered = categories.filter(c => c.type === formData.type);
+      const uniqueNames = Array.from(new Set(filtered.map(c => c.name)));
+      
+      return uniqueNames.sort((a:string, b:string) => {
+          const nameA = getLocalizedCategoryName(a, language);
+          const nameB = getLocalizedCategoryName(b, language);
+          return nameA.localeCompare(nameB, language === 'ru' ? 'ru' : 'en');
+      });
+  }, [categories, formData.type, language]);
 
-  // (Your budgetInfo logic - unchanged)
+
   const budgetInfo = useMemo(() => {
     if (!formData.category || formData.type === TransactionType.INCOME || isTransfer) return null;
     const transactionDate = new Date(formData.date); 
@@ -270,25 +322,10 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
     }
   }, [formData.category, formData.date, formData.type, formData.amount, formData.currency, budgets, transactions, rates, transaction, isTransfer]);
 
-  // (Your savingsGoalInfo logic - unchanged)
-  const savingsGoalInfo = useMemo(() => {
-    if (!formData.goalId || !isSavingsTransaction || isTransfer) return null;
-    const selectedGoal = savingsGoals.find(g => g.id === formData.goalId);
-    if (!selectedGoal) return null;
-    let baseAmount = selectedGoal.currentAmount;
-    const originalTransaction = 'id' in transaction ? transaction : null;
-    if (originalTransaction && originalTransaction.goalId === selectedGoal.id && originalTransaction.type === TransactionType.EXPENSE) { const originalAmountInGoalCurrency = convertCurrency(originalTransaction.amount, originalTransaction.currency, selectedGoal.currency, rates); baseAmount -= originalAmountInGoalCurrency; }
-    const currentFormAmountInGoalCurrency = convertCurrency(formData.amount, formData.currency, selectedGoal.currency, rates);
-    const totalAmountWithCurrent = baseAmount + currentFormAmountInGoalCurrency;
-    return { goal: selectedGoal, baseAmount: Math.max(0, baseAmount), progress: selectedGoal.targetAmount > 0 ? (totalAmountWithCurrent / selectedGoal.targetAmount) * 100 : 0 };
-  }, [formData.goalId, formData.amount, formData.currency, isSavingsTransaction, savingsGoals, rates, transaction, isTransfer]);
-
-  // (Your formatCurrencyLocal logic - unchanged)
   const formatCurrencyLocal = (amount: number, currency: string) => {
     return new Intl.NumberFormat(language, { style: 'currency', currency: currency, minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(amount);
   };
 
-  // (Your safeDate logic - unchanged)
   const safeDate = useMemo(() => {
     try { const d = new Date(formData.date); if (isNaN(d.getTime())) return new Date(); return d; } catch (e) { return new Date(); }
   }, [formData.date]);
@@ -300,7 +337,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center z-50 p-4"
-        onClick={onCancel}
+        onClick={!isSubmitting ? onCancel : undefined} // Блокируем закрытие по клику на фон при отправке
       >
         <motion.div
           initial={{ opacity: 0, y: 10, scale: 0.98 }}
@@ -314,268 +351,322 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
             <div className="flex items-center gap-3">
                 {isTransfer && <div className="p-2 bg-blue-500/20 rounded-full"><ArrowRightLeft className="w-5 h-5 text-blue-400"/></div>}
                 <h2 className="text-xl font-semibold text-white tracking-tight">
-                    {/* UPDATED: Title changes if it's a debt payment */}
                     {isSavingsDeposit ? `Add to "${goalName}"` : 
                      isEditing ? t('editTransaction') : 
                      isTransfer ? (language === 'ru' ? 'Новый перевод' : 'New Transfer') : 
-                     isDebtRelated ? (language === 'ru' ? 'Погашение долга' : 'Debt Repayment') :
+                     isDebtRelated ? (isCreatingDebt ? (language === 'ru' ? 'Новый долг' : 'New Debt') : (language === 'ru' ? 'Операция с долгом' : 'Debt Transaction')) :
                      t('confirmTransaction')}
                 </h2>
             </div>
           </div>
 
           <form onSubmit={handleSubmit} className="overflow-y-auto">
-            <div className="px-6 py-6 space-y-4">
+            <fieldset disabled={isSubmitting} className="contents"> {/* Блокируем все поля ввода при отправке */}
+                <div className="px-6 py-6 space-y-4">
 
-              {/* --- ADDED: DEBT WIDGET CARD --- */}
-              <AnimatePresence>
-                {debtWidgetData && (
-                   <motion.div 
-                     layout
-                     initial={{ opacity: 0, height: 0, y: -10 }} 
-                     animate={{ opacity: 1, height: 'auto', y: 0 }} 
-                     exit={{ opacity: 0, height: 0, y: -10 }}
-                     transition={{ duration: 0.3, ease: 'easeInOut' }}
-                     className={`rounded-2xl p-4 mb-2 bg-gradient-to-br ${debtWidgetData.gradient} shadow-lg overflow-hidden relative`}
-                   >
-                       <div className="relative z-10 flex justify-between items-start">
-                           <div className="flex items-center gap-3">
-                               <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm">
-                                   {debtWidgetData.isIOwe ? 
-                                      <ArrowDownCircle className="w-6 h-6 text-white"/> : 
-                                      <ArrowUpCircle className="w-6 h-6 text-white"/>
-                                   }
-                               </div>
-                               <div>
-                                   <p className="text-white/80 text-xs uppercase tracking-wider font-medium">
-                                       {debtWidgetData.isIOwe ? (language === 'ru' ? 'Возврат долга' : 'Paying back to') : (language === 'ru' ? 'Получение долга' : 'Receiving from')}
-                                   </p>
-                                   <p className="text-white font-bold text-lg leading-tight">{debtWidgetData.person}</p>
-                               </div>
-                           </div>
-                           <div className="text-right flex-shrink-0 pl-2">
-                               <p className="text-white/70 text-xs">Remaining</p>
-                               <p className="text-white font-bold text-xl">
-                                   {formatCurrencyLocal(debtWidgetData.remaining, debtWidgetData.currency)}
-                               </p>
-                           </div>
-                       </div>
-                       {/* Projected Balance */}
-                       <AnimatePresence>
-                        {parseFloat(amountStr) > 0 && (
-                            <motion.div 
-                                initial={{ opacity: 0, height: 0, y: -5 }}
-                                animate={{ opacity: 1, height: 'auto', y: 0 }}
-                                exit={{ opacity: 0, height: 0, y: -5 }}
-                                className="mt-3 pt-3 border-t border-white/20 flex justify-between items-center text-xs text-white"
-                            >
-                               <span>{language === 'ru' ? 'Останется после' : 'Projected balance'}:</span>
-                               <span className="font-bold bg-white/20 px-2 py-0.5 rounded-full">
-                                   {formatCurrencyLocal(debtWidgetData.projected, debtWidgetData.currency)}
-                               </span>
-                            </motion.div>
-                        )}
-                       </AnimatePresence>
-                   </motion.div>
-                )}
-              </AnimatePresence>
-              {/* --- END ADDED --- */}
-              
-              {/* TYPE SELECTION (Your code - unchanged) */}
-              <div>
-                <label htmlFor="type" className="block text-sm font-medium text-zinc-300 mb-1.5">{t('type')}</label>
-                <div className="relative">
-                  <select
-                    id="type"
-                    name="type"
-                    value={formData.type}
-                    onChange={handleTypeChange}
-                    disabled={isSavingsDeposit || isDebtRelated} // UPDATED: Disable if debt is related (flow is fixed)
-                    className="appearance-none w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 pr-10 disabled:bg-zinc-700/50 disabled:cursor-not-allowed"
-                  >
-                    <option value={TransactionType.EXPENSE}>{t('expense')}</option>
-                    <option value={TransactionType.INCOME}>{t('income')}</option>
-                    <option value={TransactionType.TRANSFER}>{language === 'ru' ? 'Перевод' : 'Transfer'}</option>
-                  </select>
-                  <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 pointer-events-none" />
-                </div>
-              </div>
-
-              {/* FROM ACCOUNT (Your code - unchanged) */}
-              <div>
-                <label htmlFor="accountId" className="block text-sm font-medium text-zinc-300 mb-1.5">
-                    {isTransfer ? (language === 'ru' ? 'Списать со счета' : 'From Account') : t('account')}
-                </label>
-                <div className="relative">
-                  <select id="accountId" name="accountId" value={formData.accountId || ''} onChange={handleChange} required className="appearance-none w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 pr-10">
-                    {accounts.map((acc) => (
-                      <option key={acc.id} value={acc.id}>
-                        {acc.name} ({acc.currency})
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 pointer-events-none" />
-                </div>
-              </div>
-
-              {/* TO ACCOUNT (ONLY FOR TRANSFER) (Your code - unchanged) */}
-              <AnimatePresence>
-                  {isTransfer && (
-                      <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
-                          <div className="mb-4">
-                            <label htmlFor="toAccountId" className="block text-sm font-medium text-zinc-300 mb-1.5">{language === 'ru' ? 'Зачислить на счет' : 'To Account'}</label>
-                            <div className="relative">
-                            <select id="toAccountId" name="toAccountId" value={formData.toAccountId || ''} onChange={handleChange} required={isTransfer} className="appearance-none w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 pr-10">
-                                <option value="" disabled>{language === 'ru' ? 'Выберите счет' : 'Select Account'}</option>
-                                {accounts.filter(acc => acc.id !== formData.accountId).map((acc) => (<option key={acc.id} value={acc.id}>{acc.name} ({acc.currency})</option>))}
-                            </select>
-                            <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 pointer-events-none" />
-                            </div>
-                        </div>
-                      </motion.div>
-                  )}
-              </AnimatePresence>
-
-              {/* Name, Amount, Currency (Your code - unchanged) */}
-              <InputField label={t('name')} name="name" value={formData.name} onChange={handleChange} required disabled={isSavingsDeposit} />
-              <div className="grid grid-cols-2 gap-4">
-                <InputField label={t('amount')} name="amount" value={amountStr} onChange={handleChange} type="text" inputMode="decimal" required />
+                {/* TYPE SELECTION */}
                 <div>
-                  <label htmlFor="currency" className="block text-sm font-medium text-zinc-300 mb-1.5">{t('currency')}</label>
-                  <div className="relative">
-                    <select id="currency" name="currency" value={formData.currency} onChange={handleChange} required className="appearance-none w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 pr-10">
-                      {currencyOptions.map((c) => (<option key={c} value={c}>{c}</option>))}
+                    <label htmlFor="type" className="block text-sm font-medium text-zinc-300 mb-1.5">{t('type')}</label>
+                    <div className="relative">
+                    <select
+                        id="type"
+                        name="type"
+                        value={formData.type}
+                        onChange={handleTypeChange}
+                        disabled={isSavingsDeposit || isSubmitting} 
+                        className="appearance-none w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 pr-10 disabled:bg-zinc-700/50 disabled:cursor-not-allowed"
+                    >
+                        <option value={TransactionType.EXPENSE}>{t('expense')}</option>
+                        <option value={TransactionType.INCOME}>{t('income')}</option>
+                        <option value={TransactionType.TRANSFER}>{language === 'ru' ? 'Перевод' : 'Transfer'}</option>
                     </select>
                     <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 pointer-events-none" />
-                  </div>
+                    </div>
                 </div>
-              </div>
-              
-              {/* CATEGORY (HIDDEN FOR TRANSFER) (Your code - unchanged) */}
-              {!isTransfer && (
-                  <div>
-                      <label htmlFor="category" className="block text-sm font-medium text-zinc-300 mb-1.5">{t('category')}</label>
-                      <div className="relative">
-                        <select
-                          id="category"
-                          name="category"
-                          value={formData.category}
-                          onChange={handleChange}
-                          required={!isTransfer}
-                          disabled={isSavingsDeposit || isCategoryLocked} // isCategoryLocked is used here
-                          className="appearance-none w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 pr-10 disabled:bg-zinc-700/50 disabled:cursor-not-allowed"
-                        >
-                          {allCategoryNames.map((c) => (
-                            <option key={c} value={c}>
-                              {c}
-                            </option>
-                          ))}
-                        </select>
-                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 pointer-events-none" />
-                      </div>
-                  </div>
-              )}
 
-              {/* DEBT SELECTOR (Your code - slightly modified) */}
-               <AnimatePresence>
-                {isDebtRelated && !isTransfer && (
-                    <motion.div initial={{ opacity: 0, height: 0, y: -10 }} animate={{ opacity: 1, height: 'auto', y: 0 }} exit={{ opacity: 0, height: 0, y: -10 }} className="overflow-hidden">
-                        <div className="pt-2">
-                            <label htmlFor="debtId" className="block text-sm font-medium text-zinc-300 mb-1.5">Related Debt *</label>
-                            <div className="relative">
-                                <select
-                                    id="debtId"
-                                    name="debtId"
-                                    value={formData.debtId || ''}
-                                    onChange={handleChange}
-                                    required
-                                    disabled={isCategoryLocked} // UPDATED: Use the prop
-                                    className="appearance-none w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 pr-10 disabled:bg-zinc-700/50 disabled:cursor-not-allowed"
-                                >
-                                    <option value="" disabled>Select Debt</option>
-                                    {/* UPDATED: Show only active debts and more info */}
-                                    {debts.filter(d => d.status === 'ACTIVE').map((d) => (
-                                        <option key={d.id} value={d.id}>
-                                            {d.person} ({formatCurrencyLocal(d.current_amount, d.currency)})
-                                        </option>
-                                    ))}
+                {/* FROM ACCOUNT */}
+                <div>
+                    <label htmlFor="accountId" className="block text-sm font-medium text-zinc-300 mb-1.5">
+                        {isTransfer ? (language === 'ru' ? 'Списать со счета' : 'From Account') : t('account')}
+                    </label>
+                    <div className="relative">
+                    <select id="accountId" name="accountId" value={formData.accountId || ''} onChange={handleChange} required className="appearance-none w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 pr-10 disabled:bg-zinc-700/50">
+                        {accounts.map((acc) => (
+                        <option key={acc.id} value={acc.id}>
+                            {acc.name} ({acc.currency})
+                        </option>
+                        ))}
+                    </select>
+                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 pointer-events-none" />
+                    </div>
+                </div>
+
+                {/* TO ACCOUNT (ONLY FOR TRANSFER) */}
+                <AnimatePresence>
+                    {isTransfer && (
+                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                            <div className="mb-4">
+                                <label htmlFor="toAccountId" className="block text-sm font-medium text-zinc-300 mb-1.5">{language === 'ru' ? 'Зачислить на счет' : 'To Account'}</label>
+                                <div className="relative">
+                                <select id="toAccountId" name="toAccountId" value={formData.toAccountId || ''} onChange={handleChange} required={isTransfer} className="appearance-none w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 pr-10 disabled:bg-zinc-700/50">
+                                    <option value="" disabled>{language === 'ru' ? 'Выберите счет' : 'Select Account'}</option>
+                                    {accounts.filter(acc => acc.id !== formData.accountId).map((acc) => (<option key={acc.id} value={acc.id}>{acc.name} ({acc.currency})</option>))}
                                 </select>
                                 <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 pointer-events-none" />
-                            </div>
-                        </div>
-                    </motion.div>
-                )}
-               </AnimatePresence>
-
-               {/* SAVINGS SELECTOR (Your code - unchanged) */}
-               <AnimatePresence>
-                {isSavingsTransaction && !isTransfer && (
-                    <motion.div initial={{ opacity: 0, height: 0, y: -10 }} animate={{ opacity: 1, height: 'auto', y: 0 }} exit={{ opacity: 0, height: 0, y: -10 }} className="overflow-hidden">
-                        <div className="pt-2">
-                            <label htmlFor="goalId" className="block text-sm font-medium text-zinc-300 mb-1.5">{t('savingsGoal')}</label>
-                            <div className="relative">
-                                <select id="goalId" name="goalId" value={formData.goalId || ''} onChange={handleChange} required disabled={isSavingsDeposit} className="appearance-none w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-brand-purple focus:border-transparent transition-all duration-200 pr-10 disabled:bg-zinc-700/50 disabled:cursor-not-allowed">
-                                    <option value="" disabled>{t('selectGoal')}</option>
-                                    {savingsGoals.map((goal) => (<option key={goal.id} value={goal.id}>{goal.name}</option>))}
-                                </select>
-                                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 pointer-events-none" />
-                            </div>
-                        </div>
-                    </motion.div>
-                )}
-               </AnimatePresence>
-              
-               {/* BUDGET WIDGET (Your code - unchanged) */}
-               <AnimatePresence>
-                    {budgetInfo && !isSavingsTransaction && !isTransfer && (
-                        <motion.div layout initial={{ opacity: 0, height: 0, y: -10 }} animate={{ opacity: 1, height: 'auto', y: 0 }} exit={{ opacity: 0, height: 0, y: -10 }} transition={{ duration: 0.3, ease: 'easeInOut' }} className="overflow-hidden">
-                            {budgetInfo.type === 'exists' && (
-                                <div className="mt-2 bg-zinc-800 p-3 rounded-xl border border-zinc-700/50 space-y-2">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 flex-shrink-0 flex items-center justify-center bg-zinc-700 rounded-lg"><IconDisplay name={budgetInfo.budget.icon} className="w-5 h-5 text-white" /></div>
-                                        <div className="flex-grow min-w-0">
-                                            <p className="text-sm font-medium text-white truncate">{budgetInfo.budget.category} Budget</p>
-                                            <p className="text-xs text-zinc-400">{formatCurrencyLocal(budgetInfo.spent, budgetInfo.budget.currency)} of {formatCurrencyLocal(budgetInfo.budget.limit, budgetInfo.budget.currency)}</p>
-                                        </div>
-                                    </div>
-                                    <div className="w-full bg-zinc-700 rounded-full h-1.5"><div className={`h-1.5 rounded-full ${budgetInfo.progress > 85 ? 'bg-red-500' : 'bg-brand-blue'}`} style={{ width: `${Math.min(budgetInfo.progress, 100)}%` }} /></div>
                                 </div>
-                            )}
+                            </div>
                         </motion.div>
                     )}
                 </AnimatePresence>
 
-              {/* DATE/TIME PICKERS (Your code - unchanged) */}
-              <div className="grid grid-cols-5 gap-4">
-                <div className="col-span-3">
-                  <label htmlFor="date-button" className="block text-sm font-medium text-zinc-300 mb-1.5">{t('date')}</label>
-                  <button type="button" id="date-button" onClick={() => setIsDatePickerOpen(true)} className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white text-left flex justify-between items-center focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200">
-                    <span>{safeDate.toLocaleDateString(language === 'ru' ? 'ru-RU' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
-                    <Calendar className="w-5 h-5 text-zinc-400" />
-                  </button>
+                <InputField label={t('name')} name="name" value={formData.name} onChange={handleChange} required disabled={isSavingsDeposit || isSubmitting} />
+                <div className="grid grid-cols-2 gap-4">
+                    <InputField label={t('amount')} name="amount" value={amountStr} onChange={handleChange} type="text" inputMode="decimal" required disabled={isSubmitting} />
+                    <div>
+                    <label htmlFor="currency" className="block text-sm font-medium text-zinc-300 mb-1.5">{t('currency')}</label>
+                    <div className="relative">
+                        <select id="currency" name="currency" value={formData.currency} onChange={handleChange} required className="appearance-none w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 pr-10 disabled:bg-zinc-700/50">
+                        {currencyOptions.map((c) => (<option key={c} value={c}>{c}</option>))}
+                        </select>
+                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 pointer-events-none" />
+                    </div>
+                    </div>
                 </div>
-                <div className="col-span-2">
-                  <label htmlFor="time-button" className="block text-sm font-medium text-zinc-300 mb-1.5">{t('time')}</label>
-                  <button type="button" id="time-button" onClick={() => setIsTimePickerOpen(true)} className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white text-left flex justify-between items-center focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200">
-                    <span>{safeDate.toTimeString().slice(0, 5)}</span>
-                    <Clock className="w-5 h-5 text-zinc-400" />
-                  </button>
+                
+                {/* CATEGORY */}
+                {!isTransfer && (
+                    <div>
+                        <label htmlFor="category" className="block text-sm font-medium text-zinc-300 mb-1.5">{t('category')}</label>
+                        <div className="relative">
+                            <select
+                            id="category"
+                            name="category"
+                            value={formData.category}
+                            onChange={handleChange}
+                            required={!isTransfer}
+                            disabled={isSavingsDeposit || isCategoryLocked || isSubmitting} 
+                            className="appearance-none w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 pr-10 disabled:bg-zinc-700/50 disabled:cursor-not-allowed"
+                            >
+                            {sortedCategoryNames.map((c) => (
+                                <option key={c} value={c}>
+                                {getLocalizedCategoryName(c, language)}
+                                </option>
+                            ))}
+                            </select>
+                            <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 pointer-events-none" />
+                        </div>
+                    </div>
+                )}
+
+                {/* DEBT SELECTOR OR NEW DEBT INPUT */}
+                <AnimatePresence>
+                    {isDebtRelated && !isTransfer && (
+                        <motion.div initial={{ opacity: 0, height: 0, y: -10 }} animate={{ opacity: 1, height: 'auto', y: 0 }} exit={{ opacity: 0, height: 0, y: -10 }} className="overflow-hidden">
+                            <div className="pt-2">
+                                <label htmlFor="debtId" className="block text-sm font-medium text-zinc-300 mb-1.5">
+                                    {isCreatingDebt ? (language === 'ru' ? 'Имя человека' : 'Person Name') : (language === 'ru' ? 'Связанный долг *' : 'Related Debt *')}
+                                </label>
+                                
+                                {isCreatingDebt ? (
+                                    <div className="relative">
+                                        <input
+                                            type="text"
+                                            name="newDebtPerson"
+                                            // ВАЖНО: Привязываем к отдельному стейту
+                                            value={newDebtPerson}
+                                            onChange={handleChange}
+                                            placeholder={language === 'ru' ? "Кому / От кого" : "Person Name"}
+                                            required
+                                            disabled={isSubmitting}
+                                            className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 pl-10 disabled:bg-zinc-700/50"
+                                        />
+                                        <UserPlus className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 pointer-events-none" />
+                                        
+                                        {/* Кнопка отмены создания нового, если категория позволяет */}
+                                        {!(formData.category === DEBT_SYSTEM_CATEGORIES.LENDING || formData.category === DEBT_SYSTEM_CATEGORIES.BORROWING) && (
+                                            <button 
+                                                type="button" 
+                                                onClick={() => { setIsCreatingDebt(false); setNewDebtPerson(''); setFormData(p => ({...p, debtId: ''}))}}
+                                                disabled={isSubmitting}
+                                                className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-blue-400 hover:text-blue-300 px-2 py-1 disabled:opacity-50"
+                                            >
+                                                {language === 'ru' ? 'Выбрать' : 'Select'}
+                                            </button>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="relative">
+                                        <select
+                                            id="debtId"
+                                            name="debtId"
+                                            value={formData.debtId || ''}
+                                            onChange={handleChange}
+                                            required={!isCreatingDebt}
+                                            disabled={isCategoryLocked || isSubmitting} 
+                                            className="appearance-none w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 pr-10 disabled:bg-zinc-700/50 disabled:cursor-not-allowed"
+                                        >
+                                            <option value="" disabled>{language === 'ru' ? 'Выберите долг' : 'Select Debt'}</option>
+                                            <option value="NEW_DEBT" className="text-blue-400 font-semibold">
+                                                + {language === 'ru' ? 'Создать новый долг' : 'Create New Debt'}
+                                            </option>
+                                            <optgroup label={language === 'ru' ? 'Активные долги' : 'Active Debts'}>
+                                                {debts.filter(d => d.status === DebtStatus.ACTIVE).map((d) => (
+                                                    <option key={d.id} value={d.id}>
+                                                        {d.person} ({formatCurrencyLocal(d.current_amount, d.currency)})
+                                                    </option>
+                                                ))}
+                                            </optgroup>
+                                        </select>
+                                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 pointer-events-none" />
+                                    </div>
+                                )}
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
+                {/* WIDGET: DEBT CARD (Moved here from above) */}
+                <AnimatePresence>
+                    {debtWidgetData && !isCreatingDebt && (
+                    <motion.div 
+                        layout
+                        initial={{ opacity: 0, height: 0, y: -10 }} 
+                        animate={{ opacity: 1, height: 'auto', y: 0 }} 
+                        exit={{ opacity: 0, height: 0, y: -10 }}
+                        transition={{ duration: 0.3, ease: 'easeInOut' }}
+                        className={`mt-4 rounded-2xl p-4 border relative overflow-hidden ${
+                            debtWidgetData.isIOwe 
+                                ? 'bg-red-500/10 border-red-500/30' 
+                                : 'bg-green-500/10 border-green-500/30'
+                        }`}
+                    >
+                        <div className="relative z-10">
+                            <div className="flex items-start justify-between mb-3">
+                                <div className="flex items-center gap-3">
+                                    <div className={`p-2 rounded-xl backdrop-blur-sm ${
+                                        debtWidgetData.isIOwe ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'
+                                    }`}>
+                                        {debtWidgetData.isIOwe ? <ArrowDownCircle className="w-6 h-6"/> : <ArrowUpCircle className="w-6 h-6"/>}
+                                    </div>
+                                    <div>
+                                        <p className={`text-xs uppercase tracking-wider font-medium ${
+                                                debtWidgetData.isIOwe ? 'text-red-300' : 'text-green-300'
+                                        }`}>
+                                            {debtWidgetData.isIOwe ? (language === 'ru' ? 'Я должен' : 'I Owe') : (language === 'ru' ? 'Мне должны' : 'Owed to Me')}
+                                        </p>
+                                        <p className="text-white font-bold text-lg leading-tight">{debtWidgetData.person}</p>
+                                    </div>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-zinc-400 text-xs">{language === 'ru' ? 'Остаток' : 'Remaining'}</p>
+                                    <p className="text-white font-bold text-lg">
+                                        {formatCurrencyLocal(debtWidgetData.current, debtWidgetData.currency)}
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Progress Bar */}
+                            <div className="space-y-2">
+                                    <div className="w-full bg-black/20 rounded-full h-2.5 overflow-hidden">
+                                        <div
+                                            className={`h-2.5 rounded-full transition-all duration-500 ease-out ${
+                                                debtWidgetData.isIOwe ? 'bg-red-500' : 'bg-green-500'
+                                            }`}
+                                            style={{ width: `${Math.min(100, ((debtWidgetData.total - debtWidgetData.current) / debtWidgetData.total) * 100)}%` }}
+                                        ></div>
+                                    </div>
+                                    <div className="flex justify-between items-center text-xs text-zinc-400">
+                                        <span>{language === 'ru' ? 'Всего: ' : 'Total: '}{formatCurrencyLocal(debtWidgetData.total, debtWidgetData.currency)}</span>
+                                        {parseFloat(amountStr) > 0 && (
+                                            <span className="text-white font-medium flex items-center gap-1">
+                                                <span>→</span>
+                                                {formatCurrencyLocal(debtWidgetData.projected, debtWidgetData.currency)}
+                                            </span>
+                                        )}
+                                    </div>
+                            </div>
+                        </div>
+                    </motion.div>
+                    )}
+                </AnimatePresence>
+
+                {/* SAVINGS SELECTOR */}
+                <AnimatePresence>
+                    {isSavingsTransaction && !isTransfer && (
+                        <motion.div initial={{ opacity: 0, height: 0, y: -10 }} animate={{ opacity: 1, height: 'auto', y: 0 }} exit={{ opacity: 0, height: 0, y: -10 }} className="overflow-hidden">
+                            <div className="pt-2">
+                                <label htmlFor="goalId" className="block text-sm font-medium text-zinc-300 mb-1.5">{t('savingsGoal')}</label>
+                                <div className="relative">
+                                    <select id="goalId" name="goalId" value={formData.goalId || ''} onChange={handleChange} required disabled={isSavingsDeposit || isSubmitting} className="appearance-none w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-brand-purple focus:border-transparent transition-all duration-200 pr-10 disabled:bg-zinc-700/50 disabled:cursor-not-allowed">
+                                        <option value="" disabled>{t('selectGoal')}</option>
+                                        {savingsGoals.map((goal) => (<option key={goal.id} value={goal.id}>{goal.name}</option>))}
+                                    </select>
+                                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 pointer-events-none" />
+                                </div>
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+                
+                {/* BUDGET WIDGET */}
+                <AnimatePresence>
+                        {budgetInfo && !isSavingsTransaction && !isTransfer && (
+                            <motion.div layout initial={{ opacity: 0, height: 0, y: -10 }} animate={{ opacity: 1, height: 'auto', y: 0 }} exit={{ opacity: 0, height: 0, y: -10 }} transition={{ duration: 0.3, ease: 'easeInOut' }} className="overflow-hidden">
+                                {budgetInfo.type === 'exists' && (
+                                    <div className="mt-2 bg-zinc-800 p-3 rounded-xl border border-zinc-700/50 space-y-2">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 flex-shrink-0 flex items-center justify-center bg-zinc-700 rounded-lg"><IconDisplay name={budgetInfo.budget.icon} className="w-5 h-5 text-white" /></div>
+                                            <div className="flex-grow min-w-0">
+                                                <p className="text-sm font-medium text-white truncate">{budgetInfo.budget.category} Budget</p>
+                                                <p className="text-xs text-zinc-400">{formatCurrencyLocal(budgetInfo.spent, budgetInfo.budget.currency)} of {formatCurrencyLocal(budgetInfo.budget.limit, budgetInfo.budget.currency)}</p>
+                                            </div>
+                                        </div>
+                                        <div className="w-full bg-zinc-700 rounded-full h-1.5"><div className={`h-1.5 rounded-full ${budgetInfo.progress > 85 ? 'bg-red-500' : 'bg-brand-blue'}`} style={{ width: `${Math.min(budgetInfo.progress, 100)}%` }} /></div>
+                                    </div>
+                                )}
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
+                <div className="grid grid-cols-5 gap-4">
+                    <div className="col-span-3">
+                    <label htmlFor="date-button" className="block text-sm font-medium text-zinc-300 mb-1.5">{t('date')}</label>
+                    <button type="button" disabled={isSubmitting} id="date-button" onClick={() => setIsDatePickerOpen(true)} className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white text-left flex justify-between items-center focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 disabled:bg-zinc-700/50">
+                        <span>{safeDate.toLocaleDateString(language === 'ru' ? 'ru-RU' : 'en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                        <Calendar className="w-5 h-5 text-zinc-400" />
+                    </button>
+                    </div>
+                    <div className="col-span-2">
+                    <label htmlFor="time-button" className="block text-sm font-medium text-zinc-300 mb-1.5">{t('time')}</label>
+                    <button type="button" disabled={isSubmitting} id="time-button" onClick={() => setIsTimePickerOpen(true)} className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white text-left flex justify-between items-center focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 disabled:bg-zinc-700/50">
+                        <span>{safeDate.toTimeString().slice(0, 5)}</span>
+                        <Clock className="w-5 h-5 text-zinc-400" />
+                    </button>
+                    </div>
                 </div>
-              </div>
 
-              {/* DESCRIPTION (Your code - unchanged) */}
-              <div>
-                <label htmlFor="description" className="block text-sm font-medium text-zinc-300 mb-1.5">{t('descriptionOptional')}</label>
-                <textarea id="description" name="description" value={formData.description || ''} onChange={handleChange} rows={2} className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 resize-none" />
-              </div>
-            </div>
+                <div>
+                    <label htmlFor="description" className="block text-sm font-medium text-zinc-300 mb-1.5">{t('descriptionOptional')}</label>
+                    <textarea id="description" name="description" value={formData.description || ''} onChange={handleChange} rows={2} disabled={isSubmitting} className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 resize-none disabled:bg-zinc-700/50" />
+                </div>
+                </div>
+            </fieldset>
 
-            {/* FOOTER (Your code - unchanged) */}
             <div className="sticky bottom-0 bg-zinc-900/95 backdrop-blur-xl px-6 py-4 border-t border-zinc-800/60 flex items-center justify-end space-x-3 flex-shrink-0">
-              <button type="button" onClick={onCancel} className="px-5 py-2.5 text-zinc-300 hover:text-white text-sm font-medium rounded-xl hover:bg-zinc-800 active:scale-95 transition-all duration-200">
+              <button 
+                type="button" 
+                onClick={onCancel} 
+                disabled={isSubmitting}
+                className="px-5 py-2.5 text-zinc-300 hover:text-white text-sm font-medium rounded-xl hover:bg-zinc-800 active:scale-95 transition-all duration-200 disabled:opacity-50 disabled:pointer-events-none"
+              >
                 {t('cancel')}
               </button>
-              <button type="submit" disabled={isSavingsTransaction && !formData.goalId} className="px-5 py-2.5 bg-brand-green text-white text-sm font-medium rounded-xl hover:bg-green-600 active:scale-95 transition-all duration-200 disabled:bg-zinc-600 disabled:cursor-not-allowed">
+              <button 
+                type="submit" 
+                disabled={isSubmitting || (isSavingsTransaction && !formData.goalId)} 
+                className="px-5 py-2.5 bg-brand-green text-white text-sm font-medium rounded-xl hover:bg-green-600 active:scale-95 transition-all duration-200 disabled:bg-zinc-600 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
                 {t('confirm')}
               </button>
             </div>
@@ -583,7 +674,6 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
         </motion.div>
       </motion.div>
 
-      {/* MODALS (Your code - unchanged) */}
       <AnimatePresence>
         {isDatePickerOpen &&
           <DatePicker

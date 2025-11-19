@@ -1,5 +1,3 @@
-// src/shared/hooks/useAudioTransaction.ts
-
 import { useState, useRef } from 'react';
 import * as api from '../../core/services/api';
 import { Transaction, Category, SavingsGoal, Account, TransactionType } from '../../core/types';
@@ -22,8 +20,8 @@ interface UseAudioTransactionResult {
   processAudioResult: (
     categories: Category[], 
     savingsGoals: SavingsGoal[],
-    accounts: Account[], // НОВОЕ
-    defaultCurrency: string // НОВОЕ
+    accounts: Account[], 
+    defaultCurrency: string
   ) => Promise<DraftTransaction | null>;
 }
 
@@ -88,11 +86,13 @@ export const useAudioTransaction = (
     setIsProcessing(true);
   };
 
+  const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
   const processAudioResult = async (
     categories: Category[], 
     savingsGoals: SavingsGoal[],
-    accounts: Account[], // НОВОЕ
-    defaultCurrency: string // НОВОЕ
+    accounts: Account[], 
+    defaultCurrency: string 
   ): Promise<DraftTransaction | null> => {
     return new Promise((resolve, reject) => {
         const recorder = mediaRecorderRef.current;
@@ -109,19 +109,57 @@ export const useAudioTransaction = (
             const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
             audioChunksRef.current = [];
 
-            try {
-                const result = await api.processAudioTransaction(
-                    audioBlob,
-                    categories,
-                    savingsGoals,
-                    accounts, // НОВОЕ
-                    language,
-                    defaultCurrency // НОВОЕ
-                ) as DraftTransaction;
+            let attempts = 0;
+            const maxAttempts = 3;
+            let result: DraftTransaction | null = null;
+            let lastError: any = null;
 
-                // --- FALLBACK ЛОГИКА ---
+            // RETRY LOGIC
+            while (attempts < maxAttempts) {
+                try {
+                    attempts++;
+                    console.log(`API: Processing audio attempt ${attempts}/${maxAttempts}...`);
+                    
+                    result = await api.processAudioTransaction(
+                        audioBlob,
+                        categories,
+                        savingsGoals,
+                        accounts,
+                        language,
+                        defaultCurrency
+                    ) as DraftTransaction;
+
+                    break;
+                } catch (err: any) {
+                    console.warn(`API: Attempt ${attempts} failed:`, err);
+                    lastError = err;
+                    const errorMessage = err.message || JSON.stringify(err);
+                    const isOverloaded = 
+                        errorMessage.includes('503') || 
+                        errorMessage.includes('overloaded') ||
+                        errorMessage.includes('Service Unavailable') ||
+                        (errorMessage.includes('500') && errorMessage.includes('GoogleGenerativeAI'));
+
+                    if (isOverloaded && attempts < maxAttempts) {
+                        await delay(2000);
+                        continue;
+                    } else {
+                        setIsProcessing(false);
+                        reject(err);
+                        return;
+                    }
+                }
+            }
+
+            if (!result) {
+                setIsProcessing(false);
+                reject(lastError || new Error("Failed to process audio"));
+                return;
+            }
+
+            try {
+                // --- FALLBACK LOGIC ---
                 
-                // 1. Маппинг счетов по именам
                 if (result.fromAccountName) {
                   const foundAccount = accounts.find(a => 
                     a.name.toLowerCase().includes(result.fromAccountName!.toLowerCase()) ||
@@ -131,7 +169,6 @@ export const useAudioTransaction = (
                   if (foundAccount) {
                     result.accountId = foundAccount.id;
                   } else {
-                    // Пытаемся найти по типу
                     if (result.fromAccountName.toLowerCase().includes('card') || 
                         result.fromAccountName.toLowerCase().includes('карт')) {
                       const cardAccount = accounts.find(a => a.type === 'CARD');
@@ -144,7 +181,6 @@ export const useAudioTransaction = (
                   }
                 }
                 
-                // 2. Маппинг toAccount для TRANSFER
                 if (result.type === TransactionType.TRANSFER && result.toAccountName) {
                   const foundToAccount = accounts.find(a => 
                     a.name.toLowerCase().includes(result.toAccountName!.toLowerCase()) ||
@@ -154,7 +190,6 @@ export const useAudioTransaction = (
                   if (foundToAccount) {
                     result.toAccountId = foundToAccount.id;
                   } else {
-                    // Пытаемся найти по типу
                     if (result.toAccountName.toLowerCase().includes('cash') || 
                         result.toAccountName.toLowerCase().includes('налич')) {
                       const cashAccount = accounts.find(a => a.type === 'CASH');
@@ -167,21 +202,17 @@ export const useAudioTransaction = (
                   }
                 }
                 
-                // 3. Исправление типа если AI ошибся
-                // Если EXPENSE, но есть toAccountName → скорее всего TRANSFER
                 if (result.type === TransactionType.EXPENSE && result.toAccountName) {
-                  console.log('Correcting: EXPENSE -> TRANSFER (toAccountName present)');
                   result.type = TransactionType.TRANSFER;
                   result.category = '';
                 }
                 
-                // Если TRANSFER, но нет toAccount — ошибка AI, возвращаем EXPENSE
                 if (result.type === TransactionType.TRANSFER && !result.toAccountId && !result.toAccountName) {
-                  console.log('Correcting: TRANSFER -> EXPENSE (no toAccount)');
                   result.type = TransactionType.EXPENSE;
                 }
 
                 // 4. Маппинг savingsGoalName на goalId
+                // ИСПРАВЛЕНО: Только маппинг, удаление перенесено ниже
                 if (result.savingsGoalName && savingsGoals.length > 0) {
                   const goal = savingsGoals.find(
                     g => g.name.toLowerCase() === result.savingsGoalName!.toLowerCase()
@@ -189,18 +220,18 @@ export const useAudioTransaction = (
                   if (goal) {
                     result.goalId = goal.id;
                   }
-                  delete (result as any).savingsGoalName;
                 }
 
                 // 5. Очистка временных полей
+                // ИСПРАВЛЕНО: savingsGoalName удаляется здесь ГАРАНТИРОВАННО
                 delete (result as any).fromAccountName;
                 delete (result as any).toAccountName;
+                delete (result as any).savingsGoalName; 
 
                 console.log('Final processed transaction:', result);
-
                 resolve(result);
             } catch (err: any) {
-                console.error('Failed to process audio:', err);
+                console.error('Failed to process result logic:', err);
                 reject(err);
             } finally {
                 setIsProcessing(false);

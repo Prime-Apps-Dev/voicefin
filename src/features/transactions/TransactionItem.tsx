@@ -4,6 +4,7 @@ import { ArrowUpCircle, ArrowDownCircle, Trash2, ArrowRightLeft } from 'lucide-r
 import LongPressWrapper from '../../shared/layout/LongPressWrapper';
 import { useLocalization } from '../../core/context/LocalizationContext';
 import { convertCurrency } from '../../core/services/currency';
+import { getLocalizedCategoryName } from '../../utils/constants';
 
 interface TransactionItemProps {
   transaction: Transaction;
@@ -82,9 +83,12 @@ export const TransactionItem: React.FC<TransactionItemProps> = ({ transaction, a
       sign = ''; // Для переводов знак можно опустить или использовать стрелку
   }
 
+  // --- ИСПОЛЬЗУЕМ ЛОКАЛИЗАЦИЮ ДЛЯ КАТЕГОРИИ ---
+  const localizedCategory = getLocalizedCategoryName(transaction.category, language);
+
   const subtitle = isTransfer 
     ? `${language === 'ru' ? 'Перевод на' : 'Transfer to'} ${toAccountName}` 
-    : `${transaction.category} • ${account?.name}`;
+    : `${localizedCategory} • ${account?.name}`;
 
   return (
     <li>

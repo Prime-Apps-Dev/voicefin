@@ -9,7 +9,12 @@ import {
 } from '../types';
 import { useAuth } from './AuthContext';
 import { useLocalization } from './LocalizationContext';
-import { getDebtTransactionType, getDebtTransactionCategory, DEBT_SYSTEM_CATEGORIES } from '../../utils/constants';
+import { 
+  getDebtTransactionType, 
+  getDebtTransactionCategory, 
+  DEBT_SYSTEM_CATEGORIES, 
+  DEFAULT_CATEGORIES 
+} from '../../utils/constants';
 
 interface SummaryData {
   monthlyIncome: number;
@@ -25,7 +30,7 @@ interface AppDataContextType {
   savingsGoals: SavingsGoal[];
   budgets: Budget[];
   debts: Debt[];
-  debtCategories: DebtCategory[]; // <--- Тип добавлен корректно
+  debtCategories: DebtCategory[];
   rates: ExchangeRates;
   isDataLoading: boolean;
   dataError: string | null;
@@ -84,7 +89,6 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [savingsGoals, setSavingsGoals] = useState<SavingsGoal[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [debts, setDebts] = useState<Debt[]>([]);
-  // --- ИСПРАВЛЕНИЕ 1: Добавлено состояние для debtCategories ---
   const [debtCategories, setDebtCategories] = useState<DebtCategory[]>([]); 
   const [rates, setRates] = useState<ExchangeRates>({});
   
@@ -92,13 +96,12 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [dataError, setDataError] = useState<string | null>(null);
   const [selectedAccountId, setSelectedAccountId] = useState<string>('all');
 
-  // --- Data Loading ---
+  // --- Data Loading & Migration ---
   const loadData = async () => {
     if (!user) return;
     setIsDataLoading(true);
     setDataError(null);
     try {
-      // --- ИСПРАВЛЕНИЕ 2: Добавлена переменная fetchedDebtCategories в destructuring ---
       const [exchangeRates, initialData, fetchedDebts, fetchedDebtCategories] = await Promise.all([
         getExchangeRates(),
         api.initializeUser(),
@@ -106,15 +109,45 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
         api.getDebtCategories()
       ]);
       
+      // --- МИГРАЦИЯ КАТЕГОРИЙ ---
+      let currentCategories = initialData.categories;
+      const missingSystemCategories = DEFAULT_CATEGORIES.filter(sysCat => 
+        sysCat.isSystem && 
+        !currentCategories.some(userCat => userCat.name === sysCat.name && userCat.type === sysCat.type)
+      );
+
+      if (missingSystemCategories.length > 0) {
+        console.log("Migration: Creating missing system categories...", missingSystemCategories);
+        const createdCategories: Category[] = [];
+        
+        for (const catToCreate of missingSystemCategories) {
+          try {
+            const newCat = await api.addCategory({
+              name: catToCreate.name,
+              icon: catToCreate.icon,
+              type: catToCreate.type,
+              isFavorite: false,
+              isDefault: false,
+              isSystem: true
+            });
+            createdCategories.push(newCat);
+          } catch (err) {
+            console.error(`Migration: Failed to create category ${catToCreate.name}`, err);
+          }
+        }
+        currentCategories = [...currentCategories, ...createdCategories];
+      }
+      // ---------------------------
+
       setRates(exchangeRates);
       setTransactions(initialData.transactions);
       setAccounts(initialData.accounts);
-      setCategories(initialData.categories);
+      setCategories(currentCategories);
       setSavingsGoals(initialData.savingsGoals);
       setBudgets(initialData.budgets);
       setDebts(fetchedDebts || []);
-      // Теперь переменная fetchedDebtCategories существует
       setDebtCategories(fetchedDebtCategories || []); 
+
     } catch (err: any) {
       console.error("AppData: Load failed", err);
       setDataError(err.message || "Failed to load data");
@@ -227,11 +260,13 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
                originalTx.category === DEBT_SYSTEM_CATEGORIES.REPAYMENT_RECEIVED || 
                originalTx.category === DEBT_SYSTEM_CATEGORIES.REPAYMENT_SENT
             ) {
+               // Возврат погашения -> долг увеличивается обратно
                newCurrentAmount += amount;
            } else if (
                originalTx.category === DEBT_SYSTEM_CATEGORIES.LENDING ||
                originalTx.category === DEBT_SYSTEM_CATEGORIES.BORROWING
            ) {
+                // Отмена выдачи/займа -> долг уменьшается
                 newCurrentAmount -= amount;
            }
         }
@@ -244,12 +279,14 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
                tx.category === DEBT_SYSTEM_CATEGORIES.REPAYMENT_RECEIVED || 
                tx.category === DEBT_SYSTEM_CATEGORIES.REPAYMENT_SENT
            ) {
+               // Погашение -> долг уменьшается
                newCurrentAmount -= amount;
            } else if (
                tx.category === DEBT_SYSTEM_CATEGORIES.LENDING ||
                tx.category === DEBT_SYSTEM_CATEGORIES.BORROWING
            ) {
-               // This case is handled by handleSaveDebt usually
+               // Выдача/Займ -> долг увеличивается
+               newCurrentAmount += amount;
            }
         }
         
@@ -263,40 +300,92 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   const handleAddTransaction = async (transactionData: Omit<Transaction, 'id'>) => {
     try {
-        // 1. Handle Category
-        if (transactionData.category && !categories.some(c => c.name.toLowerCase() === transactionData.category.toLowerCase())) {
-            const iconName = await api.getIconForCategory(transactionData.category);
+        // Создаем копию, чтобы можно было удалять служебные поля (newDebtPerson)
+        // и модифицировать без побочных эффектов
+        let finalTxData: any = { ...transactionData };
+
+        // --- 0. Handle New Debt Creation (ВАЖНОЕ ИСПРАВЛЕНИЕ) ---
+        if (finalTxData.newDebtPerson) {
+             // Определяем тип долга на основе категории
+             let debtType = DebtType.I_OWE;
+             if (finalTxData.category === DEBT_SYSTEM_CATEGORIES.LENDING) debtType = DebtType.OWED_TO_ME;
+             else if (finalTxData.category === DEBT_SYSTEM_CATEGORIES.BORROWING) debtType = DebtType.I_OWE;
+             else if (finalTxData.category === DEBT_SYSTEM_CATEGORIES.REPAYMENT_RECEIVED) debtType = DebtType.OWED_TO_ME;
+             else if (finalTxData.category === DEBT_SYSTEM_CATEGORIES.REPAYMENT_SENT) debtType = DebtType.I_OWE;
+             
+             // Создаем долг. Начинаем с 0, транзакция добавит сумму сама (через логику обновления баланса)
+             // или можно сразу установить amount, но тогда нужно аккуратно с updateDebtsFromTransaction
+             const newDebt = await api.addDebt({
+                 person: finalTxData.newDebtPerson,
+                 amount: finalTxData.amount, // Общая сумма (лимит)
+                 current_amount: 0,          // Текущий долг начнем с 0, транзакция его "наполнит"
+                 currency: finalTxData.currency,
+                 type: debtType,
+                 status: DebtStatus.ACTIVE,
+                 date: finalTxData.date,
+                 description: `Linked to: ${finalTxData.name}`,
+                 category: finalTxData.category
+             });
+             
+             setDebts(prev => [newDebt, ...prev]); // Обновляем UI сразу
+             
+             // Привязываем транзакцию к созданному долгу
+             finalTxData.debtId = newDebt.id;
+             // УДАЛЯЕМ служебное поле, чтобы не сломать запрос к Supabase
+             delete finalTxData.newDebtPerson;
+        }
+
+        // --- 1. Handle Category ---
+        if (finalTxData.category && !categories.some((c: Category) => c.name.toLowerCase() === finalTxData.category.toLowerCase())) {
+            const iconName = await api.getIconForCategory(finalTxData.category);
             const newCategory = await api.addCategory({
-                name: transactionData.category,
+                name: finalTxData.category,
                 icon: iconName,
                 isFavorite: false,
                 isDefault: false,
-                type: transactionData.type,
+                type: finalTxData.type,
             });
             setCategories(prev => [...prev, newCategory]);
         }
 
-        // 2. Handle Dependencies (Goals/Debts)
-        updateGoalsFromTransaction(transactionData);
+        // --- 2. Handle Dependencies (Goals/Debts) ---
+        updateGoalsFromTransaction(finalTxData);
         
-        // Если есть debtId, обновляем баланс долга в БД
-        if (transactionData.debtId) {
+        // Обновляем баланс долга (в БД и локально)
+        if (finalTxData.debtId) {
             let amountChange = 0;
-            // Определяем изменение баланса для API
-            // Мы предполагаем, что это погашение (уменьшение долга), поэтому amountChange отрицательный
-            amountChange = -convertCurrency(transactionData.amount, transactionData.currency, 'USD', rates); // TODO: Improve currency logic
             
-            updateDebtsFromTransaction(transactionData);
-            await api.updateDebtBalance(transactionData.debtId, -transactionData.amount);
+            const isDebtIncrease = 
+                finalTxData.category === DEBT_SYSTEM_CATEGORIES.LENDING || 
+                finalTxData.category === DEBT_SYSTEM_CATEGORIES.BORROWING;
+            
+            if (isDebtIncrease) {
+                amountChange = finalTxData.amount;
+            } else {
+                amountChange = -finalTxData.amount;
+            }
+            
+            // 1. Сначала обновляем визуально (чтобы было мгновенно)
+            updateDebtsFromTransaction(finalTxData); 
+
+            // 2. Отправляем запрос в Supabase и получаем ОБНОВЛЕННУЮ запись долга
+            const updatedDebtFromServer = await api.updateDebtBalance(finalTxData.debtId, amountChange); 
+            
+            // 3. Если сервер вернул обновленный долг, обновляем его в стейте "начисто"
+            // Это заменяет необходимость вызывать api.getDebts()
+            if (updatedDebtFromServer) {
+                setDebts(prev => prev.map(d => d.id === updatedDebtFromServer.id ? updatedDebtFromServer : d));
+            }
         }
 
-        const newTx = await api.addTransaction(transactionData);
+        // Создаем транзакцию (без newDebtPerson)
+        const newTx = await api.addTransaction(finalTxData);
         setTransactions(prev => [newTx, ...prev]);
         
-        if (transactionData.debtId) {
-            const updatedDebts = await api.getDebts();
-            setDebts(updatedDebts);
-        }
+        // УБРАЛИ ЛИШНИЙ ЗАПРОС api.getDebts()
+        // Мы уже обновили debts локально либо через setDebts при создании,
+        // либо через updateDebtsFromTransaction при обновлении баланса.
+        // Это должно существенно ускорить процесс.
 
     } catch (e: any) {
         setDataError(e.message);
@@ -306,17 +395,66 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   const handleUpdateTransaction = async (transactionData: Transaction) => {
       try {
+        let finalTxData: any = { ...transactionData };
         const originalTransaction = transactions.find(t => t.id === transactionData.id) || null;
-        updateGoalsFromTransaction(transactionData, originalTransaction);
-        updateDebtsFromTransaction(transactionData, originalTransaction);
+
+        // --- 0. Handle New Debt on Update (редкий кейс, но возможен) ---
+        if (finalTxData.newDebtPerson) {
+             let debtType = DebtType.I_OWE;
+             if (finalTxData.category === DEBT_SYSTEM_CATEGORIES.LENDING) debtType = DebtType.OWED_TO_ME;
+             else if (finalTxData.category === DEBT_SYSTEM_CATEGORIES.BORROWING) debtType = DebtType.I_OWE;
+             
+             const newDebt = await api.addDebt({
+                 person: finalTxData.newDebtPerson,
+                 amount: finalTxData.amount,
+                 current_amount: 0, 
+                 currency: finalTxData.currency,
+                 type: debtType,
+                 status: DebtStatus.ACTIVE,
+                 date: finalTxData.date,
+                 description: `Linked to: ${finalTxData.name}`,
+                 category: finalTxData.category
+             });
+             
+             setDebts(prev => [newDebt, ...prev]);
+             finalTxData.debtId = newDebt.id;
+             delete finalTxData.newDebtPerson;
+        }
+
+        // Обновляем зависимости
+        updateGoalsFromTransaction(finalTxData, originalTransaction);
+        updateDebtsFromTransaction(finalTxData, originalTransaction); // Optimistic update
         
-        const updatedTx = await api.updateTransaction(transactionData);
+        // Синхронизируем балансы долгов в БД (нужно и откатить старое, и применить новое)
+        // 1. Откат старой транзакции
+        if (originalTransaction?.debtId) {
+             let revertChange = 0;
+             if (originalTransaction.category === DEBT_SYSTEM_CATEGORIES.LENDING || 
+                 originalTransaction.category === DEBT_SYSTEM_CATEGORIES.BORROWING) {
+                 revertChange = -originalTransaction.amount; // Откатываем увеличение
+             } else {
+                 revertChange = originalTransaction.amount; // Откатываем уменьшение (возвращаем долг обратно)
+             }
+             await api.updateDebtBalance(originalTransaction.debtId, revertChange);
+        }
+
+        // 2. Применение новой транзакции
+        if (finalTxData.debtId) {
+             let applyChange = 0;
+             if (finalTxData.category === DEBT_SYSTEM_CATEGORIES.LENDING || 
+                 finalTxData.category === DEBT_SYSTEM_CATEGORIES.BORROWING) {
+                 applyChange = finalTxData.amount;
+             } else {
+                 applyChange = -finalTxData.amount;
+             }
+             await api.updateDebtBalance(finalTxData.debtId, applyChange);
+        }
+        
+        const updatedTx = await api.updateTransaction(finalTxData);
         setTransactions(prev => prev.map(t => t.id === updatedTx.id ? updatedTx : t));
         
-        if (transactionData.debtId || originalTransaction?.debtId) {
-             const updatedDebts = await api.getDebts();
-             setDebts(updatedDebts);
-        }
+        // УБРАЛИ ЛИШНИЙ ЗАПРОС api.getDebts()
+        
       } catch (e: any) {
           setDataError(e.message);
           throw e;
@@ -328,8 +466,8 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
           const txToDelete = transactions.find(t => t.id === txId);
           if (!txToDelete) return;
 
+          // 1. Обработка Целей (Savings Goals) - откат прогресса
           if (txToDelete.goalId && txToDelete.type === TransactionType.EXPENSE) {
-             // Revert goal amount
              setSavingsGoals(prevGoals => prevGoals.map(g => {
                 if (g.id === txToDelete.goalId) {
                     const amount = convertCurrency(txToDelete.amount, txToDelete.currency, g.currency, rates);
@@ -339,23 +477,49 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
              }));
           }
           
+          // 2. Обработка Долгов (Debts) - откат баланса
           if (txToDelete.debtId) {
               let amountChange = 0;
-              if (txToDelete.category === DEBT_SYSTEM_CATEGORIES.REPAYMENT_SENT || txToDelete.category === DEBT_SYSTEM_CATEGORIES.REPAYMENT_RECEIVED) {
-                  amountChange = txToDelete.amount; // Add back repayment
-              } else if (txToDelete.category === DEBT_SYSTEM_CATEGORIES.LENDING || txToDelete.category === DEBT_SYSTEM_CATEGORIES.BORROWING) {
-                  amountChange = -txToDelete.amount; // Remove initial amount
+              
+              // Логика:
+              // Если мы удаляем запись о том, что "Я дал в долг" (Lending) -> Долг должен уменьшиться (-).
+              // Если мы удаляем запись о том, что "Мне вернули долг" (Repayment) -> Долг должен увеличиться обратно (+).
+              
+              const isDebtCreation = 
+                  txToDelete.category === DEBT_SYSTEM_CATEGORIES.LENDING || 
+                  txToDelete.category === DEBT_SYSTEM_CATEGORIES.BORROWING;
+              
+              if (isDebtCreation) {
+                  // Было увеличение долга, значит при удалении уменьшаем
+                  amountChange = -txToDelete.amount; 
+              } else {
+                  // Было погашение (уменьшение), значит при удалении возвращаем сумму обратно
+                  amountChange = txToDelete.amount; 
               }
               
-              await api.updateDebtBalance(txToDelete.debtId, amountChange); 
-              const updatedDebts = await api.getDebts();
-              setDebts(updatedDebts);
+              // Вызываем API. Благодаря updateDebtBalance с maybeSingle, 
+              // если долг удален, код не упадет, а просто вернет null.
+              const updatedDebt = await api.updateDebtBalance(txToDelete.debtId, amountChange);
+              
+              // Если долг существовал и обновился, обновляем стейт
+              if (updatedDebt) {
+                  setDebts(prev => prev.map(d => d.id === updatedDebt.id ? updatedDebt : d));
+              } else {
+                  // Если долг вернулся null, значит он удален в БД.
+                  // Можно опционально почистить локальный стейт, если там вдруг остался висячий долг
+                  setDebts(prev => prev.filter(d => d.id !== txToDelete.debtId));
+              }
           }
+          
+          // 3. Удаляем саму транзакцию
           await api.deleteTransaction(txId);
           setTransactions(prev => prev.filter(t => t.id !== txId));
+          
       } catch (e: any) {
+          console.error("Ошибка при удалении транзакции:", e);
           setDataError(e.message);
-          throw e;
+          // Не пробрасываем ошибку дальше (throw e), чтобы UI не крашился,
+          // но показываем пользователю уведомление через dataError
       }
   };
 
@@ -448,6 +612,18 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
                 debtId: savedDebt.id,
                 description: savedDebt.description || 'Initial debt record'
             };
+            // Здесь мы не вызываем handleAddTransaction, чтобы избежать рекурсии или двойного обновления,
+            // вызываем api напрямую. Но нужно помнить, что эта транзакция увеличит долг.
+            // api.addDebt создает долг с current_amount = amount.
+            // api.addTransaction создаст запись.
+            // Мы должны обновить initial_transaction_id у долга.
+            
+            // ВАЖНО: Если мы создали долг с полным amount, то эта транзакция (Lending)
+            // не должна увеличивать его еще раз.
+            // В текущей логике handleAddTransaction увеличивает долг для Lending.
+            // Здесь мы вызываем api.addTransaction напрямую, поэтому updateDebtBalance НЕ вызывается.
+            // Это правильно, так как amount уже учтен в самом объекте Debt при создании.
+            
             const newTx = await api.addTransaction(newTxData);
             setTransactions(prev => [newTx, ...prev]);
             const debtWithLink = await api.updateDebt({ ...savedDebt, initial_transaction_id: newTx.id });

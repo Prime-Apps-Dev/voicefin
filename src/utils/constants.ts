@@ -1,3 +1,5 @@
+// src/utils/constants.ts
+
 import { TransactionType, Debt, DebtType, DebtCategory } from '../core/types';
 
 export const COMMON_CURRENCIES = [
@@ -35,6 +37,44 @@ export const DEBT_SYSTEM_CATEGORIES = {
   BORROWING: 'Debt: Borrowing',               // Я взял в долг
   REPAYMENT_RECEIVED: 'Debt: Repayment Received', // Мне вернули
 } as const;
+
+// Словарь переводов для системных категорий
+export const SYSTEM_CATEGORY_TRANSLATIONS: Record<string, { ru: string; en: string }> = {
+  [DEBT_SYSTEM_CATEGORIES.LENDING]: {
+    ru: 'Дал в долг',
+    en: 'Lending'
+  },
+  [DEBT_SYSTEM_CATEGORIES.REPAYMENT_SENT]: {
+    ru: 'Вернул долг',
+    en: 'Repayment Sent'
+  },
+  [DEBT_SYSTEM_CATEGORIES.BORROWING]: {
+    ru: 'Взял в долг',
+    en: 'Borrowing'
+  },
+  [DEBT_SYSTEM_CATEGORIES.REPAYMENT_RECEIVED]: {
+    ru: 'Мне вернули',
+    en: 'Repayment Received'
+  },
+  // Можно добавить перевод для стандартной системной категории Savings, если нужно
+  'Savings': {
+    ru: 'Накопления',
+    en: 'Savings'
+  }
+};
+
+/**
+ * Получает локализованное название категории.
+ * Если категория системная, возвращает перевод.
+ * Иначе возвращает оригинальное название.
+ */
+export const getLocalizedCategoryName = (categoryName: string, language: string): string => {
+  const translation = SYSTEM_CATEGORY_TRANSLATIONS[categoryName];
+  if (translation) {
+    return language === 'ru' ? translation.ru : translation.en;
+  }
+  return categoryName;
+};
 
 // Дефолтные категории долгов (создаются при первом использовании)
 export const DEFAULT_DEBT_CATEGORIES: Omit<DebtCategory, 'id'>[] = [

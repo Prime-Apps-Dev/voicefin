@@ -1,9 +1,12 @@
+// src/features/categories/CategoriesScreen.tsx
+
 import React, { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, Plus, Star } from 'lucide-react';
 import { useLocalization } from '../../core/context/LocalizationContext';
 import { Category, TransactionType } from '../../core/types';
 import { ICONS } from '../../shared/ui/icons/icons';
+import { getLocalizedCategoryName } from '../../utils/constants'; // ДОБАВЛЕНО
 
 interface CategoriesScreenProps {
   categories: Category[];
@@ -24,7 +27,8 @@ const CategoryItem: React.FC<{
   onSelect: (category: Category) => void;
   onToggleFavorite: (category: Category) => void;
   isFavoriteDisabled: boolean;
-}> = ({ category, onSelect, onToggleFavorite, isFavoriteDisabled }) => {
+  language: string; // ДОБАВЛЕНО: язык для локализации
+}> = ({ category, onSelect, onToggleFavorite, isFavoriteDisabled, language }) => {
     return (
         <motion.div
             layout
@@ -38,7 +42,10 @@ const CategoryItem: React.FC<{
                 <div className="w-10 h-10 bg-gray-700 rounded-xl flex items-center justify-center flex-shrink-0">
                     <IconDisplay name={category.icon} className="w-5 h-5 text-gray-300" />
                 </div>
-                <span className="text-white font-medium truncate">{category.name}</span>
+                {/* ДОБАВЛЕНО: Локализация имени */}
+                <span className="text-white font-medium truncate">
+                    {getLocalizedCategoryName(category.name, language)}
+                </span>
             </button>
             <button
                 onClick={() => onToggleFavorite(category)}
@@ -76,7 +83,12 @@ export const CategoriesScreen: React.FC<CategoriesScreenProps> = (props) => {
     return { expenseCategories: expenseCats, incomeCategories: incomeCats, favorites: favs };
   }, [categories]);
   
-  const localeCompare = (a: Category, b: Category) => a.name.localeCompare(b.name, language === 'ru' ? 'ru' : 'en');
+  // ДОБАВЛЕНО: Сортировка по переведенному имени
+  const localeCompare = (a: Category, b: Category) => {
+      const nameA = getLocalizedCategoryName(a.name, language);
+      const nameB = getLocalizedCategoryName(b.name, language);
+      return nameA.localeCompare(nameB, language === 'ru' ? 'ru' : 'en');
+  };
   
   const sortedExpenses = useMemo(() => [...expenseCategories].sort(localeCompare), [expenseCategories, language]);
   const sortedIncomes = useMemo(() => [...incomeCategories].sort(localeCompare), [incomeCategories, language]);
@@ -105,6 +117,7 @@ export const CategoriesScreen: React.FC<CategoriesScreenProps> = (props) => {
                       onSelect={onEditCategory}
                       onToggleFavorite={onToggleFavorite}
                       isFavoriteDisabled={favorites.length >= 10}
+                      language={language} // Передаем язык
                   />
               ))}
           </AnimatePresence>
@@ -112,10 +125,8 @@ export const CategoriesScreen: React.FC<CategoriesScreenProps> = (props) => {
   );
 
   return (
-    // Корневой div с отступом для маски
     <div className="min-h-screen bg-gray-900 flex flex-col pb-24">
       
-      {/* "Липкий" header */}
       <header className="px-4 pb-4 pt-4 flex items-center justify-between sticky top-0 bg-gray-900/80 backdrop-blur-sm z-10">
         <button onClick={onBack} className="p-2 rounded-full hover:bg-gray-700">
           <ChevronLeft className="w-6 h-6 text-white" />
@@ -126,7 +137,6 @@ export const CategoriesScreen: React.FC<CategoriesScreenProps> = (props) => {
         </button>
       </header>
 
-      {/* Основной контент */}
       <main className="flex-grow px-4 space-y-6">
         <div className="flex justify-center p-1 bg-gray-800 rounded-full">
             <TabButton tab="INCOME" label={t('income')} />

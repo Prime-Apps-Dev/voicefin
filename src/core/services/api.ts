@@ -5,6 +5,7 @@
 import { supabase } from './supabase';
 import { Transaction, Account, SavingsGoal, Budget, Category, TransactionType, AccountType, Debt, DebtCategory, DebtStatus } from '../types';
 import { ICON_NAMES } from '../../shared/ui/icons/icons';
+import { DEBT_SYSTEM_CATEGORIES } from '../../utils/constants';
 
 // --- Аутентификация ---
 /**
@@ -75,15 +76,23 @@ export const initializeUser = async () => {
  * Вспомогательная функция: создание категорий по умолчанию
  */
 const createDefaultCategories = async (): Promise<Category[]> => {
+  // --- ИЗМЕНЕНИЕ: Добавлены системные категории для долгов ---
   const DEFAULT_CATEGORIES = [
+    // Обычные категории (на русском, как было)
     { name: 'Еда и напитки', icon: 'UtensilsCrossed', type: TransactionType.EXPENSE, isDefault: true, isFavorite: false },
     { name: 'Покупки', icon: 'ShoppingCart', type: TransactionType.EXPENSE, isDefault: true, isFavorite: false },
     { name: 'Транспорт', icon: 'Bus', type: TransactionType.EXPENSE, isDefault: true, isFavorite: false },
     { name: 'Дом', icon: 'Home', type: TransactionType.EXPENSE, isDefault: true, isFavorite: false },
     { name: 'Счета и коммуналка', icon: 'Lightbulb', type: TransactionType.EXPENSE, isDefault: true, isFavorite: false },
-    { name: 'Накопления', icon: 'PiggyBank', type: TransactionType.EXPENSE, isDefault: true, isFavorite: false },
+    { name: 'Накопления', icon: 'PiggyBank', type: TransactionType.EXPENSE, isDefault: true, isFavorite: false, isSystem: true }, // Можно пометить Накопления как системную тоже
     { name: 'Зарплата', icon: 'Banknote', type: TransactionType.INCOME, isDefault: true, isFavorite: false },
     { name: 'Подарки', icon: 'Gift', type: TransactionType.INCOME, isDefault: true, isFavorite: false },
+    
+    // Новые системные категории для долгов (используем константы для имен, чтобы логика приложения работала)
+    { name: DEBT_SYSTEM_CATEGORIES.LENDING, icon: 'ArrowUpCircle', type: TransactionType.EXPENSE, isDefault: false, isFavorite: false, isSystem: true },
+    { name: DEBT_SYSTEM_CATEGORIES.REPAYMENT_SENT, icon: 'CheckCircle', type: TransactionType.EXPENSE, isDefault: false, isFavorite: false, isSystem: true },
+    { name: DEBT_SYSTEM_CATEGORIES.BORROWING, icon: 'ArrowDownCircle', type: TransactionType.INCOME, isDefault: false, isFavorite: false, isSystem: true },
+    { name: DEBT_SYSTEM_CATEGORIES.REPAYMENT_RECEIVED, icon: 'CheckCircle', type: TransactionType.INCOME, isDefault: false, isFavorite: false, isSystem: true },
   ];
 
   // Получаем ID пользователя
@@ -172,10 +181,13 @@ export const addTransaction = async (transaction: Omit<Transaction, 'id'>): Prom
 };
 
 export const updateTransaction = async (transaction: Transaction): Promise<Transaction> => {
+  // Деструктурируем id, чтобы не отправлять его в теле запроса (он используется только для поиска записи)
+  const { id, ...updateData } = transaction;
+  
   const { data, error } = await supabase
     .from('transactions')
-    .update(transaction)
-    .eq('id', transaction.id)
+    .update(updateData)
+    .eq('id', id)
     .select()
     .single();
   if (error) throw error;
@@ -376,19 +388,27 @@ export const unarchiveDebt = async (debtId: string): Promise<Debt> => {
  */
 export const updateDebtBalance = async (
   debtId: string,
-  amountChange: number // Положительное значение = увеличение остатка, отрицательное = уменьшение
-): Promise<Debt> => {
-  // Получаем текущий долг
+  amountChange: number
+): Promise<Debt | null> => {
+  // 1. Пытаемся найти долг
   const { data: debt, error: fetchError } = await supabase
     .from('debts')
     .select('*')
     .eq('id', debtId)
-    .single();
-  
+    .maybeSingle(); // Используем maybeSingle вместо single, чтобы не получать ошибку, если записи нет
+
   if (fetchError) throw fetchError;
   
+  // Если долг не найден (например, удален ранее), просто выходим
+  if (!debt) {
+    console.warn(`API: Долг с ID ${debtId} не найден. Пропускаем обновление баланса.`);
+    return null;
+  }
+  
+  // 2. Вычисляем новый баланс
   const newCurrentAmount = Math.max(0, (debt.current_amount || 0) + amountChange);
   
+  // 3. Обновляем
   const { data, error } = await supabase
     .from('debts')
     .update({ current_amount: newCurrentAmount })
@@ -638,4 +658,3 @@ export const updateDefaultCurrency = async (userId: string, currency: string): P
   }
   console.log("API: Валюта по умолчанию успешно обновлена в профиле.");
 };
-// <-- КОНЕЦ НОВОЙ ФУНКЦИИ -->

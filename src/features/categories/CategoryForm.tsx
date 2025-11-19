@@ -4,8 +4,9 @@ import { Category, TransactionType } from '../../core/types';
 import { useLocalization } from '../../core/context/LocalizationContext';
 import { ICON_NAMES, ICONS } from '../../shared/ui/icons/icons';
 import { Trash2, Star } from 'lucide-react';
+import { getLocalizedCategoryName } from '../../utils/constants';
 
-const defaultState: Omit<Category, 'id' | 'isDefault'> = {
+const defaultState: Omit<Category, 'id' | 'isDefault' | 'isSystem'> = {
   name: '',
   icon: 'LayoutGrid',
   isFavorite: false,
@@ -28,7 +29,9 @@ const IconDisplay: React.FC<{ name: string; className?: string; }> = ({ name, cl
 };
 
 export const CategoryForm: React.FC<CategoryFormProps> = ({ isOpen, onClose, onSave, onDelete, category, isFavoriteDisabled, categories }) => {
-  const { t } = useLocalization();
+  const { t, language } = useLocalization();
+  // Note: we initialize form state with the category object. 
+  // For system categories, the name is the English key, but we will DISPLAY the translation.
   const [formData, setFormData] = useState<Omit<Category, 'id' | 'isDefault'> | Category>(defaultState);
   const [error, setError] = useState<string | null>(null);
 
@@ -63,6 +66,7 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ isOpen, onClose, onS
       return;
     }
 
+    // Проверка на дубликаты (только если это не редактирование самой себя)
     const isDuplicate = categories.some(
       c => c.name.toLowerCase() === trimmedName.toLowerCase() && c.id !== category?.id
     );
@@ -82,6 +86,17 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ isOpen, onClose, onS
         onClose();
     }
   };
+
+  const isSystemCategory = category?.isSystem || false;
+  const isDefaultCategory = category?.isDefault || false;
+  
+  // Если категория системная, запрещаем редактирование имени
+  const isNameDisabled = isDefaultCategory || isSystemCategory;
+
+  // Для отображения используем локализованное имя, если это системная категория
+  const displayName = isSystemCategory 
+      ? getLocalizedCategoryName(formData.name, language) 
+      : formData.name;
 
   return (
     <AnimatePresence>
@@ -111,12 +126,19 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ isOpen, onClose, onS
                   <input
                     type="text"
                     name="name"
-                    value={formData.name}
+                    // Если редактирование запрещено, показываем переведенное имя. 
+                    // Если разрешено (кастомная), показываем реальное значение из стейта.
+                    value={isNameDisabled ? displayName : formData.name}
                     onChange={handleChange}
                     required
-                    disabled={category?.isDefault}
+                    disabled={isNameDisabled}
                     className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent transition-all duration-200 disabled:bg-zinc-700/50 disabled:cursor-not-allowed"
                   />
+                  {isSystemCategory && (
+                      <p className="text-xs text-gray-500 mt-1 ml-1">
+                          {t('systemCategoryCannotBeRenamed') || "System categories cannot be renamed"}
+                      </p>
+                  )}
                   {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
                 </div>
                 <div>
@@ -152,7 +174,7 @@ export const CategoryForm: React.FC<CategoryFormProps> = ({ isOpen, onClose, onS
 
               <div className="sticky bottom-0 bg-zinc-900/95 backdrop-blur-xl px-6 py-4 border-t border-zinc-800/60 flex items-center justify-between space-x-3 flex-shrink-0">
                 <div>
-                    {category && !category.isDefault && (
+                    {category && !isDefaultCategory && !isSystemCategory && (
                         <button type="button" onClick={handleDeleteClick} className="p-2.5 text-red-400 text-sm font-medium rounded-xl hover:bg-red-500/10 active:scale-95 transition-all duration-200">
                            <Trash2 className="w-5 h-5"/>
                         </button>
