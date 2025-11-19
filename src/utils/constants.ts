@@ -206,7 +206,15 @@ export const APP_VERSION = '1.1.0';
  */
 export const CHANGELOG = [
   { 
-    version: '1.0.2', 
+    version: '1.1.5', 
+    date: '2025-11-16', 
+    changes: [
+      'changelog_v1_1_5_change_1',
+      'changelog_v1_1_5_change_2',
+    ] 
+  },
+  { 
+    version: '1.1.0', 
     date: '2025-11-16', 
     changes: [
       'changelog_v1_1_0_change_1',
