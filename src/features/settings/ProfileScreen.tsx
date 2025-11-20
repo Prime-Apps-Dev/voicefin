@@ -2,14 +2,15 @@ import React, { useRef } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { User } from '../../core/types';
 import {
-    Target, Wallet, Handshake, Banknote, CalendarDays, CreditCard, LayoutGrid, Settings, ChevronRight, Info
+    Target, Wallet, Handshake, Banknote, CalendarDays, CreditCard, 
+    LayoutGrid, Settings, ChevronRight, Info, Bell
 } from 'lucide-react';
 import { useLocalization } from '../../core/context/LocalizationContext';
+import { useAppData } from '../../core/context/AppDataContext'; // <--- 1. Импортируем контекст
 
 interface ProfileScreenProps {
     user: User;
     daysActive: number;
-    // ОБНОВЛЕНИЕ ТИПА: добавление 'about' и 'debts'
     onNavigate: (screen: 'home' | 'savings' | 'profile' | 'accounts' | 'budgetPlanning' | 'categories' | 'settings' | 'comingSoon' | 'history' | 'about' | 'debts') => void; 
 }
 
@@ -20,7 +21,6 @@ const zoomInOut = {
   initial: { scale: 0.95, opacity: 0 },
   whileInView: { scale: 1, opacity: 1, transition: { duration: 0.5, ease: [0.42, 0, 0.58, 1] } }
 };
-
 
 const stringToColor = (str: string) => {
     let hash = 0;
@@ -37,11 +37,14 @@ const stringToColor = (str: string) => {
 
 export const ProfileScreen: React.FC<ProfileScreenProps> = (props) => {
     const { t } = useLocalization();
-    const {
-        user, daysActive,
-        onNavigate
-    } = props;
+    const { user, daysActive, onNavigate } = props;
     
+    // 2. Достаем запросы и функцию открытия модалки
+    const { requests, setIsRequestsModalOpen } = useAppData();
+    
+    // 3. Считаем новые уведомления
+    const pendingRequestsCount = requests.filter(r => r.status === 'PENDING').length;
+
     const scrollRef = useRef(null);
     const { scrollYProgress } = useScroll({
       container: scrollRef,
@@ -56,10 +59,33 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = (props) => {
     const avatarColor = stringToColor(user.name);
     
     return (
-
         <div ref={scrollRef} className="h-screen overflow-y-auto bg-gradient-to-b from-gray-900 to-gray-800 pb-32 scrollbar-hide">
             
-            <div className="sticky top-0 h-[180px] bg-gradient-to-b from-gray-900 to-gray-800 z-0 flex items-center justify-center px-6">
+            <div className="sticky top-0 h-[180px] bg-gradient-to-b from-gray-900 to-gray-800 z-0 flex items-center justify-center px-6 relative">
+                
+                {/* --- НОВЫЙ БЛОК: Кнопка уведомлений (абсолютное позиционирование) --- */}
+                <div className="absolute top-4 right-4 z-50">
+                    <motion.button 
+                        whileTap={{ scale: 0.9 }}
+                        onClick={() => setIsRequestsModalOpen(true)}
+                        className="relative p-3 bg-gray-800/50 backdrop-blur-md border border-white/10 rounded-full hover:bg-gray-700 transition-colors"
+                    >
+                        <Bell className="w-6 h-6 text-gray-300" />
+                        
+                        {/* Красный бейдж */}
+                        {pendingRequestsCount > 0 && (
+                            <motion.div 
+                                initial={{ scale: 0 }}
+                                animate={{ scale: 1 }}
+                                className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-bold flex items-center justify-center rounded-full border-2 border-gray-900"
+                            >
+                                {pendingRequestsCount}
+                            </motion.div>
+                        )}
+                    </motion.button>
+                </div>
+                {/* ------------------------------------------------------------------- */}
+
                 <motion.div
                     className="w-full max-w-md"
                     style={{
@@ -70,7 +96,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = (props) => {
                 >
                     <div className="flex items-center p-4">
                         <div
-                            className="w-16 h-16 flex-shrink-0 rounded-2xl flex items-center justify-center text-white text-3xl font-bold mr-4"
+                            className="w-16 h-16 flex-shrink-0 rounded-2xl flex items-center justify-center text-white text-3xl font-bold mr-4 shadow-lg shadow-black/20"
                             style={{ backgroundColor: avatarColor }}
                         >
                             {userAvatar}
@@ -80,8 +106,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = (props) => {
                                 <h1 className="text-xl leading-5 font-bold text-gray-100 truncate">{user.name}</h1>
                                 <p className="text-sm text-gray-400 truncate">{user.email}</p>
                             </div>
-                            <div className="flex items-center text-xs text-gray-400 mt-2">
-                                <div className="w-2 h-2 bg-green-500 rounded-full mr-2" />
+                            <div className="flex items-center text-xs text-gray-400 mt-2 bg-gray-800/50 w-fit px-2 py-1 rounded-lg backdrop-blur-sm">
+                                <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse" />
                                 {t('activeDays', { days: daysActive })}
                             </div>
                         </div>
@@ -90,23 +116,23 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = (props) => {
             </div>
 
             {/* Content that scrolls over the header */}
-            <div className="relative z-10 bg-gray-900 rounded-t-3xl -mt-8">
+            <div className="relative z-10 bg-gray-900 rounded-t-3xl -mt-8 shadow-[0_-4px_20px_rgba(0,0,0,0.3)]">
               <div className="px-6 py-6 space-y-6">
                   <div className="space-y-4">
                       <h2 className="text-xl font-semibold text-gray-100 px-2">{t('financialManagement')}</h2>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <motion.button onClick={() => onNavigate('comingSoon')} className="relative overflow-hidden bg-gradient-to-br from-green-500 to-green-700 rounded-3xl p-6 text-white shadow-lg text-left w-full" variants={zoomInOut} whileInView="whileInView" viewport={{ once: true, amount: 0.2 }}>
-                             <div className="absolute -top-4 -right-4 w-24 h-24 bg-white/10 rounded-full blur-xl" />
+                          <motion.button onClick={() => onNavigate('comingSoon')} className="relative overflow-hidden bg-gradient-to-br from-green-500 to-green-700 rounded-3xl p-6 text-white shadow-lg text-left w-full group" variants={zoomInOut} whileInView="whileInView" viewport={{ once: true, amount: 0.2 }}>
+                             <div className="absolute -top-4 -right-4 w-24 h-24 bg-white/10 rounded-full blur-xl group-hover:bg-white/20 transition-colors" />
                              <div className="relative z-10"><div className="p-2 bg-white/20 rounded-2xl backdrop-blur-sm inline-block"><Target className="w-6 h-6" /></div><h3 className="font-semibold mt-2">{t('financialGoals')}</h3><p className="text-sm opacity-80">{t('planFuture')}</p></div>
                           </motion.button>
-                           <motion.button onClick={() => onNavigate('budgetPlanning')} className="relative overflow-hidden bg-gradient-to-br from-blue-500 to-blue-700 rounded-3xl p-6 text-white shadow-lg text-left w-full" variants={zoomInOut} whileInView="whileInView" viewport={{ once: true, amount: 0.2 }}>
-                             <div className="absolute -top-4 -right-4 w-24 h-24 bg-white/10 rounded-full blur-xl" />
+                           <motion.button onClick={() => onNavigate('budgetPlanning')} className="relative overflow-hidden bg-gradient-to-br from-blue-500 to-blue-700 rounded-3xl p-6 text-white shadow-lg text-left w-full group" variants={zoomInOut} whileInView="whileInView" viewport={{ once: true, amount: 0.2 }}>
+                             <div className="absolute -top-4 -right-4 w-24 h-24 bg-white/10 rounded-full blur-xl group-hover:bg-white/20 transition-colors" />
                              <div className="relative z-10"><div className="p-2 bg-white/20 rounded-2xl backdrop-blur-sm inline-block"><Wallet className="w-6 h-6" /></div><h3 className="font-semibold mt-2">{t('budgetPlanning')}</h3><p className="text-sm opacity-80">{t('controlSpending')}</p></div>
                           </motion.button>
                       </div>
-                       {/* ИЗМЕНЕНИЕ: onNavigate('debts') */}
-                       <motion.button onClick={() => onNavigate('debts')} className="relative overflow-hidden bg-gradient-to-br from-orange-500 to-red-600 rounded-3xl p-6 text-white shadow-lg text-left w-full" variants={zoomInOut} whileInView="whileInView" viewport={{ once: true, amount: 0.2 }}>
-                         <div className="absolute -top-4 -right-4 w-24 h-24 bg-white/10 rounded-full blur-xl" />
+                       
+                       <motion.button onClick={() => onNavigate('debts')} className="relative overflow-hidden bg-gradient-to-br from-orange-500 to-red-600 rounded-3xl p-6 text-white shadow-lg text-left w-full group" variants={zoomInOut} whileInView="whileInView" viewport={{ once: true, amount: 0.2 }}>
+                         <div className="absolute -top-4 -right-4 w-24 h-24 bg-white/10 rounded-full blur-xl group-hover:bg-white/20 transition-colors" />
                          <div className="relative z-10"><div className="p-2 bg-white/20 rounded-2xl backdrop-blur-sm inline-block"><Handshake className="w-6 h-6" /></div><h3 className="font-semibold mt-2">{t('debts')}</h3><p className="text-sm opacity-80">{t('manageLiabilities')}</p></div>
                       </motion.button>
                   </div>
@@ -129,7 +155,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = (props) => {
                           <motion.button onClick={() => onNavigate('settings')} className="w-full bg-gray-800 p-4 rounded-2xl border border-gray-700 flex items-center justify-between hover:bg-gray-700/50 transition-colors" whileTap={whileTap} whileHover={{ x: 5 }} transition={spring} variants={zoomInOut} whileInView="whileInView" viewport={{ once: true, amount: 0.2 }}>
                               <div className="flex items-center"><div className="w-10 h-10 bg-gray-700 rounded-2xl flex items-center justify-center mr-3"><Settings className="w-5 h-5 text-gray-400" /></div><div className="text-left"><div className="font-medium leading-5 text-gray-100">{t('settings')}</div><div className="text-sm text-gray-400">{t('personalizationAndSecurity')}</div></div></div><ChevronRight className="w-5 h-5 text-gray-400" />
                           </motion.button>
-                          {/* --- НОВАЯ КНОПКА: О ПРИЛОЖЕНИИ --- */}
+                          
                           <motion.button 
                               onClick={() => onNavigate('about')} 
                               className="w-full bg-gray-800 p-4 rounded-2xl border border-gray-700 flex items-center justify-between hover:bg-gray-700/50 transition-colors" 

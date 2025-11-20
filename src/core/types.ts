@@ -1,4 +1,4 @@
-// src/types.ts
+// src/core/types.ts
 
 export enum TransactionType {
   INCOME = 'INCOME',
@@ -112,6 +112,10 @@ export interface Debt {
   initial_transaction_id?: string;   // ID первой транзакции
   created_at?: string;
   updated_at?: string;
+  
+  // Новые поля для синхронизации
+  linked_user_id?: string | null;    // ID пользователя-партнера (если есть)
+  parent_debt_id?: string | null;    // ID оригинального долга (если это зеркало)
 }
 
 export interface DebtCategory {
@@ -119,4 +123,23 @@ export interface DebtCategory {
   name: string;
   icon: string;
   color: string;
+}
+
+export type RequestStatus = 'PENDING' | 'COMPLETED' | 'REJECTED';
+
+export interface TransactionRequest {
+  id: string;
+  created_at: string;
+  sender_user_id: string;
+  receiver_user_id: string;
+  related_debt_id: string;
+  amount: number;
+  currency: string;
+  transaction_type: TransactionType;
+  category_name: string;
+  description?: string;
+  status: RequestStatus;
+  
+  // Join поля (опционально, если будем подгружать имена)
+  sender_name?: string; 
 }

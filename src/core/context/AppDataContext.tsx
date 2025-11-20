@@ -2,10 +2,11 @@
 
 import React, { createContext, useContext, useEffect, useMemo, useState, ReactNode } from 'react';
 import * as api from '../services/api';
+import { supabase } from '../services/supabase'; // <-- ВАЖНО: Импорт клиента Supabase
 import { getExchangeRates, convertCurrency } from '../services/currency';
 import { 
   Transaction, Account, Category, SavingsGoal, Budget, Debt, ExchangeRates, 
-  TransactionType, DebtType, DebtStatus, DebtCategory
+  TransactionType, DebtType, DebtStatus, DebtCategory, TransactionRequest 
 } from '../types';
 import { useAuth } from './AuthContext';
 import { useLocalization } from './LocalizationContext';
@@ -15,6 +16,8 @@ import {
   DEBT_SYSTEM_CATEGORIES, 
   DEFAULT_CATEGORIES 
 } from '../../utils/constants';
+// НЕ ЗАБУДЬ ИМПОРТИРОВАТЬ МОДАЛКУ
+import { TransactionRequestsModal } from '../../features/transactions/TransactionRequestsModal';
 
 interface SummaryData {
   monthlyIncome: number;
@@ -31,6 +34,7 @@ interface AppDataContextType {
   budgets: Budget[];
   debts: Debt[];
   debtCategories: DebtCategory[];
+  requests: TransactionRequest[]; // НОВОЕ
   rates: ExchangeRates;
   isDataLoading: boolean;
   dataError: string | null;
@@ -44,7 +48,7 @@ interface AppDataContextType {
   
   // Actions
   refreshData: () => Promise<void>;
-  refreshDebts: () => Promise<void>; // <--- НОВАЯ ФУНКЦИЯ
+  refreshDebts: () => Promise<void>;
   
   handleAddTransaction: (tx: Omit<Transaction, 'id'>) => Promise<void>;
   handleUpdateTransaction: (tx: Transaction) => Promise<void>;
@@ -71,6 +75,10 @@ interface AppDataContextType {
   // Filters
   selectedAccountId: string;
   setSelectedAccountId: (id: string) => void;
+
+  // UI States (НОВОЕ)
+  isRequestsModalOpen: boolean;
+  setIsRequestsModalOpen: (isOpen: boolean) => void;
 }
 
 const AppDataContext = createContext<AppDataContextType | undefined>(undefined);
@@ -92,11 +100,14 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [debts, setDebts] = useState<Debt[]>([]);
   const [debtCategories, setDebtCategories] = useState<DebtCategory[]>([]); 
+  const [requests, setRequests] = useState<TransactionRequest[]>([]); // НОВОЕ
   const [rates, setRates] = useState<ExchangeRates>({});
   
   const [isDataLoading, setIsDataLoading] = useState(false);
   const [dataError, setDataError] = useState<string | null>(null);
   const [selectedAccountId, setSelectedAccountId] = useState<string>('all');
+  
+  const [isRequestsModalOpen, setIsRequestsModalOpen] = useState(false); // НОВОЕ
 
   // --- Data Loading & Migration ---
   const loadData = async () => {
@@ -104,11 +115,12 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
     setIsDataLoading(true);
     setDataError(null);
     try {
-      const [exchangeRates, initialData, fetchedDebts, fetchedDebtCategories] = await Promise.all([
+      const [exchangeRates, initialData, fetchedDebts, fetchedDebtCategories, fetchedRequests] = await Promise.all([
         getExchangeRates(),
         api.initializeUser(),
         api.getDebts(),
-        api.getDebtCategories()
+        api.getDebtCategories(),
+        api.getPendingRequests() // Загружаем входящие запросы
       ]);
       
       // --- МИГРАЦИЯ КАТЕГОРИЙ ---
@@ -119,9 +131,7 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
       );
 
       if (missingSystemCategories.length > 0) {
-        console.log("Migration: Creating missing system categories...", missingSystemCategories);
         const createdCategories: Category[] = [];
-        
         for (const catToCreate of missingSystemCategories) {
           try {
             const newCat = await api.addCategory({
@@ -149,6 +159,7 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
       setBudgets(initialData.budgets);
       setDebts(fetchedDebts || []);
       setDebtCategories(fetchedDebtCategories || []); 
+      setRequests(fetchedRequests || []); // Сохраняем запросы
 
     } catch (err: any) {
       console.error("AppData: Load failed", err);
@@ -158,13 +169,17 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
   };
 
-  // --- НОВАЯ ФУНКЦИЯ: ОБНОВЛЕНИЕ ТОЛЬКО ДОЛГОВ ---
+  // Обновление долгов и запросов
   const refreshDebts = async () => {
     if (!user) return;
     try {
-      const updatedDebts = await api.getDebts();
+      const [updatedDebts, updatedRequests] = await Promise.all([
+          api.getDebts(),
+          api.getPendingRequests()
+      ]);
       setDebts(updatedDebts || []);
-      console.log("Debts refreshed successfully");
+      setRequests(updatedRequests || []);
+      console.log("Debts and requests refreshed");
     } catch (error) {
       console.error("Failed to refresh debts:", error);
     }
@@ -175,6 +190,58 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
       loadData();
     }
   }, [user, isAuthLoading]);
+
+  // --- REALTIME SUBSCRIPTIONS ---
+  // Подписка на изменения в реальном времени
+  useEffect(() => {
+    if (!user) return;
+
+    console.log('🔌 Subscribing to Realtime changes...');
+
+    // 1. Подписка на изменения в таблице запросов (для красного бейджа и списка)
+    const requestsChannel = supabase
+      .channel('requests_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Слушаем все события: INSERT, UPDATE
+          schema: 'public',
+          table: 'transaction_requests',
+          filter: `receiver_user_id=eq.${user.id}`, // Только для текущего пользователя
+        },
+        (payload) => {
+          console.log('🔔 Realtime: Incoming request update!', payload);
+          // Перезапрашиваем список запросов, чтобы обновить UI
+          api.getPendingRequests().then(setRequests);
+        }
+      )
+      .subscribe();
+
+    // 2. Подписка на изменения в таблице долгов (если друг оплатил, и баланс обновился)
+    const debtsChannel = supabase
+      .channel('debts_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', 
+          schema: 'public',
+          table: 'debts',
+          filter: `telegram_user_id=eq.${user.id}`, // Только мои долги
+        },
+        (payload) => {
+          console.log('💰 Realtime: Debt update!', payload);
+          // Перезапрашиваем долги
+          api.getDebts().then(setDebts);
+        }
+      )
+      .subscribe();
+
+    // Очистка подписок при размонтировании или смене юзера
+    return () => {
+      supabase.removeChannel(requestsChannel);
+      supabase.removeChannel(debtsChannel);
+    };
+  }, [user]);
 
   // --- Calculations (Derived State) ---
   const displayCurrency = useMemo(() => user?.default_currency || 'USD', [user]);
@@ -246,11 +313,9 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
     if (currentGoalId || originalTx?.goalId) {
         setSavingsGoals(prevGoals => prevGoals.map(g => {
             let newCurrentAmount = g.currentAmount;
-            // Revert original
             if (originalTx?.goalId === g.id) {
                 newCurrentAmount -= convertCurrency(originalTx.amount, originalTx.currency, g.currency, rates);
             }
-            // Apply new
             if (currentGoalId === g.id && tx.type === TransactionType.EXPENSE) {
                 newCurrentAmount += convertCurrency(tx.amount, tx.currency, g.currency, rates);
             }
@@ -259,7 +324,6 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
   };
 
-  // Локальное обновление долга при транзакции (Optimistic UI)
   const updateDebtsFromTransaction = (tx: Transaction | Omit<Transaction, 'id'>, originalTx: Transaction | null = null) => {
     const currentDebtId = 'debtId' in tx ? tx.debtId : undefined;
 
@@ -267,25 +331,21 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
       setDebts(prevDebts => prevDebts.map(d => {
         let newCurrentAmount = d.current_amount;
         
-        // 1. Если редактируем транзакцию: сначала откатываем влияние старой
         if (originalTx?.debtId === d.id) {
            const amount = convertCurrency(originalTx.amount, originalTx.currency, d.currency, rates);
            if (
                originalTx.category === DEBT_SYSTEM_CATEGORIES.REPAYMENT_RECEIVED || 
                originalTx.category === DEBT_SYSTEM_CATEGORIES.REPAYMENT_SENT
             ) {
-               // Возврат погашения -> долг увеличивается обратно
                newCurrentAmount += amount;
            } else if (
                originalTx.category === DEBT_SYSTEM_CATEGORIES.LENDING ||
                originalTx.category === DEBT_SYSTEM_CATEGORIES.BORROWING
            ) {
-                // Отмена выдачи/займа -> долг уменьшается
                 newCurrentAmount -= amount;
            }
         }
 
-        // 2. Применяем новую транзакцию
         if (currentDebtId === d.id) {
            const amount = convertCurrency(tx.amount, tx.currency, d.currency, rates);
            
@@ -293,19 +353,16 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
                tx.category === DEBT_SYSTEM_CATEGORIES.REPAYMENT_RECEIVED || 
                tx.category === DEBT_SYSTEM_CATEGORIES.REPAYMENT_SENT
            ) {
-               // Погашение -> долг уменьшается
                newCurrentAmount -= amount;
            } else if (
                tx.category === DEBT_SYSTEM_CATEGORIES.LENDING ||
                tx.category === DEBT_SYSTEM_CATEGORIES.BORROWING
            ) {
-               // Выдача/Займ -> долг увеличивается
                newCurrentAmount += amount;
            }
         }
         
-        const updatedDebt = { ...d, current_amount: Math.max(0, newCurrentAmount) };
-        return updatedDebt;
+        return { ...d, current_amount: Math.max(0, newCurrentAmount) };
       }));
     }
   };
@@ -372,6 +429,28 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
             
             if (updatedDebtFromServer) {
                 setDebts(prev => prev.map(d => d.id === updatedDebtFromServer.id ? updatedDebtFromServer : d));
+            }
+
+            // --- НОВОЕ: Отправка запроса другу, если мы связаны ---
+            const debt = debts.find(d => d.id === finalTxData.debtId);
+            const linkedUserId = (debt as any)?.linked_user_id; // Поле linked_user_id, добавленное в SQL
+
+            if (linkedUserId) {
+                console.log("Sync: Sending transaction request to", linkedUserId);
+                
+                // Определяем тип транзакции для получателя (зеркальный)
+                let receiverTxType = TransactionType.INCOME;
+                if (finalTxData.type === TransactionType.INCOME) receiverTxType = TransactionType.EXPENSE;
+
+                await api.createTransactionRequest({
+                    receiver_user_id: linkedUserId,
+                    related_debt_id: finalTxData.debtId, // Ссылаемся на МОЙ долг, получатель разберется
+                    amount: finalTxData.amount,
+                    currency: finalTxData.currency,
+                    transaction_type: receiverTxType,
+                    category_name: finalTxData.category,
+                    description: finalTxData.name || 'Debt transaction'
+                });
             }
         }
 
@@ -622,12 +701,64 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
       }
   };
 
+  // --- HANDLERS ДЛЯ ЗАПРОСОВ (REQUESTS) ---
+
+  const handleConfirmRequest = async (req: TransactionRequest, accountId: string) => {
+      try {
+          // 1. Создаем реальную транзакцию
+          const newTxData: Omit<Transaction, 'id'> = {
+              accountId: accountId,
+              amount: req.amount,
+              currency: req.currency,
+              date: new Date().toISOString(),
+              name: req.description || `Transaction from ${req.sender_name || 'partner'}`,
+              type: req.transaction_type,
+              category: req.category_name || 'Debt',
+              debtId: undefined // Будем искать ниже
+          };
+          
+          // Ищем локальный долг, который соответствует related_debt_id
+          // Либо это parent_debt_id, либо сам ID (если это изначальный долг)
+          const relatedDebt = debts.find(d => 
+              (d as any).linked_user_id === req.sender_user_id || 
+              (d as any).parent_debt_id === req.related_debt_id ||
+              d.id === req.related_debt_id
+          );
+          
+          if (relatedDebt) {
+              newTxData.debtId = relatedDebt.id;
+          }
+
+          await handleAddTransaction(newTxData); 
+
+          // 2. Обновляем статус на сервере
+          await api.updateRequestStatus(req.id, 'COMPLETED');
+          
+          // 3. Убираем из списка
+          setRequests(prev => prev.filter(r => r.id !== req.id));
+
+      } catch (e: any) {
+          setDataError(e.message);
+      }
+  };
+
+  const handleRejectRequest = async (req: TransactionRequest) => {
+      try {
+          await api.updateRequestStatus(req.id, 'REJECTED');
+          // Помечаем как отклоненный локально
+          setRequests(prev => prev.map(r => r.id === req.id ? { ...r, status: 'REJECTED' } : r));
+      } catch (e: any) {
+          setDataError(e.message);
+      }
+  };
+
+
   return (
     <AppDataContext.Provider value={{
-        transactions, accounts, categories, savingsGoals, budgets, debts, debtCategories, rates, isDataLoading, dataError,
+        transactions, accounts, categories, savingsGoals, budgets, debts, debtCategories, rates, requests, isDataLoading, dataError,
         displayCurrency, totalBalance, totalSavings, summary, daysActive,
         refreshData: loadData,
-        refreshDebts, // Экспортируем нашу новую функцию
+        refreshDebts, 
         handleAddTransaction, handleUpdateTransaction, handleDeleteTransaction,
         handleSaveAccount, handleDeleteAccount,
         handleSaveCategory, handleDeleteCategory,
@@ -635,9 +766,21 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
         handleSaveBudget, handleDeleteBudget,
         handleSaveDebt, handleDeleteDebt, handleArchiveDebt,
         updateDefaultCurrency,
-        selectedAccountId, setSelectedAccountId
+        selectedAccountId, setSelectedAccountId,
+        // UI State для модалки запросов
+        isRequestsModalOpen, setIsRequestsModalOpen
     }}>
       {children}
+      
+      {/* Модалка для обработки входящих запросов */}
+      <TransactionRequestsModal 
+        isOpen={isRequestsModalOpen}
+        onClose={() => setIsRequestsModalOpen(false)}
+        requests={requests}
+        accounts={accounts}
+        onConfirm={handleConfirmRequest}
+        onReject={handleRejectRequest}
+      />
     </AppDataContext.Provider>
   );
 };

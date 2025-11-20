@@ -692,3 +692,80 @@ export const generateDebtShareLink = (debtId: string, amount: number, currency: 
   
   return { shareUrl, appLink };
 };
+
+// --- TRANSACTION REQUESTS (SYNC) ---
+
+/**
+ * Связать двух пользователей по долгу (вызывается при принятии инвайта)
+ */
+export const linkDebtPartners = async (parentDebtId: string, newDebtId: string) => {
+  const { error } = await supabase.rpc('link_debt_partners', {
+    debt_id_user1: parentDebtId,
+    debt_id_user2: newDebtId
+  });
+  if (error) console.error("Error linking partners:", error);
+};
+
+/**
+ * Создать запрос на транзакцию (отправляется другу)
+ */
+export const createTransactionRequest = async (request: {
+  receiver_user_id: string;
+  related_debt_id: string; // ID долга ПОЛУЧАТЕЛЯ (если знаем) или NULL
+  amount: number;
+  currency: string;
+  transaction_type: string; // INCOME / EXPENSE
+  category_name: string;
+  description: string;
+}) => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("User not auth");
+
+  const { error } = await supabase
+    .from('transaction_requests')
+    .insert({
+      ...request,
+      sender_user_id: user.id
+    });
+    
+  if (error) throw error;
+};
+
+/**
+ * Получить входящие запросы (PENDING)
+ */
+export const getPendingRequests = async () => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
+
+  // Загружаем запросы + можно подтянуть имя отправителя через join profiles
+  const { data, error } = await supabase
+    .from('transaction_requests')
+    .select(`
+      *,
+      sender:sender_user_id ( full_name )
+    `)
+    .eq('receiver_user_id', user.id)
+    .in('status', ['PENDING', 'REJECTED']) // Показываем и отклоненные, чтобы можно было восстановить
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  
+  // Маппим имя отправителя
+  return data.map((item: any) => ({
+    ...item,
+    sender_name: item.sender?.full_name || 'Unknown User'
+  }));
+};
+
+/**
+ * Обновить статус запроса (Принять/Отклонить)
+ */
+export const updateRequestStatus = async (requestId: string, status: 'COMPLETED' | 'REJECTED') => {
+  const { error } = await supabase
+    .from('transaction_requests')
+    .update({ status })
+    .eq('id', requestId);
+    
+  if (error) throw error;
+};
