@@ -711,10 +711,10 @@ export const linkDebtPartners = async (parentDebtId: string, newDebtId: string) 
  */
 export const createTransactionRequest = async (request: {
   receiver_user_id: string;
-  related_debt_id: string; // ID долга ПОЛУЧАТЕЛЯ (если знаем) или NULL
+  related_debt_id: string; 
   amount: number;
   currency: string;
-  transaction_type: string; // INCOME / EXPENSE
+  transaction_type: string; 
   category_name: string;
   description: string;
 }) => {
@@ -732,29 +732,29 @@ export const createTransactionRequest = async (request: {
 };
 
 /**
- * Получить входящие запросы (PENDING)
+ * Получить входящие запросы (PENDING и REJECTED)
  */
 export const getPendingRequests = async () => {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return [];
 
-  // Загружаем запросы + можно подтянуть имя отправителя через join profiles
+  // ИЗМЕНЕНИЕ: Используем sender_user_id для JOIN
   const { data, error } = await supabase
     .from('transaction_requests')
     .select(`
       *,
-      sender:sender_user_id ( full_name )
+      sender_profile:sender_user_id ( full_name )
     `)
     .eq('receiver_user_id', user.id)
-    .in('status', ['PENDING', 'REJECTED']) // Показываем и отклоненные, чтобы можно было восстановить
+    .in('status', ['PENDING', 'REJECTED']) 
     .order('created_at', { ascending: false });
 
   if (error) throw error;
   
-  // Маппим имя отправителя
+  // Маппим имя отправителя через псевдоним
   return data.map((item: any) => ({
     ...item,
-    sender_name: item.sender?.full_name || 'Unknown User'
+    sender_name: item.sender_profile?.full_name || 'Пользователь'
   }));
 };
 

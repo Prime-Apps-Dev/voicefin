@@ -6,7 +6,7 @@
     "module": "ESNext",
     "moduleResolution": "node",
     "lib": ["ES2020"],
-    "types": ["npm:@types/node/ts4.2"],
+    "types": ["npm:@types/node"],
     "isolatedModules": true
   },
   "include": ["**/*.ts", "**/*.tsx"],
