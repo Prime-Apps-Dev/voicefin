@@ -57,7 +57,8 @@ const AppContent: React.FC = () => {
     handleSaveGoal, handleDeleteGoal,
     handleSaveBudget, handleDeleteBudget,
     updateDefaultCurrency,
-    debts 
+    debts,
+    refreshDebts // <-- ИЗВЛЕКАЕМ НОВУЮ ФУНКЦИЮ
   } = useAppData();
 
   const [activeScreen, setActiveScreen] = useState<'home' | 'savings' | 'analytics' | 'profile' | 'accounts' | 'budgetPlanning' | 'categories' | 'settings' | 'comingSoon' | 'history' | 'about' | 'debts'>('home');
@@ -115,19 +116,14 @@ const AppContent: React.FC = () => {
 
     if (startParam && startParam.startsWith('debt_')) {
       let rawId = startParam.replace('debt_', '');
-      
-      // ЖЕСТКАЯ ЧИСТКА: Оставляем только буквы a-f, цифры и дефисы. 
-      // Это уберет любые кавычки, пробелы и спецсимволы, от которых падает база.
       const cleanId = rawId.replace(/[^a-f0-9-]/gi, '');
 
-      console.log("🎯 Incoming Debt ID (Raw):", rawId);
       console.log("🎯 Incoming Debt ID (Clean):", cleanId);
       
-      // UUID всегда 36 символов
       if (cleanId.length === 36) {
         setIncomingDebtId(cleanId);
       } else {
-        console.error("⚠️ Invalid UUID received:", rawId);
+        console.error("⚠️ Invalid UUID format:", rawId);
       }
     }
   }, []);
@@ -316,7 +312,9 @@ const AppContent: React.FC = () => {
       <IncomingDebtModal 
         debtId={incomingDebtId}
         onClose={() => setIncomingDebtId(null)}
-        onDebtAdded={() => {
+        // ВАЖНОЕ ИЗМЕНЕНИЕ: Вызываем refreshDebts при добавлении
+        onDebtAdded={async () => {
+           await refreshDebts();
            setIncomingDebtId(null);
            setActiveScreen('debts');
         }}
