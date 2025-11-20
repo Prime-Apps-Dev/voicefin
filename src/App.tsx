@@ -108,7 +108,7 @@ const AppContent: React.FC = () => {
     }
   }, [user]);
 
-  // ОБРАБОТКА DEEP LINK (ВХОДЯЩИЙ ДОЛГ)
+  // --- ЛОГИКА DEEP LINK ---
   useEffect(() => {
     const initData = (window as any).Telegram?.WebApp?.initDataUnsafe;
     const startParam = initData?.start_param;
@@ -116,15 +116,18 @@ const AppContent: React.FC = () => {
     if (startParam && startParam.startsWith('debt_')) {
       let rawId = startParam.replace('debt_', '');
       
-      // ЧИСТКА ID: Оставляем только символы UUID, убираем кавычки и мусор
+      // ЖЕСТКАЯ ЧИСТКА: Оставляем только буквы a-f, цифры и дефисы. 
+      // Это уберет любые кавычки, пробелы и спецсимволы, от которых падает база.
       const cleanId = rawId.replace(/[^a-f0-9-]/gi, '');
 
-      console.log("🎯 Cleaned Debt ID:", cleanId);
+      console.log("🎯 Incoming Debt ID (Raw):", rawId);
+      console.log("🎯 Incoming Debt ID (Clean):", cleanId);
       
+      // UUID всегда 36 символов
       if (cleanId.length === 36) {
         setIncomingDebtId(cleanId);
       } else {
-        console.error("⚠️ Invalid UUID format:", rawId);
+        console.error("⚠️ Invalid UUID received:", rawId);
       }
     }
   }, []);
