@@ -1,14 +1,13 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle, X, AlertCircle, ArrowRight } from 'lucide-react';
-// Исправленный импорт: добавили DebtStatus
-import { DebtType, Debt, DebtStatus } from '../../core/types';
+import { DebtType, DebtStatus } from '../../core/types';
 import * as api from '../../core/services/api';
 
 interface IncomingDebtModalProps {
-  debtId: string | null; // ID оригинального долга
+  debtId: string | null; 
   onClose: () => void;
-  onDebtAdded: () => void; // Обновить список после добавления
+  onDebtAdded: () => void;
   defaultCurrency: string;
 }
 
@@ -29,15 +28,21 @@ export const IncomingDebtModal: React.FC<IncomingDebtModalProps> = ({
     const loadDebt = async () => {
       try {
         setIsLoading(true);
+        console.log('🔍 Fetching shared debt:', debtId); // ЛОГ ДЛЯ ОТЛАДКИ
+
         const data = await api.getSharedDebt(debtId);
+        
         if (!data) {
+          console.error('❌ Debt data is null/empty');
           setError('Долг не найден или был удален.');
         } else {
+          console.log('✅ Debt loaded:', data);
           setSharedDebt(data);
         }
-      } catch (err) {
-        console.error(err);
-        setError('Не удалось загрузить данные долга.');
+      } catch (err: any) {
+        console.error('🔥 Error loading shared debt:', err);
+        // Показываем реальную ошибку для отладки
+        setError(err.message || 'Не удалось загрузить данные долга.');
       } finally {
         setIsLoading(false);
       }
@@ -52,7 +57,6 @@ export const IncomingDebtModal: React.FC<IncomingDebtModalProps> = ({
     try {
       setIsLoading(true);
 
-      // ЛОГИКА ЗЕРКАЛИРОВАНИЯ
       const myType = sharedDebt.type === DebtType.I_OWE 
         ? DebtType.OWED_TO_ME 
         : DebtType.I_OWE;
@@ -65,15 +69,15 @@ export const IncomingDebtModal: React.FC<IncomingDebtModalProps> = ({
         type: myType,
         date: new Date().toISOString(),
         description: `Синхронизировано: ${sharedDebt.description || ''}`,
-        // ИСПРАВЛЕНИЕ: Используем Enum вместо строки
         status: DebtStatus.ACTIVE,
-        // @ts-ignore: Поле parent_debt_id мы добавили в SQL, но в типах TS его может еще не быть
+        // @ts-ignore
         parent_debt_id: sharedDebt.id 
       });
 
       onDebtAdded();
       onClose();
     } catch (err) {
+      console.error(err);
       setError('Ошибка при сохранении долга');
       setIsLoading(false);
     }
@@ -87,22 +91,24 @@ export const IncomingDebtModal: React.FC<IncomingDebtModalProps> = ({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[60] p-4"
+        // ИСПРАВЛЕНО: z-[9999] гарантирует, что это будет ПОВЕРХ всего (онбординга, лоадеров)
+        className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[9999] p-4"
       >
         <motion.div
           initial={{ scale: 0.9, y: 20 }}
           animate={{ scale: 1, y: 0 }}
-          className="bg-zinc-900 rounded-2xl w-full max-w-sm border border-zinc-700 overflow-hidden shadow-2xl"
+          className="bg-zinc-900 rounded-2xl w-full max-w-sm border border-zinc-700 overflow-hidden shadow-2xl relative"
         >
+          {/* Кнопка закрытия */}
+          <button 
+            onClick={onClose}
+            className="absolute top-4 right-4 z-10 text-zinc-400 hover:text-white bg-black/20 p-1 rounded-full"
+          >
+            <X className="w-5 h-5" />
+          </button>
+
           {/* Header */}
-          <div className="bg-gradient-to-r from-blue-900/50 to-purple-900/50 p-6 text-center relative">
-             <button 
-                onClick={onClose}
-                className="absolute top-4 right-4 text-zinc-400 hover:text-white"
-              >
-                <X className="w-5 h-5" />
-              </button>
-              
+          <div className="bg-gradient-to-r from-blue-900/50 to-purple-900/50 p-6 text-center">
               <div className="w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-4 ring-4 ring-blue-500/10">
                 <ArrowRight className="w-8 h-8 text-blue-400" />
               </div>
@@ -112,17 +118,20 @@ export const IncomingDebtModal: React.FC<IncomingDebtModalProps> = ({
 
           <div className="p-6">
             {isLoading ? (
-              <div className="flex justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+              <div className="flex flex-col items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mb-4"></div>
+                <p className="text-zinc-500 text-sm">Загрузка информации...</p>
               </div>
             ) : error ? (
               <div className="text-center py-4">
                 <AlertCircle className="w-10 h-10 text-red-500 mx-auto mb-3" />
-                <p className="text-red-400">{error}</p>
+                <p className="text-red-400 mb-4">{error}</p>
+                <button onClick={onClose} className="text-zinc-400 underline text-sm">
+                    Закрыть
+                </button>
               </div>
             ) : (
               <div className="space-y-6">
-                {/* Info Card */}
                 <div className="bg-zinc-800/50 rounded-xl p-4 border border-zinc-700">
                   <div className="flex justify-between items-start mb-2">
                     <span className="text-zinc-400 text-sm">От кого:</span>
@@ -144,7 +153,7 @@ export const IncomingDebtModal: React.FC<IncomingDebtModalProps> = ({
 
                 <div className="text-center">
                    <p className="text-zinc-400 text-sm mb-4">
-                     Добавить этот долг в ваш список как <br/>
+                     Добавить в ваш список как <br/>
                      <strong className="text-white">
                        {sharedDebt.type === 'I_OWE' ? '"Мне должны"' : '"Я должен"'}
                      </strong>?
@@ -155,7 +164,7 @@ export const IncomingDebtModal: React.FC<IncomingDebtModalProps> = ({
                     className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3.5 rounded-xl font-bold shadow-lg shadow-blue-900/20 transition-all active:scale-95 flex items-center justify-center gap-2"
                    >
                      <CheckCircle className="w-5 h-5" />
-                     Принять и сохранить
+                     Принять
                    </button>
                 </div>
               </div>

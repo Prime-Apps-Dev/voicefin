@@ -110,21 +110,26 @@ const AppContent: React.FC = () => {
     }
   }, [user]);
 
-  // 2. Добавляем useEffect для проверки start_param при загрузке
   useEffect(() => {
-    // Проверяем, есть ли параметры запуска от Telegram
     const initData = (window as any).Telegram?.WebApp?.initDataUnsafe;
     const startParam = initData?.start_param;
 
     if (startParam && startParam.startsWith('debt_')) {
-      const debtId = startParam.replace('debt_', '');
-      console.log("Found incoming debt ID:", debtId);
+      // 1. Убираем префикс
+      let rawId = startParam.replace('debt_', '');
       
-      // Открываем модалку приема долга
-      setIncomingDebtId(debtId);
+      // 2. ЖЕСТКАЯ ОЧИСТКА: Оставляем только символы UUID (цифры, буквы a-f, дефисы)
+      // Это уберет кавычки, пробелы и любой мусор, который ломает SQL
+      const cleanId = rawId.replace(/[^a-f0-9-]/gi, '');
+
+      console.log("🎯 Cleaned Debt ID:", cleanId);
       
-      // (Опционально) Можно сразу переключить экран, если нужно,
-      // но модалка будет поверх всего, так что не обязательно.
+      // Проверяем длину UUID (должно быть 36 символов), чтобы не слать мусор
+      if (cleanId.length === 36) {
+        setIncomingDebtId(cleanId);
+      } else {
+        console.error("⚠️ Invalid UUID received from start_param:", rawId);
+      }
     }
   }, []);
 
