@@ -1,5 +1,3 @@
-// src/App.tsx
-
 import React, { useState, useEffect } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { AlertTriangle } from 'lucide-react';
@@ -33,10 +31,10 @@ import { ComingSoonScreen } from './shared/ui/screens/ComingSoonScreen';
 import { AccountList } from './features/accounts/AccountList';
 import { FinancialOverview } from './features/analytics/FinancialOverview';
 import { TransactionList } from './features/transactions/TransactionList';
-import { DebtsScreen } from './features/debts/DebtsScreen'; // ДОБАВЛЕНО: Импорт DebtsScreen
+import { DebtsScreen } from './features/debts/DebtsScreen'; 
 
 // Types & Hooks
-import { Transaction, TransactionType, Account, SavingsGoal, Budget, Category, Debt } from './core/types'; // ИЗМЕНЕНО: Добавлен Debt
+import { Transaction, TransactionType, Account, SavingsGoal, Budget, Category, Debt } from './core/types';
 import { useAudioTransaction } from './shared/hooks/useAudioTransaction';
 
 const TG_HEADER_OFFSET_CLASS = 'pt-[85px]';
@@ -59,10 +57,10 @@ const AppContent: React.FC = () => {
     handleSaveGoal, handleDeleteGoal,
     handleSaveBudget, handleDeleteBudget,
     updateDefaultCurrency,
-    debts // ДОБАВЛЕНО: Массив долгов
+    debts 
   } = useAppData();
 
-  const [activeScreen, setActiveScreen] = useState<'home' | 'savings' | 'analytics' | 'profile' | 'accounts' | 'budgetPlanning' | 'categories' | 'settings' | 'comingSoon' | 'history' | 'about' | 'debts'>('home'); // ИЗМЕНЕНО: Добавлен 'debts'
+  const [activeScreen, setActiveScreen] = useState<'home' | 'savings' | 'analytics' | 'profile' | 'accounts' | 'budgetPlanning' | 'categories' | 'settings' | 'comingSoon' | 'history' | 'about' | 'debts'>('home');
   const [error, setError] = useState<string | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
   
@@ -110,25 +108,23 @@ const AppContent: React.FC = () => {
     }
   }, [user]);
 
+  // ОБРАБОТКА DEEP LINK (ВХОДЯЩИЙ ДОЛГ)
   useEffect(() => {
     const initData = (window as any).Telegram?.WebApp?.initDataUnsafe;
     const startParam = initData?.start_param;
 
     if (startParam && startParam.startsWith('debt_')) {
-      // 1. Убираем префикс
       let rawId = startParam.replace('debt_', '');
       
-      // 2. ЖЕСТКАЯ ОЧИСТКА: Оставляем только символы UUID (цифры, буквы a-f, дефисы)
-      // Это уберет кавычки, пробелы и любой мусор, который ломает SQL
+      // ЧИСТКА ID: Оставляем только символы UUID, убираем кавычки и мусор
       const cleanId = rawId.replace(/[^a-f0-9-]/gi, '');
 
       console.log("🎯 Cleaned Debt ID:", cleanId);
       
-      // Проверяем длину UUID (должно быть 36 символов), чтобы не слать мусор
       if (cleanId.length === 36) {
         setIncomingDebtId(cleanId);
       } else {
-        console.error("⚠️ Invalid UUID received from start_param:", rawId);
+        console.error("⚠️ Invalid UUID format:", rawId);
       }
     }
   }, []);
@@ -139,36 +135,32 @@ const AppContent: React.FC = () => {
     stopRecording();
     
     try {
-        // ОБНОВЛЕНО: Передаём accounts и displayCurrency
         const tx = await processAudioResult(
           categories, 
           savingsGoals, 
-          accounts, // НОВОЕ
-          displayCurrency // НОВОЕ (из AppDataContext)
+          accounts, 
+          displayCurrency 
         );
         
         if (tx) {
             setPotentialTransaction({
                 ...tx,
-                // Если accountId не определён, ставим первый счёт
                 accountId: tx.accountId || accounts[0]?.id,
             });
         }
     } catch (e: any) {
         setError(e.message || t('connectionError'));
     }
-};
+  };
 
   const handleTextTransactionSubmit = async (text: string) => {
       if (!text.trim()) return;
       setIsProcessingText(true);
       try {
-        // ✅ Pass accounts to API
         const newTransaction = await api.parseTransactionFromText(
           text, displayCurrency, categories, savingsGoals, accounts, language
         );
         
-        // Account mapping for Text as well (simple fallback for now, ideally API returns matched name too)
         const finalAccountId = newTransaction.accountId || (selectedAccountId !== 'all' ? selectedAccountId : accounts[0]?.id);
 
         setPotentialTransaction({ ...newTransaction, accountId: finalAccountId });
@@ -181,7 +173,6 @@ const AppContent: React.FC = () => {
       }
   };
 
-  // ... (Rest of handlers: handleConfirmTransactionWrapper, etc. remain same) ...
   const handleConfirmTransactionWrapper = async (tx: Transaction | Omit<Transaction, 'id'>) => {
     try {
         if ('id' in tx) await handleUpdateTransaction(tx);
@@ -286,7 +277,6 @@ const AppContent: React.FC = () => {
           case 'history': return <TransactionHistoryScreen transactions={transactions} accounts={accounts} categories={categories} rates={rates} defaultCurrency={displayCurrency} onSelectTransaction={setEditingTransaction} onDeleteTransaction={setItemToDelete} onBack={() => setActiveScreen('home')} />;
           case 'comingSoon': return <ComingSoonScreen onBack={() => setActiveScreen('profile')} />;
           
-          // НОВЫЙ ЭКРАН
           case 'debts': return <DebtsScreen debts={debts} onBack={() => setActiveScreen('profile')} />;
 
           case 'home': default: return (
@@ -319,15 +309,13 @@ const AppContent: React.FC = () => {
         <RecordingOverlay transcription={transcription} stream={stream} onStop={handleRecordingStopLogic} isRecording={isRecording} audioContext={audioContext} />
       )}
 
+      {/* Модалка входящего долга */}
       <IncomingDebtModal 
         debtId={incomingDebtId}
         onClose={() => setIncomingDebtId(null)}
         onDebtAdded={() => {
-           // Обновляем данные (долги)
-           // Если у вас нет функции reloadDebts, просто закройте,
-           // данные обновятся при следующем входе или через стейт-менеджер
            setIncomingDebtId(null);
-           setActiveScreen('debts'); // Переходим в раздел долгов
+           setActiveScreen('debts');
         }}
         defaultCurrency={displayCurrency}
       />
@@ -345,7 +333,7 @@ const AppContent: React.FC = () => {
         goalForHistory={goalForHistory} setGoalForHistory={setGoalForHistory} budgetForHistory={budgetForHistory} setBudgetForHistory={setBudgetForHistory} onDeleteTransaction={setItemToDelete} onSelectTransaction={setEditingTransaction}
         carryOverInfo={carryOverInfo} setCarryOverInfo={setCarryOverInfo} onConfirmCarryOver={() => { if(carryOverInfo){ budgets.filter(b => b.monthKey === carryOverInfo.from).forEach(b => handleSaveBudget({...b, monthKey: carryOverInfo.to})); setCarryOverInfo(null); } }}
         categories={categories} accounts={accounts} savingsGoals={savingsGoals} budgets={budgets} transactions={transactions} rates={rates} displayCurrency={displayCurrency}
-        debts={debts} // ДОБАВЛЕНО: Передача массива долгов
+        debts={debts}
       />
 
       {!(isAuthLoading || isDataLoading) && (

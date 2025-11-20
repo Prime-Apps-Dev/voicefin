@@ -28,20 +28,20 @@ export const IncomingDebtModal: React.FC<IncomingDebtModalProps> = ({
     const loadDebt = async () => {
       try {
         setIsLoading(true);
-        console.log('🔍 Fetching shared debt:', debtId); // ЛОГ ДЛЯ ОТЛАДКИ
+        console.log('🔍 Запрос данных долга:', debtId);
 
         const data = await api.getSharedDebt(debtId);
         
         if (!data) {
-          console.error('❌ Debt data is null/empty');
+          console.warn('❌ Данные долга пусты или не найдены');
           setError('Долг не найден или был удален.');
         } else {
-          console.log('✅ Debt loaded:', data);
+          console.log('✅ Долг загружен:', data);
           setSharedDebt(data);
         }
       } catch (err: any) {
-        console.error('🔥 Error loading shared debt:', err);
-        // Показываем реальную ошибку для отладки
+        console.error('🔥 Ошибка загрузки долга:', err);
+        // Показываем сообщение ошибки, чтобы понимать причину
         setError(err.message || 'Не удалось загрузить данные долга.');
       } finally {
         setIsLoading(false);
@@ -57,6 +57,7 @@ export const IncomingDebtModal: React.FC<IncomingDebtModalProps> = ({
     try {
       setIsLoading(true);
 
+      // Инвертируем тип: если он говорит "Я должен", значит мне "Мне должны"
       const myType = sharedDebt.type === DebtType.I_OWE 
         ? DebtType.OWED_TO_ME 
         : DebtType.I_OWE;
@@ -70,7 +71,7 @@ export const IncomingDebtModal: React.FC<IncomingDebtModalProps> = ({
         date: new Date().toISOString(),
         description: `Синхронизировано: ${sharedDebt.description || ''}`,
         status: DebtStatus.ACTIVE,
-        // @ts-ignore
+        // @ts-ignore: parent_debt_id есть в базе, но может отсутствовать в типах TS
         parent_debt_id: sharedDebt.id 
       });
 
@@ -91,7 +92,7 @@ export const IncomingDebtModal: React.FC<IncomingDebtModalProps> = ({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        // ИСПРАВЛЕНО: z-[9999] гарантирует, что это будет ПОВЕРХ всего (онбординга, лоадеров)
+        // z-[9999] гарантирует, что окно будет ПОВЕРХ всего (онбординга, лоадеров)
         className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-[9999] p-4"
       >
         <motion.div
@@ -107,7 +108,7 @@ export const IncomingDebtModal: React.FC<IncomingDebtModalProps> = ({
             <X className="w-5 h-5" />
           </button>
 
-          {/* Header */}
+          {/* Хедер */}
           <div className="bg-gradient-to-r from-blue-900/50 to-purple-900/50 p-6 text-center">
               <div className="w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-4 ring-4 ring-blue-500/10">
                 <ArrowRight className="w-8 h-8 text-blue-400" />
@@ -125,8 +126,8 @@ export const IncomingDebtModal: React.FC<IncomingDebtModalProps> = ({
             ) : error ? (
               <div className="text-center py-4">
                 <AlertCircle className="w-10 h-10 text-red-500 mx-auto mb-3" />
-                <p className="text-red-400 mb-4">{error}</p>
-                <button onClick={onClose} className="text-zinc-400 underline text-sm">
+                <p className="text-red-400 mb-4 text-sm">{error}</p>
+                <button onClick={onClose} className="bg-zinc-800 text-white px-4 py-2 rounded-lg text-sm">
                     Закрыть
                 </button>
               </div>
