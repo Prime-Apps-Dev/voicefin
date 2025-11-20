@@ -1,21 +1,22 @@
 // src/features/debts/DebtForm.tsx
-// ФОРМА СОЗДАНИЯ/РЕДАКТИРОВАНИЯ ДОЛГА
+// ФОРМА СОЗДАНИЯ/РЕДАКТИРОВАНИЯ ДОЛГА (С ФУНКЦИЕЙ ШАРИНГА)
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Debt, DebtType } from '../../core/types';
+import { Debt, DebtType, DebtStatus } from '../../core/types'; // Добавлен DebtStatus
 import { useLocalization } from '../../core/context/LocalizationContext';
 import { COMMON_CURRENCIES } from '../../utils/constants';
-import { ChevronDown, Calendar, X } from 'lucide-react';
+import { ChevronDown, Calendar, X, Share, CheckCircle } from 'lucide-react';
 import { DatePicker } from '../../shared/ui/modals/DatePicker';
+import * as api from '../../core/services/api';
 
 interface DebtFormProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (debt: Omit<Debt, 'id' | 'created_at' | 'updated_at'>) => void;
+  onSave: (debt: any) => void;
   debt?: Debt | null;
   defaultCurrency: string;
-  categories: string[]; // Категории долгов
+  categories: string[];
 }
 
 const defaultState = {
@@ -37,14 +38,21 @@ export const DebtForm: React.FC<DebtFormProps> = ({
   defaultCurrency,
   categories 
 }) => {
-  const { t, language } = useLocalization();
+  const { t } = useLocalization(); 
+  
   const [formData, setFormData] = useState(defaultState);
   const [amountStr, setAmountStr] = useState('');
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [isDueDatePickerOpen, setIsDueDatePickerOpen] = useState(false);
+  
+  const [savedDebtId, setSavedDebtId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
+      setSavedDebtId(null); // Сброс при открытии
+      setIsSaving(false);
+
       if (debt) {
         setFormData({
           person: debt.person,
@@ -80,7 +88,7 @@ export const DebtForm: React.FC<DebtFormProps> = ({
     setFormData(prev => ({ ...prev, type }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     const amount = parseFloat(formData.amount);
@@ -94,18 +102,69 @@ export const DebtForm: React.FC<DebtFormProps> = ({
       return;
     }
 
-    onSave({
+    // --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
+    const debtPayload = {
       person: formData.person.trim(),
       description: formData.description.trim(),
       category: formData.category.trim(),
       amount: amount,
-      current_amount: amount, // Initially, full amount is owed
+      current_amount: amount,
       currency: formData.currency,
       type: formData.type,
-      status: 'ACTIVE',
-      date: formData.date,
-      due_date: formData.due_date || undefined,
+      status: DebtStatus.ACTIVE, // Используем Enum
+      date: formData.date || new Date().toISOString(), // Защита от пустой даты
+      // КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Явно передаем null, если строка пустая
+      due_date: formData.due_date && formData.due_date.trim() !== '' ? formData.due_date : null,
+    };
+
+    try {
+      setIsSaving(true);
+
+      if (debt) {
+        // Редактирование
+        onSave({ ...debtPayload, id: debt.id }); 
+      } else {
+        // Создание (с шарингом)
+        // Используем 'as any', так как Supabase примет null для due_date нормально
+        const newDebt = await api.addDebt(debtPayload as any);
+        setSavedDebtId(newDebt.id);
+      }
+    } catch (error: any) {
+      console.error("Error saving debt:", error);
+      alert(`Failed to save debt: ${error.message || 'Unknown error'}`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleShare = () => {
+    if (!savedDebtId) return;
+
+    const amount = parseFloat(formData.amount);
+    
+    const { shareUrl } = api.generateDebtShareLink(
+        savedDebtId, 
+        amount, 
+        formData.currency, 
+        formData.type
+    );
+
+    if ((window as any).Telegram?.WebApp) {
+        (window as any).Telegram.WebApp.openTelegramLink(shareUrl);
+    } else {
+        window.open(shareUrl, '_blank');
+    }
+
+    handleFinish();
+  };
+
+  const handleFinish = () => {
+    onSave({
+        ...formData,
+        amount: parseFloat(formData.amount),
+        id: savedDebtId
     });
+    onClose();
   };
 
   const safeDate = new Date(formData.date);
@@ -129,180 +188,227 @@ export const DebtForm: React.FC<DebtFormProps> = ({
               className="bg-zinc-900 rounded-2xl w-full max-w-md border border-zinc-800 overflow-hidden shadow-xl"
               onClick={(e) => e.stopPropagation()}
             >
-              {/* Header */}
-              <div className="p-4 border-b border-zinc-800 flex justify-between items-center">
-                <h2 className="text-lg font-bold text-white">
-                  {debt ? 'Edit Debt' : 'New Debt'}
-                </h2>
-                <button 
-                  onClick={onClose} 
-                  className="text-zinc-400 hover:text-white p-1 rounded-full hover:bg-zinc-800"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
+              
+              {savedDebtId ? (
+                // === ЭКРАН УСПЕХА И ШАРИНГА ===
+                <div className="p-8 text-center flex flex-col items-center">
+                  <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mb-6 ring-4 ring-green-500/10">
+                    <CheckCircle className="w-10 h-10 text-green-500" />
+                  </div>
+                  
+                  <h2 className="text-2xl font-bold text-white mb-2">Debt Created!</h2>
+                  <p className="text-zinc-400 mb-8">
+                    The debt has been successfully saved. Do you want to send a notification to {formData.person}?
+                  </p>
 
-              <form onSubmit={handleSubmit} className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
-                {/* Person Name */}
-                <div>
-                  <label className="block text-sm font-medium text-zinc-400 mb-1">
-                    Person / Entity *
-                  </label>
-                  <input 
-                    name="person"
-                    value={formData.person}
-                    onChange={handleChange}
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl p-3 text-white focus:outline-none focus:border-blue-500"
-                    placeholder="e.g. John Doe"
-                    required
-                  />
+                  <button 
+                    onClick={handleShare}
+                    className="w-full bg-blue-600 hover:bg-blue-500 text-white py-4 rounded-xl font-bold mb-3 flex items-center justify-center gap-2 transition-transform active:scale-95 shadow-lg shadow-blue-900/20"
+                  >
+                    <Share className="w-5 h-5" />
+                    Share via Telegram
+                  </button>
+                  
+                  <button 
+                    onClick={handleFinish}
+                    className="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-4 rounded-xl font-medium transition-colors"
+                  >
+                    Done
+                  </button>
                 </div>
-
-                {/* Type Selection */}
-                <div>
-                  <label className="block text-sm font-medium text-zinc-400 mb-1">
-                    Type *
-                  </label>
-                  <div className="grid grid-cols-2 gap-2 bg-zinc-800 p-1 rounded-xl">
+              ) : (
+                // === ОБЫЧНАЯ ФОРМА ===
+                <>
+                  {/* Header */}
+                  <div className="p-4 border-b border-zinc-800 flex justify-between items-center">
+                    <h2 className="text-lg font-bold text-white">
+                      {debt ? 'Edit Debt' : 'New Debt'}
+                    </h2>
                     <button 
-                      type="button"
-                      onClick={() => handleTypeChange(DebtType.I_OWE)}
-                      className={`py-2 rounded-lg text-sm font-medium transition-colors ${
-                        formData.type === DebtType.I_OWE 
-                          ? 'bg-red-500/20 text-red-400' 
-                          : 'text-zinc-400 hover:text-white'
-                      }`}
+                      onClick={onClose} 
+                      className="text-zinc-400 hover:text-white p-1 rounded-full hover:bg-zinc-800"
                     >
-                      I Owe
-                    </button>
-                    <button 
-                      type="button"
-                      onClick={() => handleTypeChange(DebtType.OWED_TO_ME)}
-                      className={`py-2 rounded-lg text-sm font-medium transition-colors ${
-                        formData.type === DebtType.OWED_TO_ME 
-                          ? 'bg-emerald-500/20 text-emerald-400' 
-                          : 'text-zinc-400 hover:text-white'
-                      }`}
-                    >
-                      Owed to Me
+                      <X className="w-5 h-5" />
                     </button>
                   </div>
-                </div>
 
-                {/* Amount & Currency */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-zinc-400 mb-1">
-                      Amount *
-                    </label>
-                    <input 
-                      type="text"
-                      inputMode="decimal"
-                      name="amount"
-                      value={amountStr}
-                      onChange={handleChange}
-                      className="w-full bg-zinc-800 border border-zinc-700 rounded-xl p-3 text-white focus:outline-none focus:border-blue-500"
-                      placeholder="0.00"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-zinc-400 mb-1">
-                      Currency
-                    </label>
-                    <div className="relative">
-                      <select 
-                        name="currency" 
-                        value={formData.currency} 
+                  <form onSubmit={handleSubmit} className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
+                    {/* Person Name */}
+                    <div>
+                      <label className="block text-sm font-medium text-zinc-400 mb-1">
+                        Person / Entity *
+                      </label>
+                      <input 
+                        name="person"
+                        value={formData.person}
                         onChange={handleChange}
-                        className="w-full appearance-none bg-zinc-800 border border-zinc-700 rounded-xl p-3 text-white focus:outline-none focus:border-blue-500 pr-10"
-                      >
-                        {COMMON_CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
-                      </select>
-                      <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 pointer-events-none" />
+                        className="w-full bg-zinc-800 border border-zinc-700 rounded-xl p-3 text-white focus:outline-none focus:border-blue-500 placeholder-zinc-600"
+                        placeholder="e.g. John Doe"
+                        required
+                        disabled={isSaving}
+                      />
                     </div>
-                  </div>
-                </div>
 
-                {/* Category */}
-                <div>
-                  <label className="block text-sm font-medium text-zinc-400 mb-1">
-                    Category (Optional)
-                  </label>
-                  <div className="relative">
-                    <select 
-                      name="category" 
-                      value={formData.category} 
-                      onChange={handleChange}
-                      className="w-full appearance-none bg-zinc-800 border border-zinc-700 rounded-xl p-3 text-white focus:outline-none focus:border-blue-500 pr-10"
-                    >
-                      <option value="">None</option>
-                      {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 pointer-events-none" />
-                  </div>
-                </div>
+                    {/* Type Selection */}
+                    <div>
+                      <label className="block text-sm font-medium text-zinc-400 mb-1">
+                        Type *
+                      </label>
+                      <div className="grid grid-cols-2 gap-2 bg-zinc-800 p-1 rounded-xl">
+                        <button 
+                          type="button"
+                          onClick={() => handleTypeChange(DebtType.I_OWE)}
+                          className={`py-2 rounded-lg text-sm font-medium transition-colors ${
+                            formData.type === DebtType.I_OWE 
+                              ? 'bg-red-500/20 text-red-400' 
+                              : 'text-zinc-400 hover:text-white'
+                          }`}
+                          disabled={isSaving}
+                        >
+                          I Owe
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={() => handleTypeChange(DebtType.OWED_TO_ME)}
+                          className={`py-2 rounded-lg text-sm font-medium transition-colors ${
+                            formData.type === DebtType.OWED_TO_ME 
+                              ? 'bg-emerald-500/20 text-emerald-400' 
+                              : 'text-zinc-400 hover:text-white'
+                          }`}
+                          disabled={isSaving}
+                        >
+                          Owed to Me
+                        </button>
+                      </div>
+                    </div>
 
-                {/* Dates */}
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-zinc-400 mb-1">
-                      Date
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => setIsDatePickerOpen(true)}
-                      className="w-full flex items-center justify-between bg-zinc-800 border border-zinc-700 rounded-xl p-3 text-white focus:outline-none focus:border-blue-500"
+                    {/* Amount & Currency */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-zinc-400 mb-1">
+                          Amount *
+                        </label>
+                        <input 
+                          type="text"
+                          inputMode="decimal"
+                          name="amount"
+                          value={amountStr}
+                          onChange={handleChange}
+                          className="w-full bg-zinc-800 border border-zinc-700 rounded-xl p-3 text-white focus:outline-none focus:border-blue-500"
+                          placeholder="0.00"
+                          required
+                          disabled={isSaving}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-zinc-400 mb-1">
+                          Currency
+                        </label>
+                        <div className="relative">
+                          <select 
+                            name="currency" 
+                            value={formData.currency} 
+                            onChange={handleChange}
+                            disabled={isSaving}
+                            className="w-full appearance-none bg-zinc-800 border border-zinc-700 rounded-xl p-3 text-white focus:outline-none focus:border-blue-500 pr-10"
+                          >
+                            {COMMON_CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
+                          </select>
+                          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 pointer-events-none" />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Category */}
+                    <div>
+                      <label className="block text-sm font-medium text-zinc-400 mb-1">
+                        Category (Optional)
+                      </label>
+                      <div className="relative">
+                        <select 
+                          name="category" 
+                          value={formData.category} 
+                          onChange={handleChange}
+                          disabled={isSaving}
+                          className="w-full appearance-none bg-zinc-800 border border-zinc-700 rounded-xl p-3 text-white focus:outline-none focus:border-blue-500 pr-10"
+                        >
+                          <option value="">None</option>
+                          {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 pointer-events-none" />
+                      </div>
+                    </div>
+
+                    {/* Dates */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-zinc-400 mb-1">
+                          Date
+                        </label>
+                        <button
+                          type="button"
+                          disabled={isSaving}
+                          onClick={() => setIsDatePickerOpen(true)}
+                          className="w-full flex items-center justify-between bg-zinc-800 border border-zinc-700 rounded-xl p-3 text-white focus:outline-none focus:border-blue-500"
+                        >
+                          <span className="text-sm">
+                            {safeDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </span>
+                          <Calendar className="w-4 h-4 text-zinc-400" />
+                        </button>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-zinc-400 mb-1">
+                          Due Date
+                        </label>
+                        <button
+                          type="button"
+                          disabled={isSaving}
+                          onClick={() => setIsDueDatePickerOpen(true)}
+                          className="w-full flex items-center justify-between bg-zinc-800 border border-zinc-700 rounded-xl p-3 text-white focus:outline-none focus:border-blue-500"
+                        >
+                          <span className="text-sm">
+                            {safeDueDate 
+                              ? safeDueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                              : 'None'
+                            }
+                          </span>
+                          <Calendar className="w-4 h-4 text-zinc-400" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Description */}
+                    <div>
+                      <label className="block text-sm font-medium text-zinc-400 mb-1">
+                        Description (Optional)
+                      </label>
+                      <textarea
+                        name="description"
+                        value={formData.description}
+                        onChange={handleChange}
+                        rows={2}
+                        disabled={isSaving}
+                        className="w-full bg-zinc-800 border border-zinc-700 rounded-xl p-3 text-white focus:outline-none focus:border-blue-500 resize-none"
+                        placeholder="Add notes..."
+                      />
+                    </div>
+
+                    {/* Submit Button */}
+                    <button 
+                      type="submit"
+                      disabled={isSaving}
+                      className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-blue-600/50 text-white py-3 rounded-xl font-semibold mt-4 transition-colors flex items-center justify-center"
                     >
-                      <span className="text-sm">
-                        {safeDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                      </span>
-                      <Calendar className="w-4 h-4 text-zinc-400" />
+                      {isSaving ? (
+                        <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      ) : (
+                        debt ? 'Update Debt' : 'Create Debt'
+                      )}
                     </button>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-zinc-400 mb-1">
-                      Due Date
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => setIsDueDatePickerOpen(true)}
-                      className="w-full flex items-center justify-between bg-zinc-800 border border-zinc-700 rounded-xl p-3 text-white focus:outline-none focus:border-blue-500"
-                    >
-                      <span className="text-sm">
-                        {safeDueDate 
-                          ? safeDueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                          : 'None'
-                        }
-                      </span>
-                      <Calendar className="w-4 h-4 text-zinc-400" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Description */}
-                <div>
-                  <label className="block text-sm font-medium text-zinc-400 mb-1">
-                    Description (Optional)
-                  </label>
-                  <textarea
-                    name="description"
-                    value={formData.description}
-                    onChange={handleChange}
-                    rows={2}
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-xl p-3 text-white focus:outline-none focus:border-blue-500 resize-none"
-                    placeholder="Add notes..."
-                  />
-                </div>
-
-                {/* Submit Button */}
-                <button 
-                  type="submit"
-                  className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-xl font-semibold mt-4 transition-colors"
-                >
-                  {debt ? 'Update Debt' : 'Create Debt'}
-                </button>
-              </form>
+                  </form>
+                </>
+              )}
             </motion.div>
           </motion.div>
         )}

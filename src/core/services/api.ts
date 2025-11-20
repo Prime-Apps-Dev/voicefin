@@ -658,3 +658,37 @@ export const updateDefaultCurrency = async (userId: string, currency: string): P
   }
   console.log("API: Валюта по умолчанию успешно обновлена в профиле.");
 };
+
+/**
+ * Получить детали долга по ссылке (для входящего пользователя)
+ */
+export const getSharedDebt = async (debtId: string) => {
+  const { data, error } = await supabase.rpc('get_shared_debt', {
+    lookup_debt_id: debtId
+  });
+
+  if (error) throw error;
+  return data?.[0] || null; // Возвращаем первый элемент или null
+};
+
+/**
+ * Генерация ссылки для шаринга
+ */
+export const generateDebtShareLink = (debtId: string, amount: number, currency: string, type: string) => {
+  // Получаем имя бота из переменных окружения или хардкодом
+  const botUsername = import.meta.env.VITE_BOT_USERNAME || 'voicefin_bot'; 
+  
+  const startParam = `debt_${debtId}`;
+  const appLink = `https://t.me/${botUsername}?startapp=${startParam}`;
+  
+  // Формируем текст сообщения
+  const isIOwe = type === 'I_OWE'; // Если Я должен
+  const text = isIOwe
+    ? `Привет! Я записал, что должен тебе ${amount} ${currency}. Проверь и подтверди:`
+    : `Привет! Напоминаю, что ты должен мне ${amount} ${currency}. Записал, чтобы не забыть:`;
+
+  // Формат ссылки для шаринга в Telegram
+  const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(appLink)}&text=${encodeURIComponent(text)}`;
+  
+  return { shareUrl, appLink };
+};

@@ -17,6 +17,7 @@ import { OnboardingGuide } from './features/onboarding/OnboardingGuide';
 import { RecordingOverlay } from './shared/ui/screens/RecordingOverlay';
 import { BottomNavBar } from './shared/layout/BottomNavBar';
 import { AppModals } from './shared/ui/modals/AppModals';
+import { IncomingDebtModal } from './features/debts/IncomingDebtModal';
 
 // Screens
 import { SavingsScreen } from './features/savings/SavingsScreen';
@@ -90,6 +91,8 @@ const AppContent: React.FC = () => {
   const [isCategoryLockedInForm, setIsCategoryLockedInForm] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<any>(null);
 
+  const [incomingDebtId, setIncomingDebtId] = useState<string | null>(null);
+
   // Audio Hook
   const {
     isRecording, isProcessing, stream, transcription,
@@ -106,6 +109,24 @@ const AppContent: React.FC = () => {
       setShowOnboarding(true);
     }
   }, [user]);
+
+  // 2. Добавляем useEffect для проверки start_param при загрузке
+  useEffect(() => {
+    // Проверяем, есть ли параметры запуска от Telegram
+    const initData = (window as any).Telegram?.WebApp?.initDataUnsafe;
+    const startParam = initData?.start_param;
+
+    if (startParam && startParam.startsWith('debt_')) {
+      const debtId = startParam.replace('debt_', '');
+      console.log("Found incoming debt ID:", debtId);
+      
+      // Открываем модалку приема долга
+      setIncomingDebtId(debtId);
+      
+      // (Опционально) Можно сразу переключить экран, если нужно,
+      // но модалка будет поверх всего, так что не обязательно.
+    }
+  }, []);
 
   // --- Logic Handlers ---
 
@@ -292,6 +313,19 @@ const AppContent: React.FC = () => {
       {isRecording && (
         <RecordingOverlay transcription={transcription} stream={stream} onStop={handleRecordingStopLogic} isRecording={isRecording} audioContext={audioContext} />
       )}
+
+      <IncomingDebtModal 
+        debtId={incomingDebtId}
+        onClose={() => setIncomingDebtId(null)}
+        onDebtAdded={() => {
+           // Обновляем данные (долги)
+           // Если у вас нет функции reloadDebts, просто закройте,
+           // данные обновятся при следующем входе или через стейт-менеджер
+           setIncomingDebtId(null);
+           setActiveScreen('debts'); // Переходим в раздел долгов
+        }}
+        defaultCurrency={displayCurrency}
+      />
 
       <AppModals 
         potentialTransaction={potentialTransaction} editingTransaction={editingTransaction} onConfirmTransaction={handleConfirmTransactionWrapper} onCancelTransaction={() => { setPotentialTransaction(null); setEditingTransaction(null); setIsCategoryLockedInForm(false); setGoalForDeposit(null); }}
