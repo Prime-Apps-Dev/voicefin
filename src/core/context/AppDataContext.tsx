@@ -773,14 +773,16 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
       {children}
       
       {/* Модалка для обработки входящих запросов */}
-      <TransactionRequestsModal 
-        isOpen={isRequestsModalOpen}
-        onClose={() => setIsRequestsModalOpen(false)}
-        requests={requests}
-        accounts={accounts}
-        onConfirm={handleConfirmRequest}
-        onReject={handleRejectRequest}
-      />
+      {user && ( // <-- ИЗМЕНЕНИЕ: Рендерим модалку только после аутентификации
+          <TransactionRequestsModal 
+            isOpen={isRequestsModalOpen}
+            onClose={() => setIsRequestsModalOpen(false)}
+            requests={requests}
+            accounts={accounts}
+            onConfirm={handleConfirmRequest}
+            onReject={handleRejectRequest}
+          />
+      )}
     </AppDataContext.Provider>
   );
 };
