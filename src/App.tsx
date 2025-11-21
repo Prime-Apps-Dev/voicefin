@@ -91,6 +91,8 @@ const AppContent: React.FC = () => {
   const [itemToDelete, setItemToDelete] = useState<any>(null);
 
   const [incomingDebtId, setIncomingDebtId] = useState<string | null>(null);
+  // НОВОЕ: Временное хранилище для ID из deep link
+  const [initialDebtId, setInitialDebtId] = useState<string | null>(null);
 
   // Audio Hook
   const {
@@ -109,7 +111,7 @@ const AppContent: React.FC = () => {
     }
   }, [user]);
 
-  // --- ЛОГИКА DEEP LINK ---
+  // --- ЛОГИКА DEEP LINK: ЧТЕНИЕ ID (Запускается 1 раз при монтировании) ---
   useEffect(() => {
     const initData = (window as any).Telegram?.WebApp?.initDataUnsafe;
     const startParam = initData?.start_param;
@@ -118,16 +120,24 @@ const AppContent: React.FC = () => {
       let rawId = startParam.replace('debt_', '');
       const cleanId = rawId.replace(/[^a-f0-9-]/gi, '');
 
-      console.log("🎯 Incoming Debt ID (Clean):", cleanId);
-      
       if (cleanId.length === 36) {
-        setIncomingDebtId(cleanId);
+        setInitialDebtId(cleanId); // Сохраняем ID во временном состоянии
       } else {
         console.error("⚠️ Invalid UUID format:", rawId);
       }
     }
-  }, []);
-
+  }, []); // Пустой массив зависимостей: выполняется 1 раз при монтировании
+  
+  // --- ЛОГИКА DEEP LINK: АКТИВАЦИЯ МОДАЛКИ (Запускается, когда пользователь загружен) ---
+  useEffect(() => {
+    // Активируем модалку, только если пользователь (user) загружен И у нас есть ID для обработки
+    if (user && initialDebtId) {
+      console.log("🎯 Activating Incoming Debt ID:", initialDebtId);
+      setIncomingDebtId(initialDebtId); // Активируем модалку
+      setInitialDebtId(null); // Очищаем временное состояние после использования
+    }
+  }, [user, initialDebtId]); // Зависит от user и временного ID
+  
   // --- Logic Handlers ---
 
   const handleRecordingStopLogic = async () => {
