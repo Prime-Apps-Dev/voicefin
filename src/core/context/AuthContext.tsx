@@ -3,6 +3,7 @@ import { supabase } from '../services/supabase';
 import { User } from '../types';
 import { useLocalization } from './LocalizationContext';
 
+// Типы данных
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
@@ -52,22 +53,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         tg.expand();
         setIsAppExpanded(tg.isExpanded);
         if (tg.isFullscreen) setIsAppFullscreen(true);
-        else { try { tg.requestFullscreen?.(); } catch(e) {} }
-
+        
         tg.onEvent('viewportChanged', () => {
             setIsAppExpanded(tg.isExpanded);
             if(tg.isFullscreen) setIsAppFullscreen(true);
         });
 
         const initData = tg.initData;
+        
         if (initData) {
           try {
             await _authenticateWithTelegram(initData);
           } catch (e: any) {
             console.error("Auth Error:", e);
-            // Показываем ошибку, но не вечную загрузку
-            setError(e.message || 'Authentication failed'); 
+            setError(e.message || 'Auth failed');
           } finally {
+            // ВАЖНО: Всегда снимаем флаг загрузки, иначе будет вечный экран
              setIsLoading(false);
           }
         } else {
@@ -80,6 +81,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const handleDevOrError = () => {
         if (import.meta.env.DEV) {
+            console.log("Dev Mode detected");
             setIsDevLoggingIn(true);
             setIsLoading(false);
         } else {
@@ -92,37 +94,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const _authenticateWithTelegram = async (initData: string) => {
-    // 1. Вызываем Edge Function
+    console.log("Sending auth request...");
+    
+    // 1. Вызываем функцию. Она теперь вернет готовый профиль и токен.
     const { data, error } = await supabase.functions.invoke('telegram-auth', {
       body: { initData },
       method: 'POST',
     });
 
-    if (error) throw new Error(error.message || "Server connection failed");
+    if (error) throw new Error(error.message || "Connection error");
     if (!data || !data.token || !data.user) throw new Error("Invalid server response");
 
-    // 2. Устанавливаем сессию Supabase (критично для RLS!)
+    // 2. Устанавливаем сессию (для доступа к RLS в будущем)
     const { error: sessionError } = await supabase.auth.setSession({
         access_token: data.token,
-        refresh_token: data.token, // В нашем случае используем тот же токен
+        refresh_token: data.token,
     });
 
-    if (sessionError) {
-        console.warn("Session warning:", sessionError);
-        // Не блокируем, так как кастомный токен может вызвать warning, но работать
-    }
+    if (sessionError) console.warn("Session warning:", sessionError);
 
-    // 3. Сразу устанавливаем пользователя (он пришел с сервера!)
-    // Нам не нужно делать еще один SELECT и получать ошибку синхронизации.
-    console.log("Auth success. User:", data.user);
+    // 3. Сохраняем пользователя в стейт.
+    // Больше никаких запросов к БД отсюда делать НЕ НАДО.
+    console.log("User authenticated:", data.user);
     setUser(data.user);
   };
 
   const handleDevLogin = async (userId: string) => {
     setIsLoading(true);
     try {
+       // В Dev режиме запрашиваем profiles, а не users
        const { data, error } = await supabase
-        .from('profiles') // Исправлено на profiles
+        .from('profiles')
         .select('*')
         .eq('id', userId)
         .single();

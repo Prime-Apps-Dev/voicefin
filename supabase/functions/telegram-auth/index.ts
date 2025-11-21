@@ -50,8 +50,8 @@ serve(async (req) => {
     const telegramUserId = telegramUser.id.toString();
     let userUuid: string;
 
-    // 1. Ищем профиль по telegram_id
-    const { data: profile, error: profileError } = await supabaseAdmin
+    // 1. Поиск профиля
+    const { data: profile } = await supabaseAdmin
       .from('profiles')
       .select('id')
       .eq('telegram_id', telegramUserId)
@@ -60,8 +60,8 @@ serve(async (req) => {
     if (profile) {
       userUuid = profile.id;
     } else {
-      // 2. Если нет - создаем через Auth (триггер создаст профиль)
-      console.log(`Registering new user: ${telegramUserId}`);
+      // 2. Регистрация нового
+      console.log(`Creating new user for Telegram ID: ${telegramUserId}`);
       const dummyEmail = `${telegramUserId}@tma.user`;
       const fullName = `${telegramUser.first_name || ''} ${telegramUser.last_name || ''}`.trim();
 
@@ -72,17 +72,19 @@ serve(async (req) => {
       });
 
       if (createAuthError) {
-          // Если юзер уже есть в auth, но нет в profiles (редкий баг рассинхрона), найдем его ID
+          // Если пользователь удалил профиль, но остался в auth.users
           if (createAuthError.message.includes("duplicate")) {
-               const { data: existingAuth } = await supabaseAdmin.from('auth.users').select('id').eq('email', dummyEmail).single(); // псевдокод, админ может искать иначе
-               // Упростим: просто вернем ошибку, или попробуем найти пользователя по email, но для надежности лучше кинуть ошибку
-               throw new Error("User sync error: Auth exists but Profile missing. Contact support.");
+               const { data: existingAuth } = await supabaseAdmin.from('auth.users').select('id').eq('email', dummyEmail).single();
+               if (!existingAuth) throw createAuthError;
+               userUuid = existingAuth.id;
+          } else {
+              throw createAuthError;
           }
-          throw createAuthError;
+      } else {
+          userUuid = newAuthUser.user.id;
       }
-      userUuid = newAuthUser.user.id;
 
-      // Обновляем профиль (вносим telegram_id)
+      // Обновляем telegram_id в profiles
       await supabaseAdmin.from('profiles').update({
           telegram_id: telegramUserId,
           username: telegramUser.username,
@@ -90,24 +92,28 @@ serve(async (req) => {
       }).eq('id', userUuid);
     }
 
-    // 3. Генерируем Токен
+    // 3. Генерация токена
     const payload = {
       sub: userUuid,
       aud: 'authenticated',
       role: 'authenticated',
       iat: Math.floor(Date.now() / 1000),
-      exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 7), // 7 дней
+      exp: Math.floor(Date.now() / 1000) + (60 * 60 * 24 * 7),
     };
     
     const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(JWT_SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
     const jwt = await create({ alg: "HS256", typ: "JWT" }, payload, key);
 
-    // 4. ВАЖНО: Возвращаем ПОЛНЫЙ ПРОФИЛЬ, чтобы клиенту не надо было его искать
-    const { data: finalProfile } = await supabaseAdmin
+    // 4. ВАЖНО: Возвращаем ПОЛНЫЙ объект пользователя из БД
+    const { data: finalProfile, error: finalProfileError } = await supabaseAdmin
         .from('profiles')
         .select('*')
         .eq('id', userUuid)
         .single();
+
+    if (finalProfileError || !finalProfile) {
+        throw new Error("Profile creation failed or not found");
+    }
 
     return new Response(JSON.stringify({ token: jwt, user: finalProfile }), {
       headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
