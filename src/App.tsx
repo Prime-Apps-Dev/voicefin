@@ -60,7 +60,7 @@ const AppContent: React.FC = () => {
     handleSaveBudget, handleDeleteBudget,
     updateDefaultCurrency,
     debts,
-    refreshDebts // <-- ИЗВЛЕКАЕМ НОВУЮ ФУНКЦИЮ
+    refreshDebts
   } = useAppData();
 
   const [activeScreen, setActiveScreen] = useState<'home' | 'savings' | 'analytics' | 'profile' | 'accounts' | 'budgetPlanning' | 'categories' | 'settings' | 'comingSoon' | 'history' | 'about' | 'debts'>('home');
@@ -323,6 +323,7 @@ const AppContent: React.FC = () => {
       
       {showMask && <div className="fixed top-0 left-0 right-0 h-[85px] bg-gray-900 z-20"></div>}
       
+      {/* 1. Основной контент скрыт, если идет загрузка ИЛИ активен онбординг */}
       {!(isAuthLoading || isDataLoading) && !showOnboarding && (
           <div className={paddingTopClass}>{renderContent()}</div>
       )}
@@ -331,9 +332,7 @@ const AppContent: React.FC = () => {
         <RecordingOverlay transcription={transcription} stream={stream} onStop={handleRecordingStopLogic} isRecording={isRecording} audioContext={audioContext} />
       )}
 
-      {/* Модалка входящего долга: показывается только существующим пользователям,
-          или если онбординг не активен и не обрабатывает долг.
-      */}
+      {/* Модалка входящего долга: показывается только существующим пользователям */}
       {!isDebtHandledInOnboarding && ( 
         <IncomingDebtModal 
           debtId={incomingDebtId}
@@ -363,7 +362,8 @@ const AppContent: React.FC = () => {
         debts={debts}
       />
 
-      {!(isAuthLoading || isDataLoading) && (
+      {/* 2. BottomNavBar скрыт, если идет загрузка ИЛИ активен онбординг */}
+      {!(isAuthLoading || isDataLoading) && !showOnboarding && (
         <BottomNavBar activeScreen={activeScreen} onNavigate={setActiveScreen} isRecording={isRecording} isProcessing={isProcessing} onToggleRecording={isRecording ? handleRecordingStopLogic : startRecording} onLongPressAdd={() => setIsTextInputOpen(true)} />
       )}
       
