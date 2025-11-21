@@ -137,7 +137,7 @@ const AppContent: React.FC = () => {
       setInitialDebtId(null); // Очищаем временное состояние после использования
     }
   }, [user, initialDebtId]); // Зависит от user и временного ID
-  
+
   // --- Logic Handlers ---
 
   const handleRecordingStopLogic = async () => {
@@ -310,7 +310,11 @@ const AppContent: React.FC = () => {
       
       {showMask && <div className="fixed top-0 left-0 right-0 h-[85px] bg-gray-900 z-20"></div>}
       
-      {!(isAuthLoading || isDataLoading) && (
+      {/* ИСХОДНОЕ МЕСТО, ГДЕ ПРОИСХОДИЛ СБОЙ. 
+        Добавляем !showOnboarding, чтобы пропустить рендеринг сложного контента, 
+        пока на экране отображается онбординг.
+      */}
+      {!(isAuthLoading || isDataLoading) && !showOnboarding && (
           <div className={paddingTopClass}>{renderContent()}</div>
       )}
 
