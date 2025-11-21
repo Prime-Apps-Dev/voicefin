@@ -1,3 +1,5 @@
+// src/App.tsx
+
 import React, { useState, useEffect } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { AlertTriangle } from 'lucide-react';
@@ -91,7 +93,7 @@ const AppContent: React.FC = () => {
   const [itemToDelete, setItemToDelete] = useState<any>(null);
 
   const [incomingDebtId, setIncomingDebtId] = useState<string | null>(null);
-  // НОВОЕ: Временное хранилище для ID из deep link
+  // Временное хранилище для ID из deep link
   const [initialDebtId, setInitialDebtId] = useState<string | null>(null);
 
   // Audio Hook
@@ -104,12 +106,24 @@ const AppContent: React.FC = () => {
     if (authError) setError(authError);
     if (dataError) setError(dataError);
   }, [authError, dataError]);
-
+  
+  // --- ЛОГИКА ОНБОРДИНГА И АКТИВАЦИИ МОДАЛКИ (ОБНОВЛЕНО) ---
   useEffect(() => {
-    if (user && !user.has_completed_onboarding) {
+    if (!user) return;
+    
+    // 1. Если пользователь новый, всегда показываем онбординг
+    if (!user.has_completed_onboarding) {
       setShowOnboarding(true);
+    } 
+    
+    // 2. Если пользователь существующий И есть ID из deep link, 
+    // активируем стандартную модалку, и сбрасываем initialDebtId
+    else if (user.has_completed_onboarding && initialDebtId) {
+      console.log("🎯 Existing user: Activating Incoming Debt ID modal:", initialDebtId);
+      setIncomingDebtId(initialDebtId); 
+      setInitialDebtId(null); 
     }
-  }, [user]);
+  }, [user, initialDebtId]);
 
   // --- ЛОГИКА DEEP LINK: ЧТЕНИЕ ID (Запускается 1 раз при монтировании) ---
   useEffect(() => {
@@ -121,22 +135,12 @@ const AppContent: React.FC = () => {
       const cleanId = rawId.replace(/[^a-f0-9-]/gi, '');
 
       if (cleanId.length === 36) {
-        setInitialDebtId(cleanId); // Сохраняем ID во временном состоянии
+        setInitialDebtId(cleanId); 
       } else {
         console.error("⚠️ Invalid UUID format:", rawId);
       }
     }
-  }, []); // Пустой массив зависимостей: выполняется 1 раз при монтировании
-  
-  // --- ЛОГИКА DEEP LINK: АКТИВАЦИЯ МОДАЛКИ (Запускается, когда пользователь загружен) ---
-  useEffect(() => {
-    // Активируем модалку, только если пользователь (user) загружен И у нас есть ID для обработки
-    if (user && initialDebtId) {
-      console.log("🎯 Activating Incoming Debt ID:", initialDebtId);
-      setIncomingDebtId(initialDebtId); // Активируем модалку
-      setInitialDebtId(null); // Очищаем временное состояние после использования
-    }
-  }, [user, initialDebtId]); // Зависит от user и временного ID
+  }, []); 
 
   // --- Logic Handlers ---
 
@@ -300,20 +304,25 @@ const AppContent: React.FC = () => {
           );
       }
   };
+  
+  // Определяем, должен ли Onboarding взять на себя обработку долга
+  const isDebtHandledInOnboarding = showOnboarding && initialDebtId; 
 
   return (
     <div className="min-h-screen bg-gray-900">
       <LoadingScreen isLoading={isAuthLoading || isDataLoading} />
       <AnimatePresence>
-        {showOnboarding && <OnboardingGuide onFinish={handleFinishOnboarding} />}
+        {showOnboarding && (
+            <OnboardingGuide 
+                onFinish={handleFinishOnboarding} 
+                initialDebtId={initialDebtId} // Передаем ID в онбординг для новых пользователей
+                onDebtActionComplete={() => setInitialDebtId(null)} // Функция очистки initialDebtId
+            />
+        )}
       </AnimatePresence>
       
       {showMask && <div className="fixed top-0 left-0 right-0 h-[85px] bg-gray-900 z-20"></div>}
       
-      {/* ИСХОДНОЕ МЕСТО, ГДЕ ПРОИСХОДИЛ СБОЙ. 
-        Добавляем !showOnboarding, чтобы пропустить рендеринг сложного контента, 
-        пока на экране отображается онбординг.
-      */}
       {!(isAuthLoading || isDataLoading) && !showOnboarding && (
           <div className={paddingTopClass}>{renderContent()}</div>
       )}
@@ -322,18 +331,21 @@ const AppContent: React.FC = () => {
         <RecordingOverlay transcription={transcription} stream={stream} onStop={handleRecordingStopLogic} isRecording={isRecording} audioContext={audioContext} />
       )}
 
-      {/* Модалка входящего долга */}
-      <IncomingDebtModal 
-        debtId={incomingDebtId}
-        onClose={() => setIncomingDebtId(null)}
-        // ВАЖНОЕ ИЗМЕНЕНИЕ: Вызываем refreshDebts при добавлении
-        onDebtAdded={async () => {
-           await refreshDebts();
-           setIncomingDebtId(null);
-           setActiveScreen('debts');
-        }}
-        defaultCurrency={displayCurrency}
-      />
+      {/* Модалка входящего долга: показывается только существующим пользователям,
+          или если онбординг не активен и не обрабатывает долг.
+      */}
+      {!isDebtHandledInOnboarding && ( 
+        <IncomingDebtModal 
+          debtId={incomingDebtId}
+          onClose={() => setIncomingDebtId(null)}
+          onDebtAdded={async () => {
+             await refreshDebts();
+             setIncomingDebtId(null);
+             setActiveScreen('debts');
+          }}
+          defaultCurrency={displayCurrency}
+        />
+      )}
 
       <AppModals 
         potentialTransaction={potentialTransaction} editingTransaction={editingTransaction} onConfirmTransaction={handleConfirmTransactionWrapper} onCancelTransaction={() => { setPotentialTransaction(null); setEditingTransaction(null); setIsCategoryLockedInForm(false); setGoalForDeposit(null); }}
