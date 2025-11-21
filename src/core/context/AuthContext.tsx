@@ -1,197 +1,194 @@
-// src/context/AuthContext.tsx
-
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '../services/supabase';
-import * as api from '../services/api';
 import { User } from '../types';
 import { useLocalization } from './LocalizationContext';
 
+// Типы данных
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
-  error: string | null;
-  isBlocked: boolean;
-  blockMessage: string;
-  isDevLoggingIn: boolean;
+  isBlocked: boolean; // Заблокирован ли пользователь (например, бан)
+  blockMessage: string | null;
+  isDevLoggingIn: boolean; // Состояние процесса Dev-логина
   isAppExpanded: boolean;
   isAppFullscreen: boolean;
-  handleDevLogin: (email: string, pass: string) => Promise<void>;
-  refreshUserProfile: () => Promise<void>;
+  handleDevLogin: (userId: string) => Promise<void>; // Функция для ручного логина в dev-режиме
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
+  error: string | null;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextType>({
+  user: null,
+  isLoading: true,
+  isBlocked: false,
+  blockMessage: null,
+  isDevLoggingIn: false,
+  isAppExpanded: false,
+  isAppFullscreen: false,
+  handleDevLogin: async () => {},
+  setUser: () => {},
+  error: null,
+});
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
+export const useAuth = () => useContext(AuthContext);
 
-export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { t } = useLocalization();
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isDevLoggingIn, setIsDevLoggingIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // Telegram specific states
-  const [isBlocked, setIsBlocked] = useState(false);
-  const [blockMessage, setBlockMessage] = useState('');
+  // Состояния UI Telegram
   const [isAppExpanded, setIsAppExpanded] = useState(false);
   const [isAppFullscreen, setIsAppFullscreen] = useState(false);
-  
-  // Dev mode specific
-  const [isDevLoggingIn, setIsDevLoggingIn] = useState(false);
-
-  const loadUserProfile = async (authUserId: string, teleUser?: { first_name?: string }) => {
-    try {
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', authUserId)
-        .single();
-
-      if (profileError) {
-        throw new Error(`Не удалось загрузить профиль пользователя: ${profileError.message}`);
-      }
-
-      const appUser: User = {
-          id: authUserId,
-          email: profileData.email,
-          name: profileData.full_name || teleUser?.first_name || profileData.username || 'User',
-          updated_at: profileData.updated_at,
-          username: profileData.username,
-          full_name: profileData.full_name,
-          avatar_url: profileData.avatar_url,
-          telegram_id: profileData.telegram_id,
-          has_completed_onboarding: profileData.has_completed_onboarding,
-          default_currency: profileData.default_currency || 'USD'
-      };
-      
-      setUser(appUser);
-      
-      // Важно: Здесь мы не загружаем транзакции, это задача DataContext.
-      // Мы только готовим юзера.
-      
-    } catch (err: any) {
-      console.error("Auth: Profile loading failed:", err);
-      setError(`Failed to load profile: ${err.message}`);
-    }
-  };
-
-  // Функция для обновления данных юзера (например, после смены валюты)
-  const refreshUserProfile = async () => {
-    if (!user) return;
-    await loadUserProfile(user.id);
-  };
-
-  const handleDevLogin = async (email: string, password: string) => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
-      if (!data.user) throw new Error("Login successful but no user data returned.");
-      
-      await loadUserProfile(data.user.id, { first_name: 'Dev' });
-      setIsDevLoggingIn(false);
-    } catch (err: any) {
-      console.error("Dev login failed:", err);
-      setError(err.message || t('loginError'));
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   useEffect(() => {
-    const isDev = import.meta.env.DEV;
-    // @ts-ignore
-    const tg = window.Telegram.WebApp;
-
-    const handleViewportChange = () => {
-      if (tg) {
-        setIsAppExpanded(tg.isExpanded);
-        setIsAppFullscreen(tg.isFullscreen || false); 
-      }
-    };
-
     const initAuth = async () => {
-      try {
-        if (isDev) {
-          console.log('DEV MODE: Checking Supabase session...');
-          const { data: { session } } = await supabase.auth.getSession();
-          
-          if (session) {
-            await loadUserProfile(session.user.id, { first_name: 'Dev' });
-          } else {
-            setIsDevLoggingIn(true);
-          }
-          setIsLoading(false); // Loading Auth is done (either logged in or showing form)
-
-        } else {
-          // PROD MODE (Telegram)
-          if (!tg) throw new Error(t('telegramErrorNotTelegram'));
-          if (!tg.initData) throw new Error(t('telegramErrorNoData'));
-          
-          tg.ready();
-          tg.expand();
-          if (tg.requestFullscreen) tg.requestFullscreen();
-
-          tg.onEvent('viewportChanged', handleViewportChange);
-          handleViewportChange();
-
-          const authResponse = await api.authenticateWithTelegram(tg.initData);
-          if (!authResponse || !authResponse.token || !authResponse.user) {
-              throw new Error("Invalid auth response from server");
-          }
-
-          const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
-            access_token: authResponse.token,
-            refresh_token: authResponse.token,
-          });
-
-          if (sessionError) throw new Error(`Failed to set session: ${sessionError.message}`);
-          
-          await loadUserProfile(sessionData.user!.id, authResponse.user);
-          setIsLoading(false);
-        }
-
-      } catch (err: any) {
-        console.error("Initialization failed:", err);
-        const errorMsg = (err instanceof Error) ? err.message : String(err);
+      setIsLoading(true);
+      setError(null);
+      
+      // 1. Инициализация Telegram WebApp
+      const tg = (window as any).Telegram?.WebApp;
+      if (tg) {
+        tg.ready();
+        tg.expand(); // Разворачиваем на весь экран
         
-        if (errorMsg === t('telegramErrorNotTelegram') || errorMsg === t('telegramErrorNoData')) {
-            setBlockMessage(errorMsg);
-            setIsBlocked(true);
+        // Устанавливаем состояния UI
+        setIsAppExpanded(tg.isExpanded);
+        // Проверка на полноэкранный режим (если поддерживается API)
+        if (tg.isFullscreen) { 
+            setIsAppFullscreen(true);
         } else {
-            setError(`Auth Error: ${errorMsg}`);
+            // Пробуем запросить фулскрин
+            try { tg.requestFullscreen?.(); } catch(e) {}
         }
-        setIsLoading(false);
+
+        // Слушаем изменения состояния
+        tg.onEvent('viewportChanged', () => {
+            setIsAppExpanded(tg.isExpanded);
+            if(tg.isFullscreen) setIsAppFullscreen(true);
+        });
+
+        const initData = tg.initData;
+        const initDataUnsafe = tg.initDataUnsafe;
+
+        // 2. Попытка аутентификации через Telegram
+        if (initData && initDataUnsafe?.user) {
+          try {
+            await _authenticateWithTelegram(initData);
+          } catch (e: any) {
+            console.error("Auth Error:", e);
+            setError(`Auth Error: ${e.message || 'Unknown error'}`);
+            // Если ошибка сети или сервера, мы не можем продолжить, 
+            // но не сбрасываем loading, чтобы пользователь видел ошибку.
+          } finally {
+             setIsLoading(false);
+          }
+        } else {
+          // Если открыто не в Telegram (или нет initData)
+          if (import.meta.env.DEV) {
+            console.log("Dev mode: waiting for manual login");
+            setIsDevLoggingIn(true); // Показываем форму логина для разработчика
+            setIsLoading(false);
+          } else {
+            setError(t('authError') || "Please open this app in Telegram.");
+            setIsLoading(false);
+          }
+        }
+      } else {
+         // Fallback для браузера без Telegram объекта
+         if (import.meta.env.DEV) {
+            setIsDevLoggingIn(true);
+            setIsLoading(false);
+         } else {
+             setError("Telegram WebApp API not found.");
+             setIsLoading(false);
+         }
       }
     };
 
     initAuth();
-
-    return () => {
-      if (tg) tg.offEvent('viewportChanged', handleViewportChange);
-    };
   }, [t]);
 
+  // Функция вызова Edge Function для аутентификации
+  const _authenticateWithTelegram = async (initData: string) => {
+    try {
+      console.log("Sending request to telegram-auth...");
+      
+      const { data, error } = await supabase.functions.invoke('telegram-auth', {
+        body: { initData },
+        method: 'POST',
+      });
+
+      if (error) {
+        // Это ошибка именно вызова функции (например, 500 или CORS)
+        console.error("Edge Function invocation error:", error);
+        throw new Error(error.message || "Failed to send a request to the Edge Function");
+      }
+
+      if (!data || !data.user) {
+        throw new Error("Invalid response from auth server");
+      }
+
+      console.log("Auth successful:", data.user);
+      
+      // Получаем полные данные пользователя из нашей таблицы users
+      // Edge function уже должна была создать пользователя, если его нет
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('telegram_id', data.user.id)
+        .single();
+
+      if (userError || !userData) {
+          // Если вдруг не нашлось (редкий кейс, гонка)
+          console.error("User not found after auth:", userError);
+          throw new Error("User data synchronization failed");
+      }
+
+      setUser(userData);
+
+    } catch (err: any) {
+       // Пробрасываем ошибку выше
+       throw err;
+    }
+  };
+
+  // Ручной логин для разработки (Dev Mode)
+  const handleDevLogin = async (userId: string) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+       // В Dev режиме мы просто подтягиваем пользователя по ID
+       const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+       if (error) throw error;
+       setUser(data);
+       setIsDevLoggingIn(false);
+    } catch (e: any) {
+       setError(e.message || "Dev login failed");
+    } finally {
+       setIsLoading(false);
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{
-      user,
-      isLoading,
-      error,
-      isBlocked,
-      blockMessage,
-      isDevLoggingIn,
+    <AuthContext.Provider value={{ 
+      user, 
+      isLoading, 
+      isBlocked: false, // Заглушка
+      blockMessage: null, 
+      isDevLoggingIn, 
       isAppExpanded,
       isAppFullscreen,
-      handleDevLogin,
-      refreshUserProfile,
-      setUser
+      handleDevLogin, 
+      setUser,
+      error
     }}>
       {children}
     </AuthContext.Provider>
