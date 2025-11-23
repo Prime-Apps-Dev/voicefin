@@ -25,10 +25,10 @@ const AuthContext = createContext<AuthContextType>({
   isDevLoggingIn: false,
   isAppExpanded: false,
   isAppFullscreen: false,
-  handleDevLogin: async () => {},
-  setUser: () => {},
+  handleDevLogin: async () => { },
+  setUser: () => { },
   error: null,
-  logout: () => {},
+  logout: () => { },
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -39,33 +39,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
   const [isDevLoggingIn, setIsDevLoggingIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   const [isAppExpanded, setIsAppExpanded] = useState(false);
   const [isAppFullscreen, setIsAppFullscreen] = useState(false);
 
   // Функция сброса
   const logout = async () => {
-      await supabase.auth.signOut();
-      setUser(null);
-      localStorage.clear(); // Очистка кэша
-      window.location.reload();
+    await supabase.auth.signOut();
+    setUser(null);
+    localStorage.clear(); // Очистка кэша
+    window.location.reload();
   };
 
   useEffect(() => {
     const initAuth = async () => {
       setIsLoading(true);
       setError(null);
-      
+
       const tg = (window as any).Telegram?.WebApp;
       if (tg) {
         tg.ready();
         tg.expand();
+        // @ts-ignore
+        if (tg.requestFullscreen) tg.requestFullscreen();
         setIsAppExpanded(tg.isExpanded);
         if (tg.isFullscreen) setIsAppFullscreen(true);
-        
+
         tg.onEvent('viewportChanged', () => {
-            setIsAppExpanded(tg.isExpanded);
-            if(tg.isFullscreen) setIsAppFullscreen(true);
+          setIsAppExpanded(tg.isExpanded);
+          if (tg.isFullscreen) setIsAppFullscreen(true);
         });
 
         const initData = tg.initData;
@@ -76,24 +78,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             console.error("Auth Error:", e);
             setError(e.message || 'Auth failed');
           } finally {
-             setIsLoading(false);
+            setIsLoading(false);
           }
         } else {
           handleDevOrError();
         }
       } else {
-         handleDevOrError();
+        handleDevOrError();
       }
     };
 
     const handleDevOrError = () => {
-        if (import.meta.env.DEV) {
-            setIsDevLoggingIn(true);
-            setIsLoading(false);
-        } else {
-            setError("Please open in Telegram");
-            setIsLoading(false);
-        }
+      if (import.meta.env.DEV) {
+        setIsDevLoggingIn(true);
+        setIsLoading(false);
+      } else {
+        setError("Please open in Telegram");
+        setIsLoading(false);
+      }
     };
 
     initAuth();
@@ -111,8 +113,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Устанавливаем сессию
     const { error: sessionError } = await supabase.auth.setSession({
-        access_token: data.token,
-        refresh_token: data.token,
+      access_token: data.token,
+      refresh_token: data.token,
     });
 
     if (sessionError) console.warn("Session warning:", sessionError);
@@ -123,20 +125,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const handleDevLogin = async (userId: string) => {
     setIsLoading(true);
     try {
-       const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
-       if (error) throw error;
-       setUser(data);
-       setIsDevLoggingIn(false);
+      const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
+      if (error) throw error;
+      setUser(data);
+      setIsDevLoggingIn(false);
     } catch (e: any) {
-       setError(e.message);
+      setError(e.message);
     } finally {
-       setIsLoading(false);
+      setIsLoading(false);
     }
   };
 
   return (
-    <AuthContext.Provider value={{ 
-      user, isLoading, isBlocked: false, blockMessage: null, isDevLoggingIn, 
+    <AuthContext.Provider value={{
+      user, isLoading, isBlocked: false, blockMessage: null, isDevLoggingIn,
       isAppExpanded, isAppFullscreen, handleDevLogin, setUser, error, logout
     }}>
       {children}

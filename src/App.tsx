@@ -341,30 +341,30 @@ const AppContent: React.FC = () => {
             showSafeBackground ? <SafeBackgroundPlaceholder /> : renderContent()
           )}
         </div>
-
-        {/* Модалки рендерим только если есть юзер, чтобы избежать ошибок контекста */}
-        {user && !isLoading && (
-          <AppModals
-            potentialTransaction={potentialTransaction} editingTransaction={editingTransaction} onConfirmTransaction={handleConfirmTransactionWrapper} onCancelTransaction={() => { setPotentialTransaction(null); setEditingTransaction(null); setIsCategoryLockedInForm(false); setGoalForDeposit(null); }}
-            goalForDeposit={goalForDeposit} isCategoryLockedInForm={isCategoryLockedInForm}
-            isAccountFormOpen={isAccountFormOpen} setIsAccountFormOpen={setIsAccountFormOpen} editingAccount={editingAccount} onSaveAccount={async (a) => { await handleSaveAccount(a); setIsAccountFormOpen(false); setEditingAccount(null); }}
-            isGoalFormOpen={isGoalFormOpen} setIsGoalFormOpen={setIsGoalFormOpen} editingGoal={editingGoal} onSaveGoal={async (g) => { await handleSaveGoal(g); setIsGoalFormOpen(false); setEditingGoal(null); }} setEditingGoal={setEditingGoal}
-            isBudgetFormOpen={isBudgetFormOpen} setIsBudgetFormOpen={setIsBudgetFormOpen} editingBudget={editingBudget} setEditingBudget={setEditingBudget} onSaveBudget={async (b) => { await handleSaveBudget(b); setIsBudgetFormOpen(false); setEditingBudget(null); }} budgetsForMonth={budgets.filter(b => b.monthKey === editingBudget?.monthKey)}
-            categoryFormState={categoryFormState} setCategoryFormState={setCategoryFormState} onSaveCategory={handleCategorySaveWrapper} onDeleteCategory={(c) => setItemToDelete({ type: 'category', value: c })}
-            accountForActions={accountForActions} setAccountForActions={setAccountForActions} onAddTxFromAccount={(id) => { setPotentialTransaction({ accountId: id, name: '', amount: 0, currency: displayCurrency, category: '', date: new Date().toISOString(), type: TransactionType.EXPENSE }); setActiveScreen('home'); setAccountForActions(null); }} onEditAccountRequest={(acc) => { setEditingAccount(acc); setIsAccountFormOpen(true); setAccountForActions(null); }} onDeleteAccountRequest={(acc) => { setItemToDelete({ type: 'account', value: acc }); setAccountForActions(null); }}
-            itemToDelete={itemToDelete} setItemToDelete={setItemToDelete} onDeleteItem={handleDeleteItemWrapper}
-            isTextInputOpen={isTextInputOpen} setIsTextInputOpen={setIsTextInputOpen} textInputValue={textInputValue} setTextInputValue={setTextInputValue} onTextTransactionSubmit={handleTextTransactionSubmit} isProcessingText={isProcessingText}
-            goalForHistory={goalForHistory} setGoalForHistory={setGoalForHistory} budgetForHistory={budgetForHistory} setBudgetForHistory={setBudgetForHistory} onDeleteTransaction={setItemToDelete} onSelectTransaction={setEditingTransaction}
-            carryOverInfo={carryOverInfo} setCarryOverInfo={setCarryOverInfo} onConfirmCarryOver={() => { if (carryOverInfo) { budgets.filter(b => b.monthKey === carryOverInfo.from).forEach(b => handleSaveBudget({ ...b, monthKey: carryOverInfo.to })); setCarryOverInfo(null); } }}
-            categories={categories} accounts={accounts} savingsGoals={savingsGoals} budgets={budgets} transactions={transactions} rates={rates} displayCurrency={displayCurrency}
-            debts={debts}
-          />
-        )}
-
-        {!isLoading && (
-          <BottomNavBar activeScreen={activeScreen} onNavigate={setActiveScreen} isRecording={isRecording} isProcessing={isProcessing} onToggleRecording={isRecording ? handleRecordingStopLogic : startRecording} onLongPressAdd={() => setIsTextInputOpen(true)} />
-        )}
       </div>
+
+      {/* Модалки рендерим только если есть юзер, чтобы избежать ошибок контекста */}
+      {user && !isLoading && (
+        <AppModals
+          potentialTransaction={potentialTransaction} editingTransaction={editingTransaction} onConfirmTransaction={handleConfirmTransactionWrapper} onCancelTransaction={() => { setPotentialTransaction(null); setEditingTransaction(null); setIsCategoryLockedInForm(false); setGoalForDeposit(null); }}
+          goalForDeposit={goalForDeposit} isCategoryLockedInForm={isCategoryLockedInForm}
+          isAccountFormOpen={isAccountFormOpen} setIsAccountFormOpen={setIsAccountFormOpen} editingAccount={editingAccount} onSaveAccount={async (a) => { await handleSaveAccount(a); setIsAccountFormOpen(false); setEditingAccount(null); }}
+          isGoalFormOpen={isGoalFormOpen} setIsGoalFormOpen={setIsGoalFormOpen} editingGoal={editingGoal} onSaveGoal={async (g) => { await handleSaveGoal(g); setIsGoalFormOpen(false); setEditingGoal(null); }} setEditingGoal={setEditingGoal}
+          isBudgetFormOpen={isBudgetFormOpen} setIsBudgetFormOpen={setIsBudgetFormOpen} editingBudget={editingBudget} setEditingBudget={setEditingBudget} onSaveBudget={async (b) => { await handleSaveBudget(b); setIsBudgetFormOpen(false); setEditingBudget(null); }} budgetsForMonth={budgets.filter(b => b.monthKey === editingBudget?.monthKey)}
+          categoryFormState={categoryFormState} setCategoryFormState={setCategoryFormState} onSaveCategory={handleCategorySaveWrapper} onDeleteCategory={(c) => setItemToDelete({ type: 'category', value: c })}
+          accountForActions={accountForActions} setAccountForActions={setAccountForActions} onAddTxFromAccount={(id) => { setPotentialTransaction({ accountId: id, name: '', amount: 0, currency: displayCurrency, category: '', date: new Date().toISOString(), type: TransactionType.EXPENSE }); setActiveScreen('home'); setAccountForActions(null); }} onEditAccountRequest={(acc) => { setEditingAccount(acc); setIsAccountFormOpen(true); setAccountForActions(null); }} onDeleteAccountRequest={(acc) => { setItemToDelete({ type: 'account', value: acc }); setAccountForActions(null); }}
+          itemToDelete={itemToDelete} setItemToDelete={setItemToDelete} onDeleteItem={handleDeleteItemWrapper}
+          isTextInputOpen={isTextInputOpen} setIsTextInputOpen={setIsTextInputOpen} textInputValue={textInputValue} setTextInputValue={setTextInputValue} onTextTransactionSubmit={handleTextTransactionSubmit} isProcessingText={isProcessingText}
+          goalForHistory={goalForHistory} setGoalForHistory={setGoalForHistory} budgetForHistory={budgetForHistory} setBudgetForHistory={setBudgetForHistory} onDeleteTransaction={setItemToDelete} onSelectTransaction={setEditingTransaction}
+          carryOverInfo={carryOverInfo} setCarryOverInfo={setCarryOverInfo} onConfirmCarryOver={() => { if (carryOverInfo) { budgets.filter(b => b.monthKey === carryOverInfo.from).forEach(b => handleSaveBudget({ ...b, monthKey: carryOverInfo.to })); setCarryOverInfo(null); } }}
+          categories={categories} accounts={accounts} savingsGoals={savingsGoals} budgets={budgets} transactions={transactions} rates={rates} displayCurrency={displayCurrency}
+          debts={debts}
+        />
+      )}
+
+      {!isLoading && (
+        <BottomNavBar activeScreen={activeScreen} onNavigate={setActiveScreen} isRecording={isRecording} isProcessing={isProcessing} onToggleRecording={isRecording ? handleRecordingStopLogic : startRecording} onLongPressAdd={() => setIsTextInputOpen(true)} />
+      )}
 
       {isRecording && !showOnboarding && (
         <RecordingOverlay transcription={transcription} stream={stream} onStop={handleRecordingStopLogic} isRecording={isRecording} audioContext={audioContext} />
