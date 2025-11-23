@@ -119,7 +119,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (sessionError) console.warn("Session warning:", sessionError);
 
-    setUser(data.user);
+    // Map profile to User interface
+    const profile = data.user;
+    const userWithDetails: User = {
+      ...profile,
+      name: profile.full_name || profile.username || 'User',
+      email: profile.email // email might be missing in profile, but that's ok as per type
+    };
+
+    setUser(userWithDetails);
   };
 
   const handleDevLogin = async (userId: string) => {
@@ -127,7 +135,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
       if (error) throw error;
-      setUser(data);
+
+      const userWithDetails: User = {
+        ...data,
+        name: data.full_name || data.username || 'User',
+        email: data.email
+      };
+
+      setUser(userWithDetails);
       setIsDevLoggingIn(false);
     } catch (e: any) {
       setError(e.message);
