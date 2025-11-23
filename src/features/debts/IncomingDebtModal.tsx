@@ -5,7 +5,7 @@ import { DebtType, DebtStatus } from '../../core/types';
 import * as api from '../../core/services/api';
 
 interface IncomingDebtModalProps {
-  debtId: string | null; 
+  debtId: string | null;
   onClose: () => void;
   onDebtAdded: () => void;
   defaultCurrency: string;
@@ -48,8 +48,8 @@ export const IncomingDebtModal: React.FC<IncomingDebtModalProps> = ({
     try {
       setIsLoading(true);
 
-      const myType = sharedDebt.type === DebtType.I_OWE 
-        ? DebtType.OWED_TO_ME 
+      const myType = sharedDebt.type === DebtType.I_OWE
+        ? DebtType.OWED_TO_ME
         : DebtType.I_OWE;
 
       // 1. Создаем долг у себя
@@ -62,8 +62,7 @@ export const IncomingDebtModal: React.FC<IncomingDebtModalProps> = ({
         date: new Date().toISOString(),
         description: `Синхронизировано: ${sharedDebt.description || ''}`,
         status: DebtStatus.ACTIVE,
-        // @ts-ignore
-        parent_debt_id: sharedDebt.id 
+        parent_debt_id: sharedDebt.id
       });
 
       // 2. ВАЖНО: Связываем пользователей в базе (Handshake)
@@ -93,7 +92,7 @@ export const IncomingDebtModal: React.FC<IncomingDebtModalProps> = ({
           animate={{ scale: 1, y: 0 }}
           className="bg-zinc-900 rounded-2xl w-full max-w-sm border border-zinc-700 overflow-hidden shadow-2xl relative"
         >
-          <button 
+          <button
             onClick={onClose}
             className="absolute top-4 right-4 z-10 text-zinc-400 hover:text-white bg-black/20 p-1 rounded-full"
           >
@@ -101,11 +100,11 @@ export const IncomingDebtModal: React.FC<IncomingDebtModalProps> = ({
           </button>
 
           <div className="bg-gradient-to-r from-blue-900/50 to-purple-900/50 p-6 text-center">
-              <div className="w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-4 ring-4 ring-blue-500/10">
-                <ArrowRight className="w-8 h-8 text-blue-400" />
-              </div>
-              <h2 className="text-xl font-bold text-white mb-1">Входящий долг</h2>
-              <p className="text-zinc-400 text-sm">Синхронизация данных</p>
+            <div className="w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-4 ring-4 ring-blue-500/10">
+              <ArrowRight className="w-8 h-8 text-blue-400" />
+            </div>
+            <h2 className="text-xl font-bold text-white mb-1">Входящий долг</h2>
+            <p className="text-zinc-400 text-sm">Синхронизация данных</p>
           </div>
 
           <div className="p-6">
@@ -127,13 +126,13 @@ export const IncomingDebtModal: React.FC<IncomingDebtModalProps> = ({
                     <span className="text-white font-medium">{sharedDebt.owner_name}</span>
                   </div>
                   <div className="flex justify-between items-center my-3">
-                     <span className="text-2xl font-bold text-white">
-                        {sharedDebt.amount} <span className="text-lg text-zinc-400">{sharedDebt.currency}</span>
-                     </span>
+                    <span className="text-2xl font-bold text-white">
+                      {sharedDebt.amount} <span className="text-lg text-zinc-400">{sharedDebt.currency}</span>
+                    </span>
                   </div>
                   <div className="text-sm p-2 rounded bg-zinc-800 text-zinc-300">
-                    {sharedDebt.type === 'I_OWE' 
-                      ? 'Этот пользователь говорит, что должен вам.' 
+                    {sharedDebt.type === 'I_OWE'
+                      ? 'Этот пользователь говорит, что должен вам.'
                       : 'Этот пользователь говорит, что вы должны ему.'}
                   </div>
                 </div>

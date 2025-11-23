@@ -474,7 +474,7 @@ export const getSystemInstruction = (
   "isDebtRepayment": false
 }
 \`\`\`
-**Комментарий:** Это создание нового долга (EXPENSE). `debtName` извлечено.
+**Комментарий:** Это создание нового долга (EXPENSE). \`debtName\` извлечено.
 
 ---
 
@@ -496,7 +496,7 @@ export const getSystemInstruction = (
   "isDebtRepayment": false
 }
 \`\`\`
-**Комментарий:** Это создание нового долга (INCOME). `debtName` извлечено.
+**Комментарий:** Это создание нового долга (INCOME). \`debtName\` извлечено.
 
 ---
 
@@ -518,7 +518,7 @@ export const getSystemInstruction = (
   "isDebtRepayment": true
 }
 \`\`\`
-**Комментарий:** Это погашение (EXPENSE). `isDebtRepayment: true`.
+**Комментарий:** Это погашение (EXPENSE). \`isDebtRepayment: true\`.
 
 ---
 
@@ -540,7 +540,7 @@ export const getSystemInstruction = (
   "isDebtRepayment": true
 }
 \`\`\`
-**Комментарий:** Это погашение (INCOME). `isDebtRepayment: true`.
+**Комментарий:** Это погашение (INCOME). \`isDebtRepayment: true\`.
 
 ## ⚙️ ТЕХНИЧЕСКИЕ ТРЕБОВАНИЯ
 
@@ -551,7 +551,7 @@ export const getSystemInstruction = (
 5. **Сленг:** Всегда преобразуй в числа
 6. **Категория для Transfer:** Всегда пусто
 7. **Счета:** Пытайся найти по частичному совпадению, иначе — пусто
-8. **Долги:** Если упоминается имя ИЛИ категория долга, заполни `debtName` (имя человека) и `isDebtRepayment` (true, если это погашение, false, если это создание).
+8. **Долги:** Если упоминается имя ИЛИ категория долга, заполни \`debtName\` (имя человека) и \`isDebtRepayment\` (true, если это погашение, false, если это создание).
 
 ---
 
@@ -565,7 +565,7 @@ export const getSystemInstruction = (
 - [ ] amount — это число (не строка)?
 - [ ] date в формате ISO 8601?
 - [ ] Если пользователь исправлялся — взято последнее значение?
-- [ ] Если это операция с долгом, `debtName` и `isDebtRepayment` заполнены?
+- [ ] Если это операция с долгом, \`debtName\` и \`isDebtRepayment\` заполнены?
 
 ---
 
