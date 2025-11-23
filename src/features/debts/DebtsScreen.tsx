@@ -16,7 +16,7 @@ import {
   Layers
 } from 'lucide-react';
 import { useAppData } from '../../core/context/AppDataContext';
-import { useLocalization } from '../../core/context/LocalizationContext'; // Импорт локализации
+import { useLocalization } from '../../core/context/LocalizationContext'; 
 import { Debt, DebtType, Transaction } from '../../core/types';
 import LongPressWrapper from '../../shared/layout/LongPressWrapper';
 import { ConfirmationModal } from '../../shared/ui/modals/ConfirmationModal';
@@ -27,6 +27,7 @@ import { getDebtTransactionType, getDebtTransactionCategory } from '../../utils/
 import { DebtForm } from './DebtForm';
 import { TransactionForm } from '../transactions/TransactionForm';
 import { DebtHistoryModal } from './DebtHistoryModal';
+import { DebtDetailsModal } from './DebtDetailsModal'; // <-- НОВЫЙ ИМПОРТ
 
 interface DebtsScreenProps {
   onBack: () => void;
@@ -54,26 +55,22 @@ const DebtWidgetCard = ({
   onClick?: () => void;
   active?: boolean;
 }) => {
-  const { t, language } = useLocalization(); // Хук внутри компонента
+  const { t, language } = useLocalization();
 
-  // Обновленные градиенты (как в счетах)
   const styles = {
     net: {
-      // Ocean vibe (Blue -> Teal)
       bg: 'bg-gradient-to-br from-blue-500 to-teal-400',
       shadow: 'shadow-blue-500/20',
       icon: Scale,
       iconColor: 'text-white'
     },
     owe: {
-      // Sunset/Rose vibe (Pink -> Rose/Red) - яркий акцент для долга
       bg: 'bg-gradient-to-br from-red-500 to-red-500',
       shadow: 'shadow-red-500/20',
       icon: ArrowDownCircle,
       iconColor: 'text-white'
     },
     owed: {
-      // Forest vibe (Green -> Emerald)
       bg: 'bg-gradient-to-br from-green-500 to-emerald-600',
       shadow: 'shadow-emerald-500/20',
       icon: ArrowUpCircle,
@@ -84,8 +81,6 @@ const DebtWidgetCard = ({
   const currentStyle = styles[type];
   const Icon = currentStyle.icon;
 
-  // Для русского языка правильное склонение (запись/записей)
-  // В упрощенном варианте используем record/records из JSON
   const recordLabel = count === 1 ? t('record') : t('records');
 
   return (
@@ -102,7 +97,6 @@ const DebtWidgetCard = ({
         ${active ? 'ring-4 ring-white/20 scale-[1.02]' : 'opacity-100 scale-100'}
       `}
     >
-      {/* Декоративные элементы фона (блики) */}
       <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/20 rounded-full blur-2xl" />
       <div className="absolute bottom-0 left-0 w-full h-1/2 bg-gradient-to-t from-black/10 to-transparent" />
 
@@ -136,7 +130,7 @@ const DebtWidgetCard = ({
 };
 
 // ============================================
-// REDESIGNED DEBT CARD COMPONENT
+// DEBT ITEM COMPONENT
 // ============================================
 const DebtItem = ({ 
   debt, 
@@ -153,7 +147,7 @@ const DebtItem = ({
   onDelete: () => void;
   defaultCurrency: string;
 }) => {
-  const { t, language } = useLocalization(); // Хук
+  const { t, language } = useLocalization();
   const isIOwe = debt.type === DebtType.I_OWE;
   const totalAmount = debt.amount;
   const currentDebt = debt.current_amount;
@@ -162,7 +156,6 @@ const DebtItem = ({
   
   const isOverdue = debt.due_date ? new Date(debt.due_date) < new Date() : false;
 
-  // Цветовая схема
   const theme = isIOwe ? {
     border: 'border-red-500/60',
     bg: 'bg-zinc-900',
@@ -185,7 +178,6 @@ const DebtItem = ({
     labelColor: 'text-emerald-400'
   };
 
-  // Обработчик двойного нажатия
   const lastTap = useRef<number>(0);
   const handleTap = () => {
       const now = Date.now();
@@ -212,7 +204,6 @@ const DebtItem = ({
         ${theme.bg} shadow-lg ${theme.glow}
         transition-all active:scale-[0.99]
       `}>
-        {/* Header: Icon + Name + Date */}
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
             <div className={`w-10 h-10 rounded-full flex items-center justify-center ${theme.iconBg}`}>
@@ -247,7 +238,6 @@ const DebtItem = ({
           )}
         </div>
 
-        {/* Main Amount Area */}
         <div className="mt-4 mb-4">
           <div className="flex items-baseline gap-2">
              <span className={`text-2xl font-bold tracking-tight ${theme.amountText}`}>
@@ -262,9 +252,7 @@ const DebtItem = ({
           )}
         </div>
 
-        {/* Progress Bar Section */}
         <div className="relative pt-1">
-          {/* Labels above bar */}
           <div className="flex justify-between text-xs mb-1.5 px-1">
             <span className="text-zinc-400 flex items-center gap-1">
               <CheckCircle2 className="w-3 h-3" /> {t('paid')}: {new Intl.NumberFormat(language === 'ru' ? 'ru-RU' : 'en-US', { style: 'decimal', minimumFractionDigits: 0 }).format(paidAmount)}
@@ -274,7 +262,6 @@ const DebtItem = ({
             </span>
           </div>
 
-          {/* The Bar */}
           <div className={`h-2 w-full rounded-full overflow-hidden ${theme.progressTrack}`}>
             <motion.div 
               initial={{ width: 0 }}
@@ -284,7 +271,6 @@ const DebtItem = ({
             />
           </div>
         </div>
-
       </div>
     </LongPressWrapper>
   );
@@ -294,7 +280,7 @@ const DebtItem = ({
 // MAIN SCREEN COMPONENT
 // ============================================
 export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
-  const { t } = useLocalization(); // Хук
+  const { t } = useLocalization();
 
   const { 
     debts, 
@@ -317,11 +303,14 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
   const [deleteConfirmation, setDeleteConfirmation] = useState<Debt | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingDebt, setEditingDebt] = useState<Debt | null>(null);
+  
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [selectedDebtForHistory, setSelectedDebtForHistory] = useState<Debt | null>(null);
+  
   const [isTxFormOpen, setIsTxFormOpen] = useState(false);
   const [prefilledTx, setPrefilledTx] = useState<Partial<Transaction> | null>(null);
-
+  
+  const [detailsDebt, setDetailsDebt] = useState<Debt | null>(null); // <-- НОВОЕ состояние для деталей
 
   // ============================================
   // CALCULATIONS
@@ -343,7 +332,6 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
     else if (activeTab === 'owed') filtered = owed;
     else if (activeTab === 'archived') filtered = debts.filter(d => d.status === 'ARCHIVED' || d.status === 'COMPLETED');
 
-    // Sort by creation
     filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
     return { 
@@ -357,24 +345,10 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
 
   const netBalance = owedTotal - iOweTotal;
 
-  // ============================================
-  // HELPER FOR TAB LABELS
-  // ============================================
-  const getTabLabel = (tab: string) => {
-    switch(tab) {
-      case 'all': return t('all');
-      case 'owe': return t('iOwe');
-      case 'owed': return t('owedToMe'); // "owed" ключ занят под заголовок виджета, используем owedToMe для таба если нужно, или создаем отдельный
-      case 'archived': return t('archive');
-      default: return tab;
-    }
-  };
-  
-  // HACK: для табов используем сокращенные названия
   const getTabDisplay = (tab: string) => {
       if (tab === 'all') return t('all');
       if (tab === 'owe') return t('iOwe');
-      if (tab === 'owed') return t('owedToMe'); // Или просто "Мне должны"
+      if (tab === 'owed') return t('owedToMe');
       if (tab === 'archived') return t('archive');
       return tab;
   };
@@ -446,7 +420,6 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
   // ============================================
   return (
     <div className="min-h-screen bg-black flex flex-col pb-24 relative">
-      {/* Header */}
       <header className="sticky top-0 z-20 bg-black/80 backdrop-blur-xl border-b border-white/5 px-4 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button 
@@ -470,10 +443,8 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
 
       <div className="flex-grow flex flex-col space-y-6 overflow-y-auto pt-6">
         
-        {/* CAROUSEL WIDGETS */}
         <div className="w-full overflow-x-auto scrollbar-hide snap-x snap-mandatory px-4 pb-4">
           <div className="flex gap-4 w-max">
-            {/* Widget 1: Net Balance */}
             <DebtWidgetCard 
               title={t('netBalance')}
               subtitle={netBalance >= 0 ? t('netPositive') : t('netNegative')}
@@ -483,7 +454,6 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
               type="net"
             />
             
-            {/* Widget 2: I Owe */}
             <DebtWidgetCard 
               title={t('iOwe')}
               subtitle={t('iOweSubtitle')}
@@ -495,7 +465,6 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
               active={activeTab === 'owe'}
             />
 
-            {/* Widget 3: Owed to Me */}
             <DebtWidgetCard 
               title={t('owedToMe')}
               subtitle={t('owedSubtitle')}
@@ -509,7 +478,6 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
           </div>
         </div>
 
-        {/* Tabs Filter (С плавной анимацией "скольжения") */}
         <div className="px-4">
             <div className="flex p-1 bg-zinc-900 rounded-xl border border-zinc-800 relative">
             {(['all', 'owe', 'owed', 'archived'] as const).map(tab => {
@@ -536,7 +504,6 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
             </div>
         </div>
 
-        {/* Debt List */}
         <div className="px-4 space-y-1 pb-20">
           <h2 className="text-zinc-500 text-xs font-semibold uppercase tracking-wider mb-3 px-1">
             {getListHeader()}
@@ -556,7 +523,8 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
                   <DebtItem 
                     debt={debt} 
                     onPress={() => handleDebtPayment(debt)} 
-                    onDoublePress={() => handleOpenHistory(debt)}
+                    // Двойной клик теперь открывает детали (шеринг/удаление), а не историю
+                    onDoublePress={() => setDetailsDebt(debt)}
                     onLongPress={() => handleDebtLongPress(debt)}
                     onDelete={() => handleDeleteClick(debt)}
                     defaultCurrency={displayCurrency}
@@ -580,7 +548,6 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
 
       {/* ================= MODALS ================= */}
       
-      {/* Create/Edit Form */}
       <DebtForm 
         isOpen={isFormOpen} 
         onClose={() => setIsFormOpen(false)} 
@@ -597,7 +564,6 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
         categories={['Personal', 'Work', 'Family', 'Other']} 
       />
 
-      {/* History Modal */}
       <DebtHistoryModal
         isOpen={isHistoryOpen}
         onClose={() => setIsHistoryOpen(false)}
@@ -607,7 +573,18 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
         currency={selectedDebtForHistory?.currency || displayCurrency}
       />
 
-      {/* Transaction (Payment) Form */}
+      {/* НОВАЯ МОДАЛКА ДЕТАЛЕЙ */}
+      {detailsDebt && (
+          <DebtDetailsModal 
+              isOpen={!!detailsDebt}
+              onClose={() => setDetailsDebt(null)}
+              debt={detailsDebt}
+              onDelete={(d) => { handleDeleteClick(d); setDetailsDebt(null); }}
+              onEdit={(d) => { handleEdit(d); setDetailsDebt(null); }}
+              onHistory={(d) => { handleOpenHistory(d); setDetailsDebt(null); }}
+          />
+      )}
+
       {isTxFormOpen && prefilledTx && (
         <TransactionForm
            transaction={prefilledTx as Transaction}
@@ -629,10 +606,9 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
         />
       )}
 
-      {/* Delete Confirmation */}
       <ConfirmationModal
         isOpen={!!deleteConfirmation}
-        title={t('deleteDebtTitle') || t('delete')} // Фолбек на общий delete если что
+        title={t('deleteDebtTitle') || t('delete')} 
         message={t('deleteDebtMessage')}
         onConfirm={confirmDelete}
         onCancel={() => setDeleteConfirmation(null)}

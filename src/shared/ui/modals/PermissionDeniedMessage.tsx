@@ -2,7 +2,7 @@ import React from 'react';
 // Используем иконку X (крестик)
 import { AlertTriangle, X } from 'lucide-react';
 // Предполагаем, что у вас есть этот хук (из RecordingOverlay.tsx)
-import { useLocalization } from '../core/context/LocalizationContext';
+import { useLocalization } from '../../../core/context/LocalizationContext';
 
 interface PermissionDeniedMessageProps {
   onDismiss: () => void;
