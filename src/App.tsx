@@ -1,6 +1,8 @@
+// src/App.tsx
+
 import React, { useState, useEffect } from 'react';
 import { AnimatePresence } from 'framer-motion';
-import { AlertTriangle, RefreshCw, LogOut } from 'lucide-react'; // Добавлены иконки для экрана ошибки
+import { AlertTriangle } from 'lucide-react';
 import * as api from './core/services/api';
 
 // Context Providers
@@ -15,7 +17,6 @@ import { OnboardingGuide } from './features/onboarding/OnboardingGuide';
 import { RecordingOverlay } from './shared/ui/screens/RecordingOverlay';
 import { BottomNavBar } from './shared/layout/BottomNavBar';
 import { AppModals } from './shared/ui/modals/AppModals';
-import { IncomingDebtModal } from './features/debts/IncomingDebtModal';
 
 // Screens
 import { SavingsScreen } from './features/savings/SavingsScreen';
@@ -31,38 +32,24 @@ import { ComingSoonScreen } from './shared/ui/screens/ComingSoonScreen';
 import { AccountList } from './features/accounts/AccountList';
 import { FinancialOverview } from './features/analytics/FinancialOverview';
 import { TransactionList } from './features/transactions/TransactionList';
-import { DebtsScreen } from './features/debts/DebtsScreen'; 
+import { DebtsScreen } from './features/debts/DebtsScreen'; // ДОБАВЛЕНО: Импорт DebtsScreen
 
 // Types & Hooks
-import { Transaction, TransactionType, Account, SavingsGoal, Budget, Category } from './core/types';
+import { Transaction, TransactionType, Account, SavingsGoal, Budget, Category, Debt } from './core/types'; // ИЗМЕНЕНО: Добавлен Debt
 import { useAudioTransaction } from './shared/hooks/useAudioTransaction';
 
 const TG_HEADER_OFFSET_CLASS = 'pt-[85px]';
 
-// --- БЕЗОПАСНАЯ ЗАГЛУШКА ДЛЯ ФОНА (Чтобы не крашилось при пустых данных) ---
-const SafeBackgroundPlaceholder = () => (
-  <main className="max-w-4xl mx-auto flex flex-col gap-4 pb-32 opacity-50 pointer-events-none">
-      <div className="px-4 pt-4">
-         <div className="h-32 bg-gray-800 rounded-2xl w-full animate-pulse mb-4"></div>
-         <div className="flex gap-2 mb-6">
-            <div className="h-24 bg-gray-800 rounded-xl flex-1 animate-pulse"></div>
-            <div className="h-24 bg-gray-800 rounded-xl flex-1 animate-pulse"></div>
-         </div>
-         <div className="h-64 bg-gray-800 rounded-2xl w-full animate-pulse"></div>
-      </div>
-  </main>
-);
-
 const AppContent: React.FC = () => {
   const { t, language } = useLocalization();
-  const { 
-    user, isLoading: isAuthLoading, isBlocked, blockMessage, 
-    isDevLoggingIn, handleDevLogin, isAppExpanded, isAppFullscreen, 
-    setUser, error: authError 
+  const {
+    user, isLoading: isAuthLoading, isBlocked, blockMessage,
+    isDevLoggingIn, handleDevLogin, isAppExpanded, isAppFullscreen,
+    setUser, error: authError
   } = useAuth();
-  
-  const { 
-    transactions, accounts, categories, savingsGoals, budgets, rates, 
+
+  const {
+    transactions, accounts, categories, savingsGoals, budgets, rates,
     isDataLoading, dataError, totalBalance, totalSavings, summary, daysActive,
     displayCurrency, selectedAccountId, setSelectedAccountId,
     handleAddTransaction, handleUpdateTransaction, handleDeleteTransaction,
@@ -71,42 +58,37 @@ const AppContent: React.FC = () => {
     handleSaveGoal, handleDeleteGoal,
     handleSaveBudget, handleDeleteBudget,
     updateDefaultCurrency,
-    debts,
-    refreshDebts
+    debts // ДОБАВЛЕНО: Массив долгов
   } = useAppData();
 
-  const [activeScreen, setActiveScreen] = useState<'home' | 'savings' | 'analytics' | 'profile' | 'accounts' | 'budgetPlanning' | 'categories' | 'settings' | 'comingSoon' | 'history' | 'about' | 'debts'>('home');
+  const [activeScreen, setActiveScreen] = useState<'home' | 'savings' | 'analytics' | 'profile' | 'accounts' | 'budgetPlanning' | 'categories' | 'settings' | 'comingSoon' | 'history' | 'about' | 'debts'>('home'); // ИЗМЕНЕНО: Добавлен 'debts'
   const [error, setError] = useState<string | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
-  
-  // Transaction State
+
   const [potentialTransaction, setPotentialTransaction] = useState<Omit<Transaction, 'id'> | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+
   const [isTextInputOpen, setIsTextInputOpen] = useState(false);
   const [isProcessingText, setIsProcessingText] = useState(false);
   const [textInputValue, setTextInputValue] = useState('');
-  
-  // Entities State
+
   const [isAccountFormOpen, setIsAccountFormOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [accountForActions, setAccountForActions] = useState<Account | null>(null);
-  
+
   const [isGoalFormOpen, setIsGoalFormOpen] = useState(false);
   const [editingGoal, setEditingGoal] = useState<SavingsGoal | null>(null);
   const [goalForDeposit, setGoalForDeposit] = useState<SavingsGoal | null>(null);
   const [goalForHistory, setGoalForHistory] = useState<SavingsGoal | null>(null);
-  
+
   const [isBudgetFormOpen, setIsBudgetFormOpen] = useState(false);
   const [editingBudget, setEditingBudget] = useState<Partial<Budget> | null>(null);
   const [budgetForHistory, setBudgetForHistory] = useState<Budget | null>(null);
   const [carryOverInfo, setCarryOverInfo] = useState<{ from: string, to: string } | null>(null);
-  
+
   const [categoryFormState, setCategoryFormState] = useState<{ isOpen: boolean; category: Category | null; context?: { type: TransactionType; from?: 'budget' } }>({ isOpen: false, category: null });
   const [isCategoryLockedInForm, setIsCategoryLockedInForm] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<any>(null);
-
-  const [incomingDebtId, setIncomingDebtId] = useState<string | null>(null);
-  const [initialDebtId, setInitialDebtId] = useState<string | null>(null);
 
   // Audio Hook
   const {
@@ -114,269 +96,221 @@ const AppContent: React.FC = () => {
     startRecording, stopRecording, audioContext, processAudioResult
   } = useAudioTransaction((msg) => setError(msg));
 
-  // Синхронизация ошибок
   useEffect(() => {
-    if (authError) {
-        console.error("Global Auth Error Caught:", authError);
-    }
-    if (dataError) {
-        console.error("Global Data Error Caught:", dataError);
-        setError(dataError);
-    }
+    if (authError) setError(authError);
+    if (dataError) setError(dataError);
   }, [authError, dataError]);
-  
-  // Логика онбординга
+
   useEffect(() => {
-    if (isAuthLoading) return;
-    
-    // Если юзер загрузился, но у него флаг "новый" -> Онбординг
     if (user && !user.has_completed_onboarding) {
       setShowOnboarding(true);
-    } 
-    // Если юзер есть, онбординг пройден, и есть ID долга -> Модалка
-    else if (user?.has_completed_onboarding && initialDebtId) {
-      setIncomingDebtId(initialDebtId); 
-      setInitialDebtId(null); 
     }
-  }, [user, initialDebtId, isAuthLoading]);
+  }, [user]);
 
-  // Deep Link Logic
-  useEffect(() => {
-    const initData = (window as any).Telegram?.WebApp?.initDataUnsafe;
-    const startParam = initData?.start_param;
+  // --- Logic Handlers ---
 
-    if (startParam && startParam.startsWith('debt_')) {
-      let rawId = startParam.replace('debt_', '');
-      const cleanId = rawId.replace(/[^a-f0-9-]/gi, '');
-      if (cleanId.length === 36) setInitialDebtId(cleanId); 
-    }
-  }, []); 
-
-  // --- Handlers ---
   const handleRecordingStopLogic = async () => {
     stopRecording();
+
     try {
-        const tx = await processAudioResult(categories, savingsGoals, accounts, displayCurrency);
-        if (tx) setPotentialTransaction({ ...tx, accountId: tx.accountId || accounts[0]?.id });
-    } catch (e: any) { setError(e.message || t('connectionError')); }
+      // ОБНОВЛЕНО: Передаём accounts и displayCurrency
+      const tx = await processAudioResult(
+        categories,
+        savingsGoals,
+        accounts, // НОВОЕ
+        displayCurrency // НОВОЕ (из AppDataContext)
+      );
+
+      if (tx) {
+        setPotentialTransaction({
+          ...tx,
+          // Если accountId не определён, ставим первый счёт
+          accountId: tx.accountId || accounts[0]?.id,
+        });
+      }
+    } catch (e: any) {
+      setError(e.message || t('connectionError'));
+    }
   };
 
   const handleTextTransactionSubmit = async (text: string) => {
-      if (!text.trim()) return;
-      setIsProcessingText(true);
-      try {
-        const newTransaction = await api.parseTransactionFromText(text, displayCurrency, categories, savingsGoals, accounts, language);
-        const finalAccountId = newTransaction.accountId || (selectedAccountId !== 'all' ? selectedAccountId : accounts[0]?.id);
-        setPotentialTransaction({ ...newTransaction, accountId: finalAccountId });
-        setTextInputValue('');
-        setIsTextInputOpen(false);
-      } catch (e: any) { setError(e.message); } finally { setIsProcessingText(false); }
+    if (!text.trim()) return;
+    setIsProcessingText(true);
+    try {
+      // ✅ Pass accounts to API
+      const newTransaction = await api.parseTransactionFromText(
+        text, displayCurrency, categories, savingsGoals, accounts, language
+      );
+
+      // Account mapping for Text as well (simple fallback for now, ideally API returns matched name too)
+      const finalAccountId = newTransaction.accountId || (selectedAccountId !== 'all' ? selectedAccountId : accounts[0]?.id);
+
+      setPotentialTransaction({ ...newTransaction, accountId: finalAccountId });
+      setTextInputValue('');
+      setIsTextInputOpen(false);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setIsProcessingText(false);
+    }
   };
 
+  // ... (Rest of handlers: handleConfirmTransactionWrapper, etc. remain same) ...
   const handleConfirmTransactionWrapper = async (tx: Transaction | Omit<Transaction, 'id'>) => {
     try {
-        if ('id' in tx) await handleUpdateTransaction(tx);
-        else await handleAddTransaction(tx);
-        setPotentialTransaction(null); setEditingTransaction(null); setGoalForDeposit(null); setIsCategoryLockedInForm(false);
-    } catch (e: any) { setError(e.message); }
+      if ('id' in tx) await handleUpdateTransaction(tx);
+      else await handleAddTransaction(tx);
+
+      setPotentialTransaction(null);
+      setEditingTransaction(null);
+      setGoalForDeposit(null);
+      setIsCategoryLockedInForm(false);
+    } catch (e: any) {
+      setError(e.message);
+    }
   };
 
   const handleDeleteItemWrapper = async () => {
-      if (!itemToDelete) return;
-      try {
-          if ('value' in itemToDelete) {
-              const { type, value } = itemToDelete;
-              switch(type) {
-                  case 'account': await handleDeleteAccount(value.id); break;
-                  case 'category': await handleDeleteCategory(value.id); break;
-                  case 'savingsGoal': await handleDeleteGoal(value.id); break;
-                  case 'budget': await handleDeleteBudget(value.id); break;
-              }
-          } else { await handleDeleteTransaction(itemToDelete.id); }
-      } catch (e: any) { setError(e.message); }
-      setItemToDelete(null);
+    if (!itemToDelete) return;
+    try {
+      if ('value' in itemToDelete) {
+        const { type, value } = itemToDelete;
+        switch (type) {
+          case 'account': await handleDeleteAccount(value.id); break;
+          case 'category': await handleDeleteCategory(value.id); break;
+          case 'savingsGoal': await handleDeleteGoal(value.id); break;
+          case 'budget': await handleDeleteBudget(value.id); break;
+        }
+      } else {
+        await handleDeleteTransaction(itemToDelete.id);
+      }
+    } catch (e: any) {
+      setError(e.message);
+    }
+    setItemToDelete(null);
   };
 
   const handleFinishOnboarding = async () => {
     setShowOnboarding(false);
     if (user) {
-        try {
-            await api.markOnboardingAsCompleted(user.id);
-            setUser(prev => prev ? ({ ...prev, has_completed_onboarding: true }) : null);
-        } catch (err) { console.error(err); }
+      try {
+        await api.markOnboardingAsCompleted(user.id);
+        setUser(prev => prev ? ({ ...prev, has_completed_onboarding: true }) : null);
+      } catch (err) { console.error(err); }
     }
   };
 
   const handleCategorySaveWrapper = async (catData: any) => {
-      await handleSaveCategory(catData);
-      setCategoryFormState({ isOpen: false, category: null });
-      if (categoryFormState.context?.from === 'budget') {
-          setEditingBudget(prev => prev ? ({...prev, category: catData.name}) : null);
-      }
+    await handleSaveCategory(catData);
+    setCategoryFormState({ isOpen: false, category: null });
+    if (categoryFormState.context?.from === 'budget') {
+      const catName = 'id' in catData ? catData.name : catData.name;
+      setEditingBudget(prev => ({ ...prev, category: catName }));
+    }
   };
 
-  // --- RENDER ---
+  // --- Rendering ---
 
-  if (isDevLoggingIn) return <DevLoginForm onSubmit={handleDevLogin} error={error} isLoading={isAuthLoading} />;
-
-  // Экран Блокировки
-  if (isBlocked) {
-    return (
-        <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center text-center p-6">
-            <AlertTriangle className="w-16 h-16 text-red-500 mb-6" />
-            <h1 className="text-2xl font-bold text-white mb-2">{t('error')}</h1>
-            <p className="text-lg text-gray-300 max-w-sm">{blockMessage}</p>
-        </div>
-    );
+  if (isDevLoggingIn) {
+    return <DevLoginForm onSubmit={handleDevLogin} error={error} isLoading={isAuthLoading} />;
   }
 
-  // КРИТИЧЕСКАЯ ОШИБКА АВТОРИЗАЦИИ (Вместо тёмного экрана)
-  if (!isAuthLoading && authError) {
-      return (
-          <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center p-6 text-center">
-              <AlertTriangle className="w-16 h-16 text-red-500 mb-4" />
-              <h2 className="text-xl font-bold text-white mb-2">Connection Error</h2>
-              <p className="text-gray-400 mb-6 max-w-xs break-words">{authError}</p>
-              <button 
-                onClick={() => window.location.reload()} 
-                className="bg-blue-600 active:bg-blue-700 text-white px-6 py-3 rounded-xl flex items-center gap-2"
-              >
-                  <RefreshCw size={20} /> Retry
-              </button>
-          </div>
-      );
+  if (isBlocked) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center text-center p-6">
+        <AlertTriangle className="w-16 h-16 text-red-500 mb-6" />
+        <h1 className="text-2xl font-bold text-white mb-2">{t('error')}</h1>
+        <p className="text-lg text-gray-300 max-w-sm">{blockMessage}</p>
+      </div>
+    );
   }
 
   const isDev = import.meta.env.DEV;
   let paddingTopClass = '';
   let showMask = false;
-  if (!isDev && isAppFullscreen) {
+  if (!isDev) {
+    if (isAppFullscreen) {
       paddingTopClass = TG_HEADER_OFFSET_CLASS;
       showMask = true;
+    }
   }
 
-  // --- БЕЗОПАСНЫЙ РЕНДЕР КОНТЕНТА ---
   const renderContent = () => {
-      // 1. Если юзера нет (даже если лоадинг прошел), рендерить нечего
-      if (!user) return <div className="text-white text-center mt-10">No user data. Please restart.</div>;
+    switch (activeScreen) {
+      case 'savings': return (
+        <SavingsScreen
+          goals={savingsGoals}
+          onAddGoal={() => setIsGoalFormOpen(true)}
+          onAddToGoal={(goal) => {
+            setGoalForDeposit(goal);
+            setPotentialTransaction({ accountId: accounts[0]?.id, name: `Deposit to "${goal.name}"`, amount: 0, currency: displayCurrency, category: 'Savings', date: new Date().toISOString(), type: TransactionType.EXPENSE, goalId: goal.id });
+          }}
+          onViewGoalHistory={setGoalForHistory}
+          onEditGoal={(goal) => { setEditingGoal(goal); setIsGoalFormOpen(true); }}
+          onDeleteGoal={(goal) => setItemToDelete({ type: 'savingsGoal', value: goal })}
+        />
+      );
+      case 'analytics': return <AnalyticsScreen transactions={transactions} savingsGoals={savingsGoals} defaultCurrency={displayCurrency} rates={rates} />;
+      case 'profile': return <ProfileScreen user={user!} daysActive={daysActive} onNavigate={setActiveScreen} />;
+      case 'accounts': return <AccountsScreen accounts={accounts} transactions={transactions} rates={rates} onBack={() => setActiveScreen('profile')} onOpenAddForm={() => { setEditingAccount(null); setIsAccountFormOpen(true); }} onOpenActions={setAccountForActions} />;
+      case 'categories': return <CategoriesScreen categories={categories} onBack={() => setActiveScreen('profile')} onCreateCategory={(type) => setCategoryFormState({ isOpen: true, category: null, context: { type } })} onEditCategory={(cat) => setCategoryFormState({ isOpen: true, category: cat })} onDeleteCategory={(cat) => setItemToDelete({ type: 'category', value: cat })} onToggleFavorite={(cat) => handleSaveCategory({ ...cat, isFavorite: !cat.isFavorite })} />;
+      case 'settings': return <SettingsScreen onBack={() => setActiveScreen('profile')} defaultCurrency={displayCurrency} onSetDefaultCurrency={updateDefaultCurrency} onShowOnboarding={() => setShowOnboarding(true)} />;
+      case 'about': return <AboutScreen onBack={() => setActiveScreen('profile')} />;
+      case 'budgetPlanning': return <BudgetPlanningScreen budgets={budgets} transactions={transactions} categories={categories} onBack={() => setActiveScreen('profile')} onAddBudget={(monthKey) => { setEditingBudget({ monthKey, currency: displayCurrency }); setIsBudgetFormOpen(true); }} onEditBudget={(b) => { setEditingBudget(b); setIsBudgetFormOpen(true); }} onDeleteBudget={(b) => setItemToDelete({ type: 'budget', value: b })} onAddTransaction={(b) => { setIsCategoryLockedInForm(true); setPotentialTransaction({ accountId: accounts[0]?.id, name: '', amount: 0, currency: displayCurrency, category: b.category, date: new Date().toISOString(), type: TransactionType.EXPENSE }); }} onViewHistory={setBudgetForHistory} onCarryOver={(from, to) => setCarryOverInfo({ from, to })} rates={rates} defaultCurrency={displayCurrency} />;
+      case 'history': return <TransactionHistoryScreen transactions={transactions} accounts={accounts} categories={categories} rates={rates} defaultCurrency={displayCurrency} onSelectTransaction={setEditingTransaction} onDeleteTransaction={setItemToDelete} onBack={() => setActiveScreen('home')} />;
+      case 'comingSoon': return <ComingSoonScreen onBack={() => setActiveScreen('profile')} />;
 
-      // 2. Безопасные данные (гарантия массивов)
-      const safeAccounts = accounts || [];
-      const safeTransactions = transactions || [];
+      // НОВЫЙ ЭКРАН
+      case 'debts': return <DebtsScreen debts={debts} onBack={() => setActiveScreen('profile')} />;
 
-      switch (activeScreen) {
-          case 'savings': return (
-              <SavingsScreen 
-                goals={savingsGoals} 
-                onAddGoal={() => setIsGoalFormOpen(true)} 
-                onAddToGoal={(goal) => { 
-                    setGoalForDeposit(goal); 
-                    setPotentialTransaction({ accountId: safeAccounts[0]?.id, name: `Deposit to "${goal.name}"`, amount: 0, currency: displayCurrency, category: 'Savings', date: new Date().toISOString(), type: TransactionType.EXPENSE, goalId: goal.id }); 
-                }} 
-                onViewGoalHistory={setGoalForHistory} 
-                onEditGoal={(goal) => { setEditingGoal(goal); setIsGoalFormOpen(true); }} 
-                onDeleteGoal={(goal) => setItemToDelete({ type: 'savingsGoal', value: goal })} 
-              />
-          );
-          case 'analytics': return <AnalyticsScreen transactions={safeTransactions} savingsGoals={savingsGoals} defaultCurrency={displayCurrency} rates={rates} />;
-          case 'profile': return <ProfileScreen user={user} daysActive={daysActive} onNavigate={setActiveScreen} />;
-          case 'accounts': return <AccountsScreen accounts={safeAccounts} transactions={safeTransactions} rates={rates} onBack={() => setActiveScreen('profile')} onOpenAddForm={() => { setEditingAccount(null); setIsAccountFormOpen(true); }} onOpenActions={setAccountForActions} />;
-          case 'categories': return <CategoriesScreen categories={categories} onBack={() => setActiveScreen('profile')} onCreateCategory={(type) => setCategoryFormState({ isOpen: true, category: null, context: { type } })} onEditCategory={(cat) => setCategoryFormState({ isOpen: true, category: cat })} onDeleteCategory={(cat) => setItemToDelete({ type: 'category', value: cat })} onToggleFavorite={(cat) => handleSaveCategory({ ...cat, isFavorite: !cat.isFavorite })} />;
-          case 'settings': return <SettingsScreen onBack={() => setActiveScreen('profile')} defaultCurrency={displayCurrency} onSetDefaultCurrency={updateDefaultCurrency} onShowOnboarding={() => setShowOnboarding(true)} />;
-          case 'about': return <AboutScreen onBack={() => setActiveScreen('profile')} />;
-          case 'budgetPlanning': return <BudgetPlanningScreen budgets={budgets} transactions={safeTransactions} categories={categories} onBack={() => setActiveScreen('profile')} onAddBudget={(monthKey) => { setEditingBudget({ monthKey, currency: displayCurrency }); setIsBudgetFormOpen(true); }} onEditBudget={(b) => { setEditingBudget(b); setIsBudgetFormOpen(true); }} onDeleteBudget={(b) => setItemToDelete({ type: 'budget', value: b })} onAddTransaction={(b) => { setIsCategoryLockedInForm(true); setPotentialTransaction({ accountId: safeAccounts[0]?.id, name: '', amount: 0, currency: displayCurrency, category: b.category, date: new Date().toISOString(), type: TransactionType.EXPENSE }); }} onViewHistory={setBudgetForHistory} onCarryOver={(from, to) => setCarryOverInfo({ from, to })} rates={rates} defaultCurrency={displayCurrency} />;
-          case 'history': return <TransactionHistoryScreen transactions={safeTransactions} accounts={safeAccounts} categories={categories} rates={rates} defaultCurrency={displayCurrency} onSelectTransaction={setEditingTransaction} onDeleteTransaction={setItemToDelete} onBack={() => setActiveScreen('home')} />;
-          case 'comingSoon': return <ComingSoonScreen onBack={() => setActiveScreen('profile')} />;
-          case 'debts': return <DebtsScreen debts={debts} onBack={() => setActiveScreen('profile')} />;
-
-          case 'home': default: return (
-              <main className="max-w-4xl mx-auto flex flex-col gap-4 pb-32">
-                  <AccountList accounts={safeAccounts} transactions={safeTransactions} rates={rates} selectedAccountId={selectedAccountId} onSelectAccount={setSelectedAccountId} totalBalance={totalBalance} defaultCurrency={displayCurrency} />
-                  <FinancialOverview monthlyIncome={summary.monthlyIncome} monthlyExpense={summary.monthlyExpense} totalBalance={summary.selectedBalance} totalSavings={totalSavings} defaultCurrency={displayCurrency} onNavigate={setActiveScreen} onGenerateTips={() => {}} />
-                  <div className="px-6">
-                      <TransactionList transactions={safeTransactions.filter(tx => selectedAccountId === 'all' || tx.accountId === selectedAccountId || tx.toAccountId === selectedAccountId)} accounts={safeAccounts} allAccounts={safeAccounts} onSelectTransaction={setEditingTransaction} onDeleteTransaction={setItemToDelete} onViewAll={() => setActiveScreen('history')} rates={rates} />
-                  </div>
-                  {error && <p className="text-center text-red-500 mt-2 px-6 text-sm" onClick={() => setError(null)}>{error}</p>}
-              </main>
-          );
-      }
+      case 'home': default: return (
+        <main className="max-w-4xl mx-auto flex flex-col gap-4 pb-32">
+          <AccountList accounts={accounts} transactions={transactions} rates={rates} selectedAccountId={selectedAccountId} onSelectAccount={setSelectedAccountId} totalBalance={totalBalance} defaultCurrency={displayCurrency} />
+          <FinancialOverview monthlyIncome={summary.monthlyIncome} monthlyExpense={summary.monthlyExpense} totalBalance={summary.selectedBalance} totalSavings={totalSavings} defaultCurrency={displayCurrency} onNavigate={setActiveScreen} onGenerateTips={() => { }} />
+          <div className="px-6">
+            <TransactionList transactions={transactions.filter(tx => selectedAccountId === 'all' || tx.accountId === selectedAccountId || tx.toAccountId === selectedAccountId)} accounts={accounts} allAccounts={accounts} onSelectTransaction={setEditingTransaction} onDeleteTransaction={setItemToDelete} onViewAll={() => setActiveScreen('history')} rates={rates} />
+          </div>
+          {error && <p className="text-center text-red-500 mt-2 px-6" onClick={() => setError(null)}>{error}</p>}
+        </main>
+      );
+    }
   };
-  
-  // Определяем, должен ли Onboarding взять на себя обработку долга
-  const isDebtHandledInOnboarding = showOnboarding && initialDebtId; 
-  // Общий флаг загрузки: если грузимся - контент не показываем
-  const isLoading = isAuthLoading || isDataLoading;
-
-  // Если мы в процессе онбординга, но данные уже есть (технически), мы все равно можем показать SafeBackground
-  // чтобы не отвлекать пользователя сложным интерфейсом под блюром
-  const showSafeBackground = showOnboarding || (accounts && accounts.length === 0 && !isDataLoading);
 
   return (
-    <div className="min-h-screen bg-gray-900 relative overflow-hidden">
-      {/* Экран загрузки показывается ТОЛЬКО если правда грузимся */}
-      <LoadingScreen isLoading={isLoading} />
-
-      {/* Слой Онбординга */}
+    <div className="min-h-screen bg-gray-900">
+      <LoadingScreen isLoading={isAuthLoading || isDataLoading} />
       <AnimatePresence>
-        {showOnboarding && (
-            <div className="fixed inset-0 z-50 overflow-y-auto">
-                <OnboardingGuide 
-                    onFinish={handleFinishOnboarding} 
-                    initialDebtId={initialDebtId} 
-                    onDebtActionComplete={() => setInitialDebtId(null)} 
-                />
-            </div>
-        )}
+        {showOnboarding && <OnboardingGuide onFinish={handleFinishOnboarding} />}
       </AnimatePresence>
-      
-      {/* Основной контейнер с Blur эффектом */}
-      <div 
-        className={`transition-all duration-500 ease-in-out ${showOnboarding ? 'filter blur-md opacity-40 pointer-events-none scale-[0.98]' : 'opacity-100 scale-100'}`}
-      >
-          {showMask && <div className="fixed top-0 left-0 right-0 h-[85px] bg-gray-900 z-20"></div>}
-          
-          <div className={paddingTopClass}>
-            {!isLoading && (
-                // Если данных нет (новый юзер) или идет онбординг, показываем заглушку, чтобы реальный рендер не упал
-                showSafeBackground ? <SafeBackgroundPlaceholder /> : renderContent()
-            )}
-          </div>
-          
-          {/* Модалки рендерим только если есть юзер, чтобы избежать ошибок контекста */}
-          {user && !isLoading && (
-            <AppModals 
-                potentialTransaction={potentialTransaction} editingTransaction={editingTransaction} onConfirmTransaction={handleConfirmTransactionWrapper} onCancelTransaction={() => { setPotentialTransaction(null); setEditingTransaction(null); setIsCategoryLockedInForm(false); setGoalForDeposit(null); }}
-                goalForDeposit={goalForDeposit} isCategoryLockedInForm={isCategoryLockedInForm}
-                isAccountFormOpen={isAccountFormOpen} setIsAccountFormOpen={setIsAccountFormOpen} editingAccount={editingAccount} onSaveAccount={async (a) => { await handleSaveAccount(a); setIsAccountFormOpen(false); setEditingAccount(null); }}
-                isGoalFormOpen={isGoalFormOpen} setIsGoalFormOpen={setIsGoalFormOpen} editingGoal={editingGoal} onSaveGoal={async (g) => { await handleSaveGoal(g); setIsGoalFormOpen(false); setEditingGoal(null); }} setEditingGoal={setEditingGoal}
-                isBudgetFormOpen={isBudgetFormOpen} setIsBudgetFormOpen={setIsBudgetFormOpen} editingBudget={editingBudget} setEditingBudget={setEditingBudget} onSaveBudget={async (b) => { await handleSaveBudget(b); setIsBudgetFormOpen(false); setEditingBudget(null); }} budgetsForMonth={budgets.filter(b => b.monthKey === editingBudget?.monthKey)}
-                categoryFormState={categoryFormState} setCategoryFormState={setCategoryFormState} onSaveCategory={handleCategorySaveWrapper} onDeleteCategory={(c) => setItemToDelete({type: 'category', value: c})}
-                accountForActions={accountForActions} setAccountForActions={setAccountForActions} onAddTxFromAccount={(id) => { setPotentialTransaction({ accountId: id, name: '', amount: 0, currency: displayCurrency, category: '', date: new Date().toISOString(), type: TransactionType.EXPENSE }); setActiveScreen('home'); setAccountForActions(null); }} onEditAccountRequest={(acc) => { setEditingAccount(acc); setIsAccountFormOpen(true); setAccountForActions(null); }} onDeleteAccountRequest={(acc) => { setItemToDelete({ type: 'account', value: acc }); setAccountForActions(null); }}
-                itemToDelete={itemToDelete} setItemToDelete={setItemToDelete} onDeleteItem={handleDeleteItemWrapper}
-                isTextInputOpen={isTextInputOpen} setIsTextInputOpen={setIsTextInputOpen} textInputValue={textInputValue} setTextInputValue={setTextInputValue} onTextTransactionSubmit={handleTextTransactionSubmit} isProcessingText={isProcessingText}
-                goalForHistory={goalForHistory} setGoalForHistory={setGoalForHistory} budgetForHistory={budgetForHistory} setBudgetForHistory={setBudgetForHistory} onDeleteTransaction={setItemToDelete} onSelectTransaction={setEditingTransaction}
-                carryOverInfo={carryOverInfo} setCarryOverInfo={setCarryOverInfo} onConfirmCarryOver={() => { if(carryOverInfo){ budgets.filter(b => b.monthKey === carryOverInfo.from).forEach(b => handleSaveBudget({...b, monthKey: carryOverInfo.to})); setCarryOverInfo(null); } }}
-                categories={categories} accounts={accounts} savingsGoals={savingsGoals} budgets={budgets} transactions={transactions} rates={rates} displayCurrency={displayCurrency}
-                debts={debts}
-            />
-          )}
 
-          {!isLoading && (
-            <BottomNavBar activeScreen={activeScreen} onNavigate={setActiveScreen} isRecording={isRecording} isProcessing={isProcessing} onToggleRecording={isRecording ? handleRecordingStopLogic : startRecording} onLongPressAdd={() => setIsTextInputOpen(true)} />
-          )}
-      </div>
+      {showMask && <div className="fixed top-0 left-0 right-0 h-[85px] bg-gray-900 z-20"></div>}
 
-      {isRecording && !showOnboarding && (
+      {!(isAuthLoading || isDataLoading) && (
+        <div className={paddingTopClass}>{renderContent()}</div>
+      )}
+
+      {isRecording && (
         <RecordingOverlay transcription={transcription} stream={stream} onStop={handleRecordingStopLogic} isRecording={isRecording} audioContext={audioContext} />
       )}
 
-      {!isDebtHandledInOnboarding && ( 
-        <IncomingDebtModal 
-          debtId={incomingDebtId}
-          onClose={() => setIncomingDebtId(null)}
-          onDebtAdded={async () => { await refreshDebts(); setIncomingDebtId(null); setActiveScreen('debts'); }}
-          defaultCurrency={displayCurrency}
-        />
+      <AppModals
+        potentialTransaction={potentialTransaction} editingTransaction={editingTransaction} onConfirmTransaction={handleConfirmTransactionWrapper} onCancelTransaction={() => { setPotentialTransaction(null); setEditingTransaction(null); setIsCategoryLockedInForm(false); setGoalForDeposit(null); }}
+        goalForDeposit={goalForDeposit} isCategoryLockedInForm={isCategoryLockedInForm}
+        isAccountFormOpen={isAccountFormOpen} setIsAccountFormOpen={setIsAccountFormOpen} editingAccount={editingAccount} onSaveAccount={async (a) => { await handleSaveAccount(a); setIsAccountFormOpen(false); setEditingAccount(null); }}
+        isGoalFormOpen={isGoalFormOpen} setIsGoalFormOpen={setIsGoalFormOpen} editingGoal={editingGoal} onSaveGoal={async (g) => { await handleSaveGoal(g); setIsGoalFormOpen(false); setEditingGoal(null); }} setEditingGoal={setEditingGoal}
+        isBudgetFormOpen={isBudgetFormOpen} setIsBudgetFormOpen={setIsBudgetFormOpen} editingBudget={editingBudget} setEditingBudget={setEditingBudget} onSaveBudget={async (b) => { await handleSaveBudget(b); setIsBudgetFormOpen(false); setEditingBudget(null); }} budgetsForMonth={budgets.filter(b => b.monthKey === editingBudget?.monthKey)}
+        categoryFormState={categoryFormState} setCategoryFormState={setCategoryFormState} onSaveCategory={handleCategorySaveWrapper} onDeleteCategory={(c) => setItemToDelete({ type: 'category', value: c })}
+        accountForActions={accountForActions} setAccountForActions={setAccountForActions} onAddTxFromAccount={(id) => { setPotentialTransaction({ accountId: id, name: '', amount: 0, currency: displayCurrency, category: '', date: new Date().toISOString(), type: TransactionType.EXPENSE }); setActiveScreen('home'); setAccountForActions(null); }} onEditAccountRequest={(acc) => { setEditingAccount(acc); setIsAccountFormOpen(true); setAccountForActions(null); }} onDeleteAccountRequest={(acc) => { setItemToDelete({ type: 'account', value: acc }); setAccountForActions(null); }}
+        itemToDelete={itemToDelete} setItemToDelete={setItemToDelete} onDeleteItem={handleDeleteItemWrapper}
+        isTextInputOpen={isTextInputOpen} setIsTextInputOpen={setIsTextInputOpen} textInputValue={textInputValue} setTextInputValue={setTextInputValue} onTextTransactionSubmit={handleTextTransactionSubmit} isProcessingText={isProcessingText}
+        goalForHistory={goalForHistory} setGoalForHistory={setGoalForHistory} budgetForHistory={budgetForHistory} setBudgetForHistory={setBudgetForHistory} onDeleteTransaction={setItemToDelete} onSelectTransaction={setEditingTransaction}
+        carryOverInfo={carryOverInfo} setCarryOverInfo={setCarryOverInfo} onConfirmCarryOver={() => { if (carryOverInfo) { budgets.filter(b => b.monthKey === carryOverInfo.from).forEach(b => handleSaveBudget({ ...b, monthKey: carryOverInfo.to })); setCarryOverInfo(null); } }}
+        categories={categories} accounts={accounts} savingsGoals={savingsGoals} budgets={budgets} transactions={transactions} rates={rates} displayCurrency={displayCurrency}
+        debts={debts} // ДОБАВЛЕНО: Передача массива долгов
+      />
+
+      {!(isAuthLoading || isDataLoading) && (
+        <BottomNavBar activeScreen={activeScreen} onNavigate={setActiveScreen} isRecording={isRecording} isProcessing={isProcessing} onToggleRecording={isRecording ? handleRecordingStopLogic : startRecording} onLongPressAdd={() => setIsTextInputOpen(true)} />
       )}
 
       <style>{`
