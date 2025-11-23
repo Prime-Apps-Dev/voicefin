@@ -4,48 +4,48 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocalization } from '../../core/context/LocalizationContext';
 import { Mic, Type, Wallet, LayoutGrid, PartyPopper, ArrowRight, CheckCircle, Loader2, X } from 'lucide-react';
-import * as api from '../../core/services/api'; 
-import { DebtType, DebtStatus } from '../../core/types'; 
+import * as api from '../../core/services/api';
+import { DebtType, DebtStatus } from '../../core/types';
 
 interface OnboardingGuideProps {
-  onFinish: () => void;
-  // НОВЫЕ ПРОПСЫ ДЛЯ ОБРАБОТКИ ДОЛГА ПРИ ОНБОРДИНГЕ
-  initialDebtId: string | null;
-  onDebtActionComplete: (debtId: string | null) => void; 
-  // ---
+    onFinish: () => void;
+    // НОВЫЕ ПРОПСЫ ДЛЯ ОБРАБОТКИ ДОЛГА ПРИ ОНБОРДИНГЕ
+    initialDebtId: string | null;
+    onDebtActionComplete: (debtId: string | null) => void;
+    // ---
 }
 
 const steps = [
-  {
-    titleKey: 'onboardingWelcomeTitle',
-    textKey: 'onboardingWelcomeText',
-    icon: PartyPopper,
-  },
-  {
-    titleKey: 'onboardingVoiceTitle',
-    textKey: 'onboardingVoiceText',
-    icon: Mic,
-  },
-  {
-    titleKey: 'onboardingTextTitle',
-    textKey: 'onboardingTextText',
-    icon: Type,
-  },
-  {
-    titleKey: 'onboardingAccountsTitle',
-    textKey: 'onboardingAccountsText',
-    icon: Wallet,
-  },
-  {
-    titleKey: 'onboardingBudgetsTitle',
-    textKey: 'onboardingBudgetsText',
-    icon: LayoutGrid,
-  },
-  {
-    titleKey: 'onboardingFinishTitle',
-    textKey: 'onboardingFinishText',
-    icon: PartyPopper,
-  },
+    {
+        titleKey: 'onboardingWelcomeTitle',
+        textKey: 'onboardingWelcomeText',
+        icon: PartyPopper,
+    },
+    {
+        titleKey: 'onboardingVoiceTitle',
+        textKey: 'onboardingVoiceText',
+        icon: Mic,
+    },
+    {
+        titleKey: 'onboardingTextTitle',
+        textKey: 'onboardingTextText',
+        icon: Type,
+    },
+    {
+        titleKey: 'onboardingAccountsTitle',
+        textKey: 'onboardingAccountsText',
+        icon: Wallet,
+    },
+    {
+        titleKey: 'onboardingBudgetsTitle',
+        textKey: 'onboardingBudgetsText',
+        icon: LayoutGrid,
+    },
+    {
+        titleKey: 'onboardingFinishTitle',
+        textKey: 'onboardingFinishText',
+        icon: PartyPopper,
+    },
 ];
 
 // НОВЫЙ КОМПОНЕНТ ДЛЯ ПЕРВОГО ШАГА ОНБОРДИНГА (ТОЛЬКО ДЛЯ DEEP LINK)
@@ -89,8 +89,8 @@ const DebtOnboardingStep: React.FC<DebtOnboardingStepProps> = ({ debtId, onCompl
         try {
             setIsProcessing(true);
 
-            const myType = sharedDebt.type === DebtType.I_OWE 
-                ? DebtType.OWED_TO_ME 
+            const myType = sharedDebt.type === DebtType.I_OWE
+                ? DebtType.OWED_TO_ME
                 : DebtType.I_OWE;
 
             // 1. Создаем долг у себя
@@ -104,7 +104,7 @@ const DebtOnboardingStep: React.FC<DebtOnboardingStepProps> = ({ debtId, onCompl
                 description: `Синхронизировано: ${sharedDebt.description || ''}`,
                 status: DebtStatus.ACTIVE,
                 // @ts-ignore
-                parent_debt_id: sharedDebt.id 
+                parent_debt_id: sharedDebt.id
             });
 
             // 2. ВАЖНО: Связываем пользователей в базе (Handshake)
@@ -116,12 +116,12 @@ const DebtOnboardingStep: React.FC<DebtOnboardingStepProps> = ({ debtId, onCompl
         } catch (err) {
             console.error(err);
             setError('Ошибка при сохранении долга. Попробуйте пропустить и добавить позже.');
-            setStatus('pending'); 
+            setStatus('pending');
         } finally {
             setIsProcessing(false);
         }
     };
-    
+
     const handleDecline = () => {
         setStatus('declined');
         setError(null);
@@ -130,17 +130,17 @@ const DebtOnboardingStep: React.FC<DebtOnboardingStepProps> = ({ debtId, onCompl
 
     const isInteractionDisabled = isProcessing || status !== 'pending';
     const hasFinishedInteraction = status === 'accepted' || status === 'declined' || (error && !isLoading);
-    
+
     return (
         <div className="w-full h-full flex flex-col items-center justify-start text-center p-8 overflow-y-auto">
             <div className="w-20 h-20 bg-blue-500/10 rounded-full flex items-center justify-center mb-6">
                 <ArrowRight className="w-10 h-10 text-blue-500" />
             </div>
             <h2 className="text-2xl font-bold text-white mb-3">
-                {isLoading ? 'Загрузка данных о долге' : 
-                 sharedDebt ? 'Входящий долг' : 'Проблема с долгом'}
+                {isLoading ? 'Загрузка данных о долге' :
+                    sharedDebt ? 'Входящий долг' : 'Проблема с долгом'}
             </h2>
-            
+
             {isLoading && (
                 <div className="py-4">
                     <Loader2 className="w-6 h-6 animate-spin text-zinc-400" />
@@ -179,8 +179,8 @@ const DebtOnboardingStep: React.FC<DebtOnboardingStepProps> = ({ debtId, onCompl
                             {sharedDebt.amount} <span className="text-sm text-zinc-400">{sharedDebt.currency}</span>
                         </div>
                         <div className="text-xs text-zinc-300">
-                            {sharedDebt.type === DebtType.I_OWE 
-                                ? 'Он должен вам' 
+                            {sharedDebt.type === DebtType.I_OWE
+                                ? 'Он должен вам'
                                 : 'Вы должны ему'}
                             {sharedDebt.description && sharedDebt.description.trim() !== '' && ` (${sharedDebt.description})`}
                         </div>
@@ -193,9 +193,9 @@ const DebtOnboardingStep: React.FC<DebtOnboardingStepProps> = ({ debtId, onCompl
                     onClick={handleAccept}
                     disabled={isInteractionDisabled || isLoading || !sharedDebt}
                     className={`w-full py-3.5 rounded-xl font-bold transition-all active:scale-95 flex items-center justify-center gap-2 
-                        ${status === 'accepted' ? 'bg-green-600/50 text-green-300 cursor-default' : 
-                          isInteractionDisabled || isLoading || !sharedDebt ? 'bg-blue-600/50 text-blue-300 opacity-50 cursor-not-allowed' :
-                          'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/20'}`}
+                        ${status === 'accepted' ? 'bg-green-600/50 text-green-300 cursor-default' :
+                            isInteractionDisabled || isLoading || !sharedDebt ? 'bg-blue-600/50 text-blue-300 opacity-50 cursor-not-allowed' :
+                                'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/20'}`}
                 >
                     {isProcessing ? (
                         <Loader2 className="w-5 h-5 animate-spin" />
@@ -212,15 +212,15 @@ const DebtOnboardingStep: React.FC<DebtOnboardingStepProps> = ({ debtId, onCompl
                     onClick={handleDecline}
                     disabled={isProcessing || status !== 'pending' || isLoading || !sharedDebt}
                     className={`w-full py-3.5 rounded-xl font-bold transition-all active:scale-95 
-                        ${status === 'declined' ? 'bg-zinc-700/50 text-zinc-400 cursor-default' : 
-                         'bg-zinc-800 hover:bg-zinc-700 text-zinc-300'}`}
+                        ${status === 'declined' ? 'bg-zinc-700/50 text-zinc-400 cursor-default' :
+                            'bg-zinc-800 hover:bg-zinc-700 text-zinc-300'}`}
                 >
                     {status === 'declined' ? 'Отклонено' : 'Отклонить'}
                 </button>
             </div>
-            
+
             {hasFinishedInteraction && (
-                 <button
+                <button
                     onClick={onComplete}
                     className="mt-4 text-sm font-medium text-brand-green hover:text-green-400"
                 >
@@ -233,163 +233,158 @@ const DebtOnboardingStep: React.FC<DebtOnboardingStepProps> = ({ debtId, onCompl
 
 
 export const OnboardingGuide: React.FC<OnboardingGuideProps> = ({ onFinish, initialDebtId, onDebtActionComplete }) => {
-  const { t } = useLocalization();
-  const [currentStep, setCurrentStep] = useState(0);
-  const [direction, setDirection] = useState(0);
-  
-  // Определяем, должен ли первый шаг быть специальным шагом для долга
-  const hasDebtStep = !!initialDebtId;
-  const debtStepIndex = 0;
+    const { t } = useLocalization();
+    const [currentStep, setCurrentStep] = useState(0);
+    const [direction, setDirection] = useState(0);
 
-  // Если есть шаг долга, добавляем его в начало массива шагов.
-  const effectiveSteps = hasDebtStep 
-    ? [ { titleKey: 'onboardingDebtTitle', textKey: 'onboardingDebtText', icon: ArrowRight }, ...steps ] 
-    : steps;
-    
-  const paginate = (newDirection: number) => {
-    setDirection(newDirection);
-    setCurrentStep(prev => prev + newDirection);
-  };
-  
-  const handleDebtComplete = () => {
-      // Переход на следующий шаг после обработки долга
-      paginate(1);
-  };
+    // Определяем, должен ли первый шаг быть специальным шагом для долга
+    const hasDebtStep = !!initialDebtId;
+    const debtStepIndex = 0;
 
-  const currentStepData = effectiveSteps[currentStep];
-  const IconComponent = currentStepData.icon;
+    // Если есть шаг долга, добавляем его в начало массива шагов.
+    const effectiveSteps = hasDebtStep
+        ? [{ titleKey: 'onboardingDebtTitle', textKey: 'onboardingDebtText', icon: ArrowRight }, ...steps]
+        : steps;
 
-  const variants = {
-    enter: (direction: number) => ({
-      x: direction > 0 ? 300 : -300,
-      opacity: 0,
-      scale: 0.9
-    }),
-    center: {
-      zIndex: 1,
-      x: 0,
-      opacity: 1,
-      scale: 1
-    },
-    exit: (direction: number) => ({
-      zIndex: 0,
-      x: direction < 0 ? 300 : -300,
-      opacity: 0,
-      scale: 0.9
-    })
-  };
+    const paginate = (newDirection: number) => {
+        setDirection(newDirection);
+        setCurrentStep(prev => prev + newDirection);
+    };
 
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/60 backdrop-blur-lg flex items-center justify-center z-[100] p-4"
-    >
-      <motion.div
-        initial={{ scale: 0.9, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.9, opacity: 0 }}
-        transition={{ duration: 0.3, ease: 'easeOut' }}
-        className="relative bg-zinc-900 rounded-3xl shadow-2xl w-full max-w-sm h-[28rem] overflow-hidden flex flex-col border border-zinc-800/60"
-      >
-        <div className="absolute top-4 right-4 z-20">
-            <button
-                onClick={onFinish}
-                className="text-zinc-500 hover:text-white text-sm font-medium px-3 py-1 rounded-full hover:bg-zinc-800 transition-colors"
+    const handleDebtComplete = () => {
+        // Переход на следующий шаг после обработки долга
+        paginate(1);
+    };
+
+    const currentStepData = effectiveSteps[currentStep];
+    const IconComponent = currentStepData.icon;
+
+    const variants = {
+        enter: (direction: number) => ({
+            x: direction > 0 ? 300 : -300,
+            opacity: 0,
+            scale: 0.9
+        }),
+        center: {
+            zIndex: 1,
+            x: 0,
+            opacity: 1,
+            scale: 1
+        },
+        exit: (direction: number) => ({
+            zIndex: 0,
+            x: direction < 0 ? 300 : -300,
+            opacity: 0,
+            scale: 0.9
+        })
+    };
+
+    return (
+        <div className="w-full h-full flex items-center justify-center p-4 bg-black/60 backdrop-blur-lg">
+            <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                transition={{ duration: 0.3, ease: 'easeOut' }}
+                className="relative bg-zinc-900 rounded-3xl shadow-2xl w-full max-w-sm h-[28rem] overflow-hidden flex flex-col border border-zinc-800/60"
             >
-                {t('skip')}
-            </button>
-        </div>
-        
-        <div className="flex-grow relative flex items-center justify-center">
-          <AnimatePresence initial={false} custom={direction}>
-            {hasDebtStep && currentStep === debtStepIndex ? (
-                // Рендерим специальный шаг для долга
-                <motion.div
-                    key="debt-step"
-                    custom={direction}
-                    variants={variants}
-                    initial="enter"
-                    animate="center"
-                    exit="exit"
-                    transition={{
-                        x: { type: "spring", stiffness: 300, damping: 30 },
-                        opacity: { duration: 0.2 }
-                    }}
-                    className="absolute w-full h-full" 
-                >
-                    <DebtOnboardingStep 
-                        debtId={initialDebtId!} 
-                        onComplete={handleDebtComplete}
-                        onDebtActionComplete={onDebtActionComplete}
-                    />
-                </motion.div>
-            ) : (
-                // Рендерим обычный шаг онбординга
-                <motion.div
-                    key={currentStep}
-                    custom={direction}
-                    variants={variants}
-                    initial="enter"
-                    animate="center"
-                    exit="exit"
-                    transition={{
-                        x: { type: "spring", stiffness: 300, damping: 30 },
-                        opacity: { duration: 0.2 }
-                    }}
-                    className="absolute w-full h-full flex flex-col items-center justify-center text-center p-8"
-                >
-                    <div className="w-20 h-20 bg-brand-green/10 rounded-full flex items-center justify-center mb-6">
-                        <IconComponent className="w-10 h-10 text-brand-green" />
-                    </div>
-                    <h2 className="text-2xl font-bold text-white mb-3">{t(currentStepData.titleKey)}</h2>
-                    <p className="text-zinc-400 leading-relaxed">{t(currentStepData.textKey)}</p>
-                </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-
-        {/* Навигация (кнопки) скрыта, если активен шаг долга и он не завершен */}
-        {!(hasDebtStep && currentStep === debtStepIndex) && (
-            <div className="p-6 flex flex-col items-center gap-4 border-t border-zinc-800/60">
-                <div className="flex gap-2">
-                    {effectiveSteps.map((_, i) => (
-                        <div
-                            key={i}
-                            className={`w-2 h-2 rounded-full transition-all ${currentStep === i ? 'bg-brand-green w-4' : 'bg-zinc-700'}`}
-                        />
-                    ))}
-                </div>
-              
-                <div className="w-full flex justify-between items-center">
-                  <button
-                    onClick={() => paginate(-1)}
-                    disabled={currentStep === 0}
-                    className="px-5 py-2.5 text-zinc-300 hover:text-white text-sm font-medium rounded-xl hover:bg-zinc-800 active:scale-95 transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed"
-                  >
-                    {t('back')}
-                  </button>
-                  {currentStep < effectiveSteps.length - 1 ? (
-                    <button
-                        onClick={() => paginate(1)}
-                        className="px-5 py-2.5 bg-brand-green text-white text-sm font-medium rounded-xl hover:bg-green-600 active:scale-95 transition-all duration-200"
-                    >
-                        {t('next')}
-                    </button>
-                  ) : (
+                <div className="absolute top-4 right-4 z-20">
                     <button
                         onClick={onFinish}
-                        className="px-5 py-2.5 bg-brand-green text-white text-sm font-medium rounded-xl hover:bg-green-600 active:scale-95 transition-all duration-200"
+                        className="text-zinc-500 hover:text-white text-sm font-medium px-3 py-1 rounded-full hover:bg-zinc-800 transition-colors"
                     >
-                        {t('getStarted')}
+                        {t('skip')}
                     </button>
-                  )}
                 </div>
-            </div>
-        )}
 
-      </motion.div>
-    </motion.div>
-  );
+                <div className="flex-grow relative flex items-center justify-center">
+                    <AnimatePresence initial={false} custom={direction}>
+                        {hasDebtStep && currentStep === debtStepIndex ? (
+                            // Рендерим специальный шаг для долга
+                            <motion.div
+                                key="debt-step"
+                                custom={direction}
+                                variants={variants}
+                                initial="enter"
+                                animate="center"
+                                exit="exit"
+                                transition={{
+                                    x: { type: "spring", stiffness: 300, damping: 30 },
+                                    opacity: { duration: 0.2 }
+                                }}
+                                className="absolute w-full h-full"
+                            >
+                                <DebtOnboardingStep
+                                    debtId={initialDebtId!}
+                                    onComplete={handleDebtComplete}
+                                    onDebtActionComplete={onDebtActionComplete}
+                                />
+                            </motion.div>
+                        ) : (
+                            // Рендерим обычный шаг онбординга
+                            <motion.div
+                                key={currentStep}
+                                custom={direction}
+                                variants={variants}
+                                initial="enter"
+                                animate="center"
+                                exit="exit"
+                                transition={{
+                                    x: { type: "spring", stiffness: 300, damping: 30 },
+                                    opacity: { duration: 0.2 }
+                                }}
+                                className="absolute w-full h-full flex flex-col items-center justify-center text-center p-8"
+                            >
+                                <div className="w-20 h-20 bg-brand-green/10 rounded-full flex items-center justify-center mb-6">
+                                    <IconComponent className="w-10 h-10 text-brand-green" />
+                                </div>
+                                <h2 className="text-2xl font-bold text-white mb-3">{t(currentStepData.titleKey)}</h2>
+                                <p className="text-zinc-400 leading-relaxed">{t(currentStepData.textKey)}</p>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
+
+                {/* Навигация (кнопки) скрыта, если активен шаг долга и он не завершен */}
+                {!(hasDebtStep && currentStep === debtStepIndex) && (
+                    <div className="p-6 flex flex-col items-center gap-4 border-t border-zinc-800/60">
+                        <div className="flex gap-2">
+                            {effectiveSteps.map((_, i) => (
+                                <div
+                                    key={i}
+                                    className={`w-2 h-2 rounded-full transition-all ${currentStep === i ? 'bg-brand-green w-4' : 'bg-zinc-700'}`}
+                                />
+                            ))}
+                        </div>
+
+                        <div className="w-full flex justify-between items-center">
+                            <button
+                                onClick={() => paginate(-1)}
+                                disabled={currentStep === 0}
+                                className="px-5 py-2.5 text-zinc-300 hover:text-white text-sm font-medium rounded-xl hover:bg-zinc-800 active:scale-95 transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed"
+                            >
+                                {t('back')}
+                            </button>
+                            {currentStep < effectiveSteps.length - 1 ? (
+                                <button
+                                    onClick={() => paginate(1)}
+                                    className="px-5 py-2.5 bg-brand-green text-white text-sm font-medium rounded-xl hover:bg-green-600 active:scale-95 transition-all duration-200"
+                                >
+                                    {t('next')}
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={onFinish}
+                                    className="px-5 py-2.5 bg-brand-green text-white text-sm font-medium rounded-xl hover:bg-green-600 active:scale-95 transition-all duration-200"
+                                >
+                                    {t('getStarted')}
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+            </motion.div>
+        </div>
+    );
 };

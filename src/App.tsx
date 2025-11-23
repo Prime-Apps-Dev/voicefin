@@ -370,7 +370,7 @@ const AppContent: React.FC = () => {
         <RecordingOverlay transcription={transcription} stream={stream} onStop={handleRecordingStopLogic} isRecording={isRecording} audioContext={audioContext} />
       )}
 
-      {!isDebtHandledInOnboarding && (
+      {incomingDebtId && (
         <IncomingDebtModal
           debtId={incomingDebtId}
           onClose={() => setIncomingDebtId(null)}

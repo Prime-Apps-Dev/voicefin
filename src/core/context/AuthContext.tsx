@@ -124,7 +124,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const userWithDetails: User = {
       ...profile,
       name: profile.full_name || profile.username || 'User',
-      email: profile.email // email might be missing in profile, but that's ok as per type
+      email: profile.email,
+      has_completed_onboarding: profile.has_completed_onboarding ?? false // Explicit default
     };
 
     setUser(userWithDetails);
