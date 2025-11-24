@@ -14,30 +14,30 @@ interface BottomNavBarProps {
 }
 
 const NavButton = ({ screen, label, icon: Icon, activeScreen, onNavigate }: { screen: Screen, label: string, icon: React.ElementType, activeScreen: Screen | 'accounts' | 'budgetPlanning' | 'categories' | 'settings', onNavigate: (s: Screen) => void }) => {
-    const isActive = activeScreen === screen || (screen === 'profile' && (activeScreen === 'accounts' || activeScreen === 'budgetPlanning' || activeScreen === 'categories' || activeScreen === 'settings'));
-    
-    // --- ИЗМЕНЕНИЯ ЗДЕСЬ: Условное применение hover/focus стилей ---
-    // Базовые классы, общие для всех кнопок
-    const baseClasses = 'flex flex-col items-center justify-center h-full py-4 px-1 text-xs transition-colors focus:outline-none';
+  const isActive = activeScreen === screen || (screen === 'profile' && (activeScreen === 'accounts' || activeScreen === 'budgetPlanning' || activeScreen === 'categories' || activeScreen === 'settings'));
 
-    // Классы, зависящие от состояния активности
-    const stateClasses = isActive
-        ? 'text-brand-green' // Активная кнопка всегда зеленая
-        : 'text-gray-400 hover:text-white focus:text-white'; // Неактивная кнопка серая, белая при наведении/фокусе
+  // --- ИЗМЕНЕНИЯ ЗДЕСЬ: Условное применение hover/focus стилей ---
+  // Базовые классы, общие для всех кнопок
+  const baseClasses = 'flex flex-col items-center justify-center h-full py-4 px-1 text-xs transition-colors focus:outline-none';
 
-    return (
-      <button
-        key={screen}
-        onClick={() => onNavigate(screen)}
-        // Применяем классы
-        className={`${baseClasses} ${stateClasses}`}
-        aria-current={isActive ? 'page' : undefined}
-      >
-        <Icon className="w-6 h-6 mb-1" />
-        <span>{label}</span>
-      </button>
-    );
-  };
+  // Классы, зависящие от состояния активности
+  const stateClasses = isActive
+    ? 'text-brand-green' // Активная кнопка всегда зеленая
+    : 'text-gray-400 hover:text-white focus:text-white'; // Неактивная кнопка серая, белая при наведении/фокусе
+
+  return (
+    <button
+      key={screen}
+      onClick={() => onNavigate(screen)}
+      // Применяем классы
+      className={`${baseClasses} ${stateClasses}`}
+      aria-current={isActive ? 'page' : undefined}
+    >
+      <Icon className="w-6 h-6 mb-1" />
+      <span>{label}</span>
+    </button>
+  );
+};
 // --- КОНЕЦ ИЗМЕНЕНИЙ ---
 
 
@@ -67,7 +67,7 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({ activeScreen, onNavi
   }, [isDisabled, onToggleRecording]);
 
   const handlePressCancel = useCallback(() => {
-     if (pressTimer.current) {
+    if (pressTimer.current) {
       clearTimeout(pressTimer.current);
     }
     longPressTriggered.current = false;
@@ -84,37 +84,37 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({ activeScreen, onNavi
   };
 
   return (
-    <footer className="fixed bottom-0 left-0 right-0 bg-gray-800/80 backdrop-blur-sm border-t border-gray-700 z-40 pb-[env(safe-area-inset-bottom)]">
+    <footer className="fixed bottom-0 left-0 right-0 bg-gray-800/80 backdrop-blur-sm border-t border-gray-700 z-[9000] pb-[env(safe-area-inset-bottom)]">
       <nav className="grid grid-cols-5 items-center max-w-4xl mx-auto h-20">
         <NavButton screen="home" label={t('home')} icon={Home} activeScreen={activeScreen} onNavigate={onNavigate} />
         <NavButton screen="savings" label={t('savings')} icon={PiggyBank} activeScreen={activeScreen} onNavigate={onNavigate} />
-        
+
         <div className="flex justify-center">
-            <div className="-mt-10 text-center">
-                <button 
-                    onMouseDown={handlePressStart}
-                    onMouseUp={handlePressEnd}
-                    onMouseLeave={handlePressCancel}
-                    onTouchStart={handlePressStart}
-                    onTouchEnd={handlePressEnd}
-                    onTouchCancel={handlePressCancel}
-                    onContextMenu={(e) => e.preventDefault()}
-                    disabled={isDisabled}
-                    aria-label={isRecording ? t('stopRecording') : t('startRecording')}
-                    className={`
+          <div className="-mt-10 text-center">
+            <button
+              onMouseDown={handlePressStart}
+              onMouseUp={handlePressEnd}
+              onMouseLeave={handlePressCancel}
+              onTouchStart={handlePressStart}
+              onTouchEnd={handlePressEnd}
+              onTouchCancel={handlePressCancel}
+              onContextMenu={(e) => e.preventDefault()}
+              disabled={isDisabled}
+              aria-label={isRecording ? t('stopRecording') : t('startRecording')}
+              className={`
                         relative w-20 h-20 rounded-full flex items-center justify-center transition-all duration-300 ease-in-out
                         focus:outline-none focus:ring-4 focus:ring-opacity-50
                         ${isRecording ? 'bg-red-500 hover:bg-red-600 focus:ring-red-300' : 'bg-brand-green hover:bg-green-600 focus:ring-green-300'}
                         ${isDisabled ? 'cursor-not-allowed bg-gray-600' : ''}
                         border-4 border-gray-900
                     `}
-                >
-                    {isRecording && !isProcessing && <div className="absolute inset-0 rounded-full bg-red-400 animate-ping"></div>}
-                    {getAddButtonIcon()}
-                </button>
-            </div>
+            >
+              {isRecording && !isProcessing && <div className="absolute inset-0 rounded-full bg-red-400 animate-ping"></div>}
+              {getAddButtonIcon()}
+            </button>
+          </div>
         </div>
-        
+
         <NavButton screen="analytics" label={t('analytics')} icon={PieChart} activeScreen={activeScreen} onNavigate={onNavigate} />
         <NavButton screen="profile" label={t('profile')} icon={User} activeScreen={activeScreen} onNavigate={onNavigate} />
       </nav>
