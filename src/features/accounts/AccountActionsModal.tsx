@@ -33,7 +33,7 @@ export const AccountActionsModal: React.FC<AccountActionsModalProps> = ({ isOpen
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={onClose}
-          className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-end justify-center z-[100]"
+          className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-end justify-center z-[9999]"
         >
           <motion.div
             initial={{ y: "100%" }}

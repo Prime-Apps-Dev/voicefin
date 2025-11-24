@@ -29,7 +29,7 @@ export const TextInputModal: React.FC<TextInputModalProps> = ({ isOpen, isProces
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-black/40 backdrop-blur-md flex flex-col justify-end items-center z-[100]"
+          className="fixed inset-0 bg-black/40 backdrop-blur-md flex flex-col justify-end items-center z-[9999]"
           onClick={onClose}
         >
           <motion.div

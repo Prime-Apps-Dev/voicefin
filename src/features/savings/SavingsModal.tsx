@@ -17,7 +17,7 @@ export const SavingsModal: React.FC<SavingsModalProps> = ({ isOpen, isLoading, t
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center z-[100] px-4 py-[56px]"
+                    className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center z-[9999] px-4 py-[88px]"
                     onClick={onClose}
                 >
                     <motion.div
