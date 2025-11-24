@@ -286,7 +286,7 @@ export const OnboardingGuide: React.FC<OnboardingGuideProps> = ({ onFinish, init
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.9, opacity: 0 }}
                 transition={{ duration: 0.3, ease: 'easeOut' }}
-                className="relative bg-zinc-900 rounded-3xl shadow-2xl w-full h-full overflow-hidden flex flex-col border border-zinc-800/60"
+                className="relative bg-zinc-900 rounded-3xl shadow-2xl w-full max-h-[85vh] overflow-hidden flex flex-col border border-zinc-800/60"
             >
                 <div className="absolute top-4 right-4 z-20">
                     <button

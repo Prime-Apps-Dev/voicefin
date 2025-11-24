@@ -90,7 +90,7 @@ export const IncomingDebtModal: React.FC<IncomingDebtModalProps> = ({
         <motion.div
           initial={{ scale: 0.9, y: 20 }}
           animate={{ scale: 1, y: 0 }}
-          className="bg-zinc-900 rounded-2xl w-full h-full border border-zinc-700 overflow-hidden shadow-2xl relative"
+          className="relative bg-zinc-900 rounded-3xl shadow-2xl w-full max-h-[85vh] overflow-hidden flex flex-col border border-zinc-800/60"
         >
           <button
             onClick={onClose}

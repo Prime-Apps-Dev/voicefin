@@ -52,7 +52,7 @@ export const DebtDetailsModal: React.FC<DebtDetailsModalProps> = ({
       >
         <motion.div
           initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
-          className="bg-zinc-900 rounded-2xl w-full h-full border border-zinc-800 overflow-hidden relative flex flex-col"
+          className="bg-zinc-900 rounded-2xl w-full max-h-[85vh] border border-zinc-800 overflow-hidden relative flex flex-col"
           onClick={e => e.stopPropagation()}
         >
           {/* Header Image / Gradient */}

@@ -33,7 +33,7 @@ export const TransactionRequestsModal: React.FC<TransactionRequestsModalProps> =
           initial={{ scale: 0.95, opacity: 0, y: 20 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
           exit={{ scale: 0.95, opacity: 0, y: 20 }}
-          className="bg-zinc-900 rounded-2xl w-full h-full border border-zinc-800 overflow-hidden flex flex-col"
+          className="bg-zinc-900 rounded-2xl w-full max-h-[85vh] border border-zinc-800 overflow-hidden flex flex-col"
           onClick={e => e.stopPropagation()}
         >
           {/* Header */}
