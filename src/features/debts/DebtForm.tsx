@@ -179,14 +179,14 @@ export const DebtForm: React.FC<DebtFormProps> = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] px-4 py-16"
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] px-4 py-[88px]"
             onClick={onClose}
           >
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-zinc-900 rounded-2xl w-full max-h-[85vh] border border-zinc-800 overflow-hidden shadow-xl flex flex-col"
+              className="bg-zinc-900 rounded-2xl w-full max-h-[calc(85vh-24px)] border border-zinc-800 overflow-hidden shadow-xl flex flex-col"
               onClick={(e) => e.stopPropagation()}
             >
 
