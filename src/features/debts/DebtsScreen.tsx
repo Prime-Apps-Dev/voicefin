@@ -2,21 +2,21 @@
 
 import React, { useState, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  ChevronLeft, 
-  Plus, 
-  ArrowDownCircle, 
-  ArrowUpCircle, 
-  Scale, 
-  Trash2, 
-  Calendar, 
+import {
+  ChevronLeft,
+  Plus,
+  ArrowDownCircle,
+  ArrowUpCircle,
+  Scale,
+  Trash2,
+  Calendar,
   AlertCircle,
   Wallet,
   CheckCircle2,
   Layers
 } from 'lucide-react';
 import { useAppData } from '../../core/context/AppDataContext';
-import { useLocalization } from '../../core/context/LocalizationContext'; 
+import { useLocalization } from '../../core/context/LocalizationContext';
 import { Debt, DebtType, Transaction } from '../../core/types';
 import LongPressWrapper from '../../shared/layout/LongPressWrapper';
 import { ConfirmationModal } from '../../shared/ui/modals/ConfirmationModal';
@@ -36,22 +36,22 @@ interface DebtsScreenProps {
 // ============================================
 // CAROUSEL WIDGET COMPONENT
 // ============================================
-const DebtWidgetCard = ({ 
-  title, 
-  subtitle, 
-  amount, 
-  count, 
-  currency, 
-  type, 
+const DebtWidgetCard = ({
+  title,
+  subtitle,
+  amount,
+  count,
+  currency,
+  type,
   onClick,
-  active 
-}: { 
-  title: string; 
-  subtitle: string; 
-  amount: number; 
-  count: number; 
-  currency: string; 
-  type: 'net' | 'owe' | 'owed'; 
+  active
+}: {
+  title: string;
+  subtitle: string;
+  amount: number;
+  count: number;
+  currency: string;
+  type: 'net' | 'owe' | 'owed';
   onClick?: () => void;
   active?: boolean;
 }) => {
@@ -84,7 +84,7 @@ const DebtWidgetCard = ({
   const recordLabel = count === 1 ? t('record') : t('records');
 
   return (
-    <motion.div 
+    <motion.div
       onClick={onClick}
       whileTap={{ scale: 0.95 }}
       className={`
@@ -113,11 +113,11 @@ const DebtWidgetCard = ({
 
         <div>
           <div className="text-3xl font-extrabold tracking-tight drop-shadow-sm">
-             {new Intl.NumberFormat(language === 'ru' ? 'ru-RU' : 'en-US', { 
-               style: 'currency', 
-               currency,
-               maximumFractionDigits: 0 
-             }).format(amount)}
+            {new Intl.NumberFormat(language === 'ru' ? 'ru-RU' : 'en-US', {
+              style: 'currency',
+              currency,
+              maximumFractionDigits: 0
+            }).format(amount)}
           </div>
           <div className="mt-2 flex items-center gap-2 text-xs font-medium text-white/90 bg-black/10 w-fit px-3 py-1 rounded-full backdrop-blur-sm">
             <Layers className="w-3 h-3" />
@@ -132,18 +132,18 @@ const DebtWidgetCard = ({
 // ============================================
 // DEBT ITEM COMPONENT
 // ============================================
-const DebtItem = ({ 
-  debt, 
+const DebtItem = ({
+  debt,
   onPress,
-  onDoublePress, 
-  onLongPress, 
-  onDelete, 
-  defaultCurrency 
-}: { 
-  debt: Debt; 
+  onDoublePress,
+  onLongPress,
+  onDelete,
+  defaultCurrency
+}: {
+  debt: Debt;
   onPress: () => void;
-  onDoublePress: () => void; 
-  onLongPress: () => void; 
+  onDoublePress: () => void;
+  onLongPress: () => void;
   onDelete: () => void;
   defaultCurrency: string;
 }) => {
@@ -153,7 +153,7 @@ const DebtItem = ({
   const currentDebt = debt.current_amount;
   const paidAmount = totalAmount - currentDebt;
   const progressPercent = totalAmount > 0 ? (paidAmount / totalAmount) * 100 : 0;
-  
+
   const isOverdue = debt.due_date ? new Date(debt.due_date) < new Date() : false;
 
   const theme = isIOwe ? {
@@ -180,14 +180,14 @@ const DebtItem = ({
 
   const lastTap = useRef<number>(0);
   const handleTap = () => {
-      const now = Date.now();
-      const DOUBLE_PRESS_DELAY = 300;
-      if (now - lastTap.current < DOUBLE_PRESS_DELAY) {
-          onDoublePress();
-      } else {
-          onPress();
-      }
-      lastTap.current = now;
+    const now = Date.now();
+    const DOUBLE_PRESS_DELAY = 300;
+    if (now - lastTap.current < DOUBLE_PRESS_DELAY) {
+      onDoublePress();
+    } else {
+      onPress();
+    }
+    lastTap.current = now;
   };
 
   return (
@@ -207,22 +207,22 @@ const DebtItem = ({
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
             <div className={`w-10 h-10 rounded-full flex items-center justify-center ${theme.iconBg}`}>
-               {isIOwe ? 
-                 <ArrowDownCircle className={`w-5 h-5 ${theme.iconColor}`} /> : 
-                 <ArrowUpCircle className={`w-5 h-5 ${theme.iconColor}`} />
-               }
+              {isIOwe ?
+                <ArrowDownCircle className={`w-5 h-5 ${theme.iconColor}`} /> :
+                <ArrowUpCircle className={`w-5 h-5 ${theme.iconColor}`} />
+              }
             </div>
             <div>
               <h3 className="text-white font-semibold text-base leading-tight">{debt.person}</h3>
               <div className="flex items-center gap-2 mt-0.5">
-                 {debt.category && (
-                    <span className="text-[10px] uppercase tracking-wider font-medium text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded">
-                      {debt.category}
-                    </span>
-                 )}
-                 <span className={`text-xs ${theme.labelColor}`}>
-                   {isIOwe ? t('youOwe') : t('owesYou')}
-                 </span>
+                {debt.category && (
+                  <span className="text-[10px] uppercase tracking-wider font-medium text-zinc-500 bg-zinc-800 px-1.5 py-0.5 rounded">
+                    {debt.category}
+                  </span>
+                )}
+                <span className={`text-xs ${theme.labelColor}`}>
+                  {isIOwe ? t('youOwe') : t('owesYou')}
+                </span>
               </div>
             </div>
           </div>
@@ -240,10 +240,10 @@ const DebtItem = ({
 
         <div className="mt-4 mb-4">
           <div className="flex items-baseline gap-2">
-             <span className={`text-2xl font-bold tracking-tight ${theme.amountText}`}>
-               {new Intl.NumberFormat(language === 'ru' ? 'ru-RU' : 'en-US', { style: 'currency', currency: debt.currency }).format(debt.current_amount)}
-             </span>
-             <span className="text-sm text-zinc-500 font-medium">{t('remaining')}</span>
+            <span className={`text-2xl font-bold tracking-tight ${theme.amountText}`}>
+              {new Intl.NumberFormat(language === 'ru' ? 'ru-RU' : 'en-US', { style: 'currency', currency: debt.currency }).format(debt.current_amount)}
+            </span>
+            <span className="text-sm text-zinc-500 font-medium">{t('remaining')}</span>
           </div>
           {debt.description && (
             <p className="text-zinc-500 text-xs mt-1 truncate max-w-[90%]">
@@ -263,7 +263,7 @@ const DebtItem = ({
           </div>
 
           <div className={`h-2 w-full rounded-full overflow-hidden ${theme.progressTrack}`}>
-            <motion.div 
+            <motion.div
               initial={{ width: 0 }}
               animate={{ width: `${progressPercent}%` }}
               transition={{ duration: 1, ease: "easeOut" }}
@@ -282,34 +282,34 @@ const DebtItem = ({
 export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
   const { t } = useLocalization();
 
-  const { 
-    debts, 
-    displayCurrency, 
-    handleSaveDebt, 
+  const {
+    debts,
+    displayCurrency,
+    handleSaveDebt,
     handleDeleteDebt,
-    handleAddTransaction, 
-    handleDeleteTransaction, 
-    transactions, 
+    handleAddTransaction,
+    handleDeleteTransaction,
+    transactions,
     rates,
     categories,
     accounts,
     savingsGoals,
-    budgets 
+    budgets
   } = useAppData();
 
   const [activeTab, setActiveTab] = useState<'all' | 'owe' | 'owed' | 'archived'>('all');
-  
+
   // --- MODAL STATES ---
   const [deleteConfirmation, setDeleteConfirmation] = useState<Debt | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingDebt, setEditingDebt] = useState<Debt | null>(null);
-  
+
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [selectedDebtForHistory, setSelectedDebtForHistory] = useState<Debt | null>(null);
-  
+
   const [isTxFormOpen, setIsTxFormOpen] = useState(false);
   const [prefilledTx, setPrefilledTx] = useState<Partial<Transaction> | null>(null);
-  
+
   const [detailsDebt, setDetailsDebt] = useState<Debt | null>(null); // <-- НОВОЕ состояние для деталей
 
   // ============================================
@@ -319,11 +319,11 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
     const activeDebts = debts.filter(d => d.status === 'ACTIVE');
     const iOwe = activeDebts.filter(d => d.type === DebtType.I_OWE);
     const owed = activeDebts.filter(d => d.type === DebtType.OWED_TO_ME);
-    
-    const iOweSum = iOwe.reduce((acc, d) => 
+
+    const iOweSum = iOwe.reduce((acc, d) =>
       acc + convertCurrency(d.current_amount, d.currency, displayCurrency, rates), 0
     );
-    const owedSum = owed.reduce((acc, d) => 
+    const owedSum = owed.reduce((acc, d) =>
       acc + convertCurrency(d.current_amount, d.currency, displayCurrency, rates), 0
     );
 
@@ -334,10 +334,10 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
 
     filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-    return { 
-      iOweTotal: iOweSum, 
-      owedTotal: owedSum, 
-      iOweCount: iOwe.length, 
+    return {
+      iOweTotal: iOweSum,
+      owedTotal: owedSum,
+      iOweCount: iOwe.length,
       owedCount: owed.length,
       filteredDebts: filtered
     };
@@ -346,28 +346,28 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
   const netBalance = owedTotal - iOweTotal;
 
   const getTabDisplay = (tab: string) => {
-      if (tab === 'all') return t('all');
-      if (tab === 'owe') return t('iOwe');
-      if (tab === 'owed') return t('owedToMe');
-      if (tab === 'archived') return t('archive');
-      return tab;
+    if (tab === 'all') return t('all');
+    if (tab === 'owe') return t('iOwe');
+    if (tab === 'owed') return t('owedToMe');
+    if (tab === 'archived') return t('archive');
+    return tab;
   };
 
   const getListHeader = () => {
-      switch(activeTab) {
-          case 'all': return t('activeDebts');
-          case 'owe': return t('oweList');
-          case 'owed': return t('owedList');
-          case 'archived': return t('archiveList');
-          default: return '';
-      }
+    switch (activeTab) {
+      case 'all': return t('activeDebts');
+      case 'owe': return t('oweList');
+      case 'owed': return t('owedList');
+      case 'archived': return t('archiveList');
+      default: return '';
+    }
   };
 
 
   // ============================================
   // HANDLERS
   // ============================================
-  
+
   const handleAddNew = () => {
     setEditingDebt(null);
     setIsFormOpen(true);
@@ -388,18 +388,18 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
   };
 
   const handleDebtPayment = (debt: Debt) => {
-    const isRepayment = true; 
-    const type = getDebtTransactionType(debt.type, !isRepayment); 
+    const isRepayment = true;
+    const type = getDebtTransactionType(debt.type, !isRepayment);
     const category = getDebtTransactionCategory(debt.type, !isRepayment);
 
     setPrefilledTx({
-        type: type,
-        category: category,
-        debtId: debt.id,
-        currency: debt.currency,
-        name: `${t('repayment') || 'Repayment'}: ${debt.person}`,
-        amount: 0,
-        date: new Date().toISOString()
+      type: type,
+      category: category,
+      debtId: debt.id,
+      currency: debt.currency,
+      name: `${t('repayment') || 'Repayment'}: ${debt.person}`,
+      amount: 0,
+      date: new Date().toISOString()
     });
     setIsTxFormOpen(true);
   };
@@ -419,11 +419,11 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
   // RENDER
   // ============================================
   return (
-    <div className="min-h-screen bg-black flex flex-col pb-24 relative">
+    <div className="min-h-screen bg-black flex flex-col pb-24">
       <header className="sticky top-0 z-20 bg-black/80 backdrop-blur-xl border-b border-white/5 px-4 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <button 
-            onClick={onBack} 
+          <button
+            onClick={onBack}
             className="p-2 -ml-2 rounded-full hover:bg-white/10 text-zinc-400 hover:text-white transition-colors"
           >
             <ChevronLeft className="w-6 h-6" />
@@ -433,8 +433,8 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
             <p className="text-xs text-zinc-400">{t('debtsSubtitle')}</p>
           </div>
         </div>
-        <button 
-          onClick={handleAddNew} 
+        <button
+          onClick={handleAddNew}
           className="p-3 rounded-full bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/20 transition-all active:scale-90"
         >
           <Plus className="w-5 h-5" />
@@ -442,10 +442,10 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
       </header>
 
       <div className="flex-grow flex flex-col space-y-6 overflow-y-auto pt-6">
-        
+
         <div className="w-full overflow-x-auto scrollbar-hide snap-x snap-mandatory px-4 pb-4">
           <div className="flex gap-4 w-max">
-            <DebtWidgetCard 
+            <DebtWidgetCard
               title={t('netBalance')}
               subtitle={netBalance >= 0 ? t('netPositive') : t('netNegative')}
               amount={Math.abs(netBalance)}
@@ -453,8 +453,8 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
               currency={displayCurrency}
               type="net"
             />
-            
-            <DebtWidgetCard 
+
+            <DebtWidgetCard
               title={t('iOwe')}
               subtitle={t('iOweSubtitle')}
               amount={iOweTotal}
@@ -465,7 +465,7 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
               active={activeTab === 'owe'}
             />
 
-            <DebtWidgetCard 
+            <DebtWidgetCard
               title={t('owedToMe')}
               subtitle={t('owedSubtitle')}
               amount={owedTotal}
@@ -479,36 +479,35 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
         </div>
 
         <div className="px-4">
-            <div className="flex p-1 bg-zinc-900 rounded-xl border border-zinc-800 relative">
+          <div className="flex p-1 bg-zinc-900 rounded-xl border border-zinc-800 relative">
             {(['all', 'owe', 'owed', 'archived'] as const).map(tab => {
-                const isActive = activeTab === tab;
-                return (
-                    <button
-                        key={tab}
-                        onClick={() => setActiveTab(tab)}
-                        className={`relative flex-1 py-2 text-sm font-medium rounded-lg transition-colors capitalize z-10 ${
-                            isActive ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'
-                        }`}
-                    >
-                        {isActive && (
-                            <motion.div
-                                layoutId="activeTabIndicator"
-                                className="absolute inset-0 bg-zinc-800 border border-zinc-700 rounded-lg shadow-sm -z-10"
-                                transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-                            />
-                        )}
-                        {getTabDisplay(tab)}
-                    </button>
-                );
+              const isActive = activeTab === tab;
+              return (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`relative flex-1 py-2 text-sm font-medium rounded-lg transition-colors capitalize z-10 ${isActive ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'
+                    }`}
+                >
+                  {isActive && (
+                    <motion.div
+                      layoutId="activeTabIndicator"
+                      className="absolute inset-0 bg-zinc-800 border border-zinc-700 rounded-lg shadow-sm -z-10"
+                      transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                    />
+                  )}
+                  {getTabDisplay(tab)}
+                </button>
+              );
             })}
-            </div>
+          </div>
         </div>
 
         <div className="px-4 space-y-1 pb-20">
           <h2 className="text-zinc-500 text-xs font-semibold uppercase tracking-wider mb-3 px-1">
             {getListHeader()}
           </h2>
-          
+
           <AnimatePresence mode="popLayout">
             {filteredDebts.length > 0 ? (
               filteredDebts.map(debt => (
@@ -520,9 +519,9 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
                   exit={{ opacity: 0, scale: 0.95 }}
                   transition={{ duration: 0.2 }}
                 >
-                  <DebtItem 
-                    debt={debt} 
-                    onPress={() => handleDebtPayment(debt)} 
+                  <DebtItem
+                    debt={debt}
+                    onPress={() => handleDebtPayment(debt)}
                     // Двойной клик теперь открывает детали (шеринг/удаление), а не историю
                     onDoublePress={() => setDetailsDebt(debt)}
                     onLongPress={() => handleDebtLongPress(debt)}
@@ -532,7 +531,7 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
                 </motion.div>
               ))
             ) : (
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 className="flex flex-col items-center justify-center py-16 text-zinc-500 border border-dashed border-zinc-800 rounded-2xl bg-zinc-900/50"
@@ -547,21 +546,21 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
       </div>
 
       {/* ================= MODALS ================= */}
-      
-      <DebtForm 
-        isOpen={isFormOpen} 
-        onClose={() => setIsFormOpen(false)} 
+
+      <DebtForm
+        isOpen={isFormOpen}
+        onClose={() => setIsFormOpen(false)}
         onSave={async (data) => {
-            await handleSaveDebt(
-                editingDebt ? { ...data, id: editingDebt.id } : data, 
-                !editingDebt, 
-                accounts[0]?.id
-            ); 
-            setIsFormOpen(false);
+          await handleSaveDebt(
+            editingDebt ? { ...data, id: editingDebt.id } : data,
+            !editingDebt,
+            accounts[0]?.id
+          );
+          setIsFormOpen(false);
         }}
         debt={editingDebt}
         defaultCurrency={displayCurrency}
-        categories={['Personal', 'Work', 'Family', 'Other']} 
+        categories={['Personal', 'Work', 'Family', 'Other']}
       />
 
       <DebtHistoryModal
@@ -575,40 +574,40 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
 
       {/* НОВАЯ МОДАЛКА ДЕТАЛЕЙ */}
       {detailsDebt && (
-          <DebtDetailsModal 
-              isOpen={!!detailsDebt}
-              onClose={() => setDetailsDebt(null)}
-              debt={detailsDebt}
-              onDelete={(d) => { handleDeleteClick(d); setDetailsDebt(null); }}
-              onEdit={(d) => { handleEdit(d); setDetailsDebt(null); }}
-              onHistory={(d) => { handleOpenHistory(d); setDetailsDebt(null); }}
-          />
+        <DebtDetailsModal
+          isOpen={!!detailsDebt}
+          onClose={() => setDetailsDebt(null)}
+          debt={detailsDebt}
+          onDelete={(d) => { handleDeleteClick(d); setDetailsDebt(null); }}
+          onEdit={(d) => { handleEdit(d); setDetailsDebt(null); }}
+          onHistory={(d) => { handleOpenHistory(d); setDetailsDebt(null); }}
+        />
       )}
 
       {isTxFormOpen && prefilledTx && (
         <TransactionForm
-           transaction={prefilledTx as Transaction}
-           categories={categories}
-           accounts={accounts}
-           savingsGoals={savingsGoals}
-           budgets={budgets}
-           debts={debts}
-           rates={rates}
-           transactions={transactions}
-           defaultCurrency={displayCurrency}
-           onConfirm={async (tx) => {
-               await handleAddTransaction(tx);
-               setIsTxFormOpen(false);
-           }}
-           onCancel={() => setIsTxFormOpen(false)}
-           onCreateBudget={() => {}}
-           isCategoryLocked={true} 
+          transaction={prefilledTx as Transaction}
+          categories={categories}
+          accounts={accounts}
+          savingsGoals={savingsGoals}
+          budgets={budgets}
+          debts={debts}
+          rates={rates}
+          transactions={transactions}
+          defaultCurrency={displayCurrency}
+          onConfirm={async (tx) => {
+            await handleAddTransaction(tx);
+            setIsTxFormOpen(false);
+          }}
+          onCancel={() => setIsTxFormOpen(false)}
+          onCreateBudget={() => { }}
+          isCategoryLocked={true}
         />
       )}
 
       <ConfirmationModal
         isOpen={!!deleteConfirmation}
-        title={t('deleteDebtTitle') || t('delete')} 
+        title={t('deleteDebtTitle') || t('delete')}
         message={t('deleteDebtMessage')}
         onConfirm={confirmDelete}
         onCancel={() => setDeleteConfirmation(null)}
