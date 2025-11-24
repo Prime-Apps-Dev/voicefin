@@ -88,7 +88,7 @@ const DebtWidgetCard = ({
       onClick={onClick}
       whileTap={{ scale: 0.95 }}
       className={`
-        relative flex-shrink-0 w-[85%] max-w-[300px] snap-center
+        relative flex-shrink-0 w-[80%] max-w-[300px] snap-center
         rounded-3xl p-5 text-white 
         ${currentStyle.bg} ${currentStyle.shadow} shadow-lg
         flex flex-col justify-between min-h-[160px]
