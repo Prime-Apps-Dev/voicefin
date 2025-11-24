@@ -178,7 +178,7 @@ export const DebtForm: React.FC<DebtFormProps> = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] px-4 py-[56px]"
             onClick={onClose}
           >
             <motion.div
@@ -259,8 +259,8 @@ export const DebtForm: React.FC<DebtFormProps> = ({
                           type="button"
                           onClick={() => handleTypeChange(DebtType.I_OWE)}
                           className={`py-2 rounded-lg text-sm font-medium transition-colors ${formData.type === DebtType.I_OWE
-                              ? 'bg-red-500/20 text-red-400'
-                              : 'text-zinc-400 hover:text-white'
+                            ? 'bg-red-500/20 text-red-400'
+                            : 'text-zinc-400 hover:text-white'
                             }`}
                           disabled={isSaving}
                         >
@@ -270,8 +270,8 @@ export const DebtForm: React.FC<DebtFormProps> = ({
                           type="button"
                           onClick={() => handleTypeChange(DebtType.OWED_TO_ME)}
                           className={`py-2 rounded-lg text-sm font-medium transition-colors ${formData.type === DebtType.OWED_TO_ME
-                              ? 'bg-emerald-500/20 text-emerald-400'
-                              : 'text-zinc-400 hover:text-white'
+                            ? 'bg-emerald-500/20 text-emerald-400'
+                            : 'text-zinc-400 hover:text-white'
                             }`}
                           disabled={isSaving}
                         >

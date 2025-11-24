@@ -336,7 +336,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center z-50 p-4"
+        className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center z-[100] px-4 py-[56px]"
         onClick={!isSubmitting ? onCancel : undefined} // Блокируем закрытие по клику на фон при отправке
       >
         <motion.div
@@ -535,8 +535,8 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
                       exit={{ opacity: 0, height: 0, y: -10 }}
                       transition={{ duration: 0.3, ease: 'easeInOut' }}
                       className={`mt-4 rounded-2xl p-4 border relative overflow-hidden ${debtWidgetData.isIOwe
-                          ? 'bg-red-500/10 border-red-500/30'
-                          : 'bg-green-500/10 border-green-500/30'
+                        ? 'bg-red-500/10 border-red-500/30'
+                        : 'bg-green-500/10 border-green-500/30'
                         }`}
                     >
                       <div className="relative z-10">

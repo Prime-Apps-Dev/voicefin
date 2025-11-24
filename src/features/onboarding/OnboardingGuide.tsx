@@ -280,7 +280,7 @@ export const OnboardingGuide: React.FC<OnboardingGuideProps> = ({ onFinish, init
     };
 
     return (
-        <div className="w-full h-full flex items-center justify-center p-4 bg-black/60 backdrop-blur-lg">
+        <div className="w-full h-full flex items-center justify-center px-4 py-[56px] bg-black/60 backdrop-blur-lg z-[100] fixed inset-0">
             <motion.div
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}

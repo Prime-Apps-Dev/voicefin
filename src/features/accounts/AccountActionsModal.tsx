@@ -33,15 +33,15 @@ export const AccountActionsModal: React.FC<AccountActionsModalProps> = ({ isOpen
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={onClose}
-          className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-end justify-center z-[100]"
         >
           <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ duration: 0.2 }}
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={{ type: 'spring', stiffness: 400, damping: 40 }}
             onClick={(e) => e.stopPropagation()}
-            className="bg-zinc-900 w-full h-full rounded-3xl p-4 border border-zinc-800/60 flex flex-col"
+            className="bg-zinc-900 w-full max-w-md rounded-t-3xl p-4 border-t border-zinc-800/60 max-h-[85vh] overflow-y-auto"
           >
             <div className="flex items-center justify-between pb-4 px-2">
               <div className="flex flex-col">

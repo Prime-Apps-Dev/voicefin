@@ -29,15 +29,15 @@ export const TextInputModal: React.FC<TextInputModalProps> = ({ isOpen, isProces
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-black/40 backdrop-blur-md flex flex-col justify-center items-center z-50 p-4"
+          className="fixed inset-0 bg-black/40 backdrop-blur-md flex flex-col justify-end items-center z-[100]"
           onClick={onClose}
         >
           <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ duration: 0.2 }}
-            className="bg-zinc-900 rounded-3xl shadow-xl w-full h-full border border-zinc-800/60 flex flex-col"
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={{ type: 'spring', stiffness: 400, damping: 40 }}
+            className="bg-zinc-900 rounded-t-3xl shadow-xl w-full max-w-md border-t border-zinc-800/60 max-h-[85vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-6">
