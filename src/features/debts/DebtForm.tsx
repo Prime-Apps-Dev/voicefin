@@ -186,7 +186,7 @@ export const DebtForm: React.FC<DebtFormProps> = ({
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-zinc-900 rounded-2xl w-full max-h-[calc(85vh-24px)] border border-zinc-800 overflow-hidden shadow-xl flex flex-col"
+              className="bg-zinc-900 rounded-2xl w-full max-h-[calc(85vh-40px)] border border-zinc-800 overflow-hidden shadow-xl flex flex-col"
               onClick={(e) => e.stopPropagation()}
             >
 
