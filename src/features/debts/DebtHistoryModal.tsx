@@ -51,10 +51,10 @@ export const DebtHistoryModal: React.FC<DebtHistoryModalProps> = ({
   // Определяем, является ли транзакция "выдачей" или "погашением"
   const getTransactionLabel = (tx: Transaction) => {
     if (tx.id === debt.initial_transaction_id) {
-        return language === 'ru' ? 'Создание долга' : 'Debt Creation';
+      return language === 'ru' ? 'Создание долга' : 'Debt Creation';
     }
     if (tx.category === DEBT_SYSTEM_CATEGORIES.LENDING || tx.category === DEBT_SYSTEM_CATEGORIES.BORROWING) {
-        return language === 'ru' ? 'Увеличение долга' : 'Debt Increase';
+      return language === 'ru' ? 'Увеличение долга' : 'Debt Increase';
     }
     return language === 'ru' ? 'Погашение' : 'Repayment';
   };
@@ -73,7 +73,7 @@ export const DebtHistoryModal: React.FC<DebtHistoryModalProps> = ({
             initial={{ scale: 0.9, opacity: 0, y: 20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.9, opacity: 0, y: 20 }}
-            className="w-full max-w-lg bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh]"
+            className="w-full h-full bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -91,7 +91,7 @@ export const DebtHistoryModal: React.FC<DebtHistoryModalProps> = ({
             </div>
 
             {/* Content */}
-            <div className="overflow-y-auto p-4 space-y-3">
+            <div className="overflow-y-auto p-4 space-y-3 flex-1">
               {debtTransactions.length === 0 ? (
                 <div className="text-center py-10 text-zinc-500">
                   <p>No transaction history found</p>
@@ -103,22 +103,21 @@ export const DebtHistoryModal: React.FC<DebtHistoryModalProps> = ({
                     className="bg-zinc-800/50 rounded-xl p-3 flex items-center justify-between border border-zinc-700/50 hover:bg-zinc-800 transition-colors group"
                   >
                     <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-full ${
-                         tx.type === TransactionType.INCOME 
-                         ? 'bg-emerald-500/10 text-emerald-500' 
-                         : 'bg-red-500/10 text-red-500'
-                      }`}>
+                      <div className={`p-2 rounded-full ${tx.type === TransactionType.INCOME
+                        ? 'bg-emerald-500/10 text-emerald-500'
+                        : 'bg-red-500/10 text-red-500'
+                        }`}>
                         {/* Логика иконки: 
                           Если это "Я должен" (I_OWE), то погашение (EXPENSE) - это хорошо (стрелка ВНИЗ, к долгу)
                           Если это "Мне должны" (OWED_TO_ME), то погашение (INCOME) - это хорошо (стрелка ВНИЗ, ко мне)
                           Создание долга (initial_tx) - всегда "плохо" (стрелка ВВЕРХ, от меня)
                         */}
                         {tx.id === debt.initial_transaction_id ? (
-                           // Создание долга
-                           debt.type === DebtType.I_OWE ? <ArrowDownLeft className="w-5 h-5" /> : <ArrowUpRight className="w-5 h-5" />
+                          // Создание долга
+                          debt.type === DebtType.I_OWE ? <ArrowDownLeft className="w-5 h-5" /> : <ArrowUpRight className="w-5 h-5" />
                         ) : (
-                           // Погашение
-                           debt.type === DebtType.I_OWE ? <ArrowUpRight className="w-5 h-5" /> : <ArrowDownLeft className="w-5 h-5" />
+                          // Погашение
+                          debt.type === DebtType.I_OWE ? <ArrowUpRight className="w-5 h-5" /> : <ArrowDownLeft className="w-5 h-5" />
                         )}
                       </div>
                       <div>
@@ -133,9 +132,8 @@ export const DebtHistoryModal: React.FC<DebtHistoryModalProps> = ({
                     </div>
 
                     <div className="flex items-center gap-4">
-                      <span className={`font-bold ${
-                        tx.type === TransactionType.INCOME ? 'text-emerald-400' : 'text-red-400'
-                      }`}>
+                      <span className={`font-bold ${tx.type === TransactionType.INCOME ? 'text-emerald-400' : 'text-red-400'
+                        }`}>
                         {tx.type === TransactionType.INCOME ? '+' : '-'}
                         {formatCurrency(tx.amount, tx.currency)}
                       </span>
@@ -150,14 +148,14 @@ export const DebtHistoryModal: React.FC<DebtHistoryModalProps> = ({
                 ))
               )}
             </div>
-            
+
             {/* Footer Summary */}
-             <div className="p-4 bg-zinc-800/30 border-t border-zinc-800 text-center">
-                 <p className="text-xs text-zinc-400 mb-1">Remaining Balance</p>
-                 <p className="text-xl font-bold text-white">
-                    {formatCurrency(debt.current_amount, debt.currency)}
-                 </p>
-             </div>
+            <div className="p-4 bg-zinc-800/30 border-t border-zinc-800 text-center">
+              <p className="text-xs text-zinc-400 mb-1">Remaining Balance</p>
+              <p className="text-xl font-bold text-white">
+                {formatCurrency(debt.current_amount, debt.currency)}
+              </p>
+            </div>
           </motion.div>
         </motion.div>
       )}

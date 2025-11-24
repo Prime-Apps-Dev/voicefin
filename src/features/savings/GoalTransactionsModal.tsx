@@ -34,8 +34,8 @@ export const GoalTransactionsModal: React.FC<GoalTransactionsModalProps> = ({
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [transactions, goal.id]);
 
-  const accountsById = React.useMemo(() => 
-      Object.fromEntries(accounts.map(acc => [acc.id, acc])),
+  const accountsById = React.useMemo(() =>
+    Object.fromEntries(accounts.map(acc => [acc.id, acc])),
     [accounts]);
 
   return (
@@ -53,7 +53,7 @@ export const GoalTransactionsModal: React.FC<GoalTransactionsModalProps> = ({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.98 }}
             transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-            className="relative bg-zinc-900 rounded-3xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-hidden flex flex-col border border-zinc-800/60"
+            className="relative bg-zinc-900 rounded-3xl shadow-2xl w-full h-full overflow-hidden flex flex-col border border-zinc-800/60"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="sticky top-0 bg-zinc-900/95 backdrop-blur-xl px-6 py-5 border-b border-zinc-800/60 z-10 flex-shrink-0">
@@ -72,9 +72,9 @@ export const GoalTransactionsModal: React.FC<GoalTransactionsModalProps> = ({
               {goalTransactions.length > 0 ? (
                 <ul className="space-y-3">
                   {goalTransactions.map(tx => (
-                    <TransactionItem 
-                      key={tx.id} 
-                      transaction={tx} 
+                    <TransactionItem
+                      key={tx.id}
+                      transaction={tx}
                       account={accountsById[tx.accountId]}
                       onSelect={onSelectTransaction}
                       onDelete={onDeleteTransaction}
@@ -88,7 +88,7 @@ export const GoalTransactionsModal: React.FC<GoalTransactionsModalProps> = ({
                 </div>
               )}
             </div>
-            
+
             <div className="sticky bottom-0 bg-zinc-900/95 backdrop-blur-xl px-6 py-4 border-t border-zinc-800/60 flex items-center justify-end flex-shrink-0">
               <button
                 onClick={onClose}

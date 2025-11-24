@@ -30,21 +30,21 @@ const defaultState = {
   due_date: '',
 };
 
-export const DebtForm: React.FC<DebtFormProps> = ({ 
-  isOpen, 
-  onClose, 
-  onSave, 
-  debt, 
+export const DebtForm: React.FC<DebtFormProps> = ({
+  isOpen,
+  onClose,
+  onSave,
+  debt,
   defaultCurrency,
-  categories 
+  categories
 }) => {
-  const { t } = useLocalization(); 
-  
+  const { t } = useLocalization();
+
   const [formData, setFormData] = useState(defaultState);
   const [amountStr, setAmountStr] = useState('');
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [isDueDatePickerOpen, setIsDueDatePickerOpen] = useState(false);
-  
+
   const [savedDebtId, setSavedDebtId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -74,7 +74,7 @@ export const DebtForm: React.FC<DebtFormProps> = ({
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    
+
     if (name === 'amount') {
       const sanitizedValue = value.replace(/[^0-9.]/g, '').replace(/(\..*?)\..*/g, '$1');
       setAmountStr(sanitizedValue);
@@ -90,7 +90,7 @@ export const DebtForm: React.FC<DebtFormProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const amount = parseFloat(formData.amount);
     if (isNaN(amount) || amount <= 0) {
       alert('Please enter a valid amount');
@@ -122,7 +122,7 @@ export const DebtForm: React.FC<DebtFormProps> = ({
 
       if (debt) {
         // Редактирование
-        onSave({ ...debtPayload, id: debt.id }); 
+        onSave({ ...debtPayload, id: debt.id });
       } else {
         // Создание (с шарингом)
         // Используем 'as any', так как Supabase примет null для due_date нормально
@@ -141,18 +141,18 @@ export const DebtForm: React.FC<DebtFormProps> = ({
     if (!savedDebtId) return;
 
     const amount = parseFloat(formData.amount);
-    
+
     const { shareUrl } = api.generateDebtShareLink(
-        savedDebtId, 
-        amount, 
-        formData.currency, 
-        formData.type
+      savedDebtId,
+      amount,
+      formData.currency,
+      formData.type
     );
 
     if ((window as any).Telegram?.WebApp) {
-        (window as any).Telegram.WebApp.openTelegramLink(shareUrl);
+      (window as any).Telegram.WebApp.openTelegramLink(shareUrl);
     } else {
-        window.open(shareUrl, '_blank');
+      window.open(shareUrl, '_blank');
     }
 
     handleFinish();
@@ -160,9 +160,9 @@ export const DebtForm: React.FC<DebtFormProps> = ({
 
   const handleFinish = () => {
     onSave({
-        ...formData,
-        amount: parseFloat(formData.amount),
-        id: savedDebtId
+      ...formData,
+      amount: parseFloat(formData.amount),
+      id: savedDebtId
     });
     onClose();
   };
@@ -181,35 +181,35 @@ export const DebtForm: React.FC<DebtFormProps> = ({
             className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
             onClick={onClose}
           >
-            <motion.div 
+            <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-zinc-900 rounded-2xl w-full max-w-md border border-zinc-800 overflow-hidden shadow-xl"
+              className="bg-zinc-900 rounded-2xl w-full h-full border border-zinc-800 overflow-hidden shadow-xl flex flex-col"
               onClick={(e) => e.stopPropagation()}
             >
-              
+
               {savedDebtId ? (
                 // === ЭКРАН УСПЕХА И ШАРИНГА ===
-                <div className="p-8 text-center flex flex-col items-center">
+                <div className="p-8 text-center flex flex-col items-center flex-1 justify-center">
                   <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mb-6 ring-4 ring-green-500/10">
                     <CheckCircle className="w-10 h-10 text-green-500" />
                   </div>
-                  
+
                   <h2 className="text-2xl font-bold text-white mb-2">Debt Created!</h2>
                   <p className="text-zinc-400 mb-8">
                     The debt has been successfully saved. Do you want to send a notification to {formData.person}?
                   </p>
 
-                  <button 
+                  <button
                     onClick={handleShare}
                     className="w-full bg-blue-600 hover:bg-blue-500 text-white py-4 rounded-xl font-bold mb-3 flex items-center justify-center gap-2 transition-transform active:scale-95 shadow-lg shadow-blue-900/20"
                   >
                     <Share className="w-5 h-5" />
                     Share via Telegram
                   </button>
-                  
-                  <button 
+
+                  <button
                     onClick={handleFinish}
                     className="w-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 py-4 rounded-xl font-medium transition-colors"
                   >
@@ -220,25 +220,25 @@ export const DebtForm: React.FC<DebtFormProps> = ({
                 // === ОБЫЧНАЯ ФОРМА ===
                 <>
                   {/* Header */}
-                  <div className="p-4 border-b border-zinc-800 flex justify-between items-center">
+                  <div className="p-4 border-b border-zinc-800 flex justify-between items-center flex-shrink-0">
                     <h2 className="text-lg font-bold text-white">
                       {debt ? 'Edit Debt' : 'New Debt'}
                     </h2>
-                    <button 
-                      onClick={onClose} 
+                    <button
+                      onClick={onClose}
                       className="text-zinc-400 hover:text-white p-1 rounded-full hover:bg-zinc-800"
                     >
                       <X className="w-5 h-5" />
                     </button>
                   </div>
 
-                  <form onSubmit={handleSubmit} className="p-4 space-y-4 max-h-[70vh] overflow-y-auto">
+                  <form onSubmit={handleSubmit} className="p-4 space-y-4 flex-1 overflow-y-auto">
                     {/* Person Name */}
                     <div>
                       <label className="block text-sm font-medium text-zinc-400 mb-1">
                         Person / Entity *
                       </label>
-                      <input 
+                      <input
                         name="person"
                         value={formData.person}
                         onChange={handleChange}
@@ -255,26 +255,24 @@ export const DebtForm: React.FC<DebtFormProps> = ({
                         Type *
                       </label>
                       <div className="grid grid-cols-2 gap-2 bg-zinc-800 p-1 rounded-xl">
-                        <button 
+                        <button
                           type="button"
                           onClick={() => handleTypeChange(DebtType.I_OWE)}
-                          className={`py-2 rounded-lg text-sm font-medium transition-colors ${
-                            formData.type === DebtType.I_OWE 
-                              ? 'bg-red-500/20 text-red-400' 
+                          className={`py-2 rounded-lg text-sm font-medium transition-colors ${formData.type === DebtType.I_OWE
+                              ? 'bg-red-500/20 text-red-400'
                               : 'text-zinc-400 hover:text-white'
-                          }`}
+                            }`}
                           disabled={isSaving}
                         >
                           I Owe
                         </button>
-                        <button 
+                        <button
                           type="button"
                           onClick={() => handleTypeChange(DebtType.OWED_TO_ME)}
-                          className={`py-2 rounded-lg text-sm font-medium transition-colors ${
-                            formData.type === DebtType.OWED_TO_ME 
-                              ? 'bg-emerald-500/20 text-emerald-400' 
+                          className={`py-2 rounded-lg text-sm font-medium transition-colors ${formData.type === DebtType.OWED_TO_ME
+                              ? 'bg-emerald-500/20 text-emerald-400'
                               : 'text-zinc-400 hover:text-white'
-                          }`}
+                            }`}
                           disabled={isSaving}
                         >
                           Owed to Me
@@ -288,7 +286,7 @@ export const DebtForm: React.FC<DebtFormProps> = ({
                         <label className="block text-sm font-medium text-zinc-400 mb-1">
                           Amount *
                         </label>
-                        <input 
+                        <input
                           type="text"
                           inputMode="decimal"
                           name="amount"
@@ -305,9 +303,9 @@ export const DebtForm: React.FC<DebtFormProps> = ({
                           Currency
                         </label>
                         <div className="relative">
-                          <select 
-                            name="currency" 
-                            value={formData.currency} 
+                          <select
+                            name="currency"
+                            value={formData.currency}
                             onChange={handleChange}
                             disabled={isSaving}
                             className="w-full appearance-none bg-zinc-800 border border-zinc-700 rounded-xl p-3 text-white focus:outline-none focus:border-blue-500 pr-10"
@@ -325,9 +323,9 @@ export const DebtForm: React.FC<DebtFormProps> = ({
                         Category (Optional)
                       </label>
                       <div className="relative">
-                        <select 
-                          name="category" 
-                          value={formData.category} 
+                        <select
+                          name="category"
+                          value={formData.category}
                           onChange={handleChange}
                           disabled={isSaving}
                           className="w-full appearance-none bg-zinc-800 border border-zinc-700 rounded-xl p-3 text-white focus:outline-none focus:border-blue-500 pr-10"
@@ -368,7 +366,7 @@ export const DebtForm: React.FC<DebtFormProps> = ({
                           className="w-full flex items-center justify-between bg-zinc-800 border border-zinc-700 rounded-xl p-3 text-white focus:outline-none focus:border-blue-500"
                         >
                           <span className="text-sm">
-                            {safeDueDate 
+                            {safeDueDate
                               ? safeDueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
                               : 'None'
                             }
@@ -395,7 +393,7 @@ export const DebtForm: React.FC<DebtFormProps> = ({
                     </div>
 
                     {/* Submit Button */}
-                    <button 
+                    <button
                       type="submit"
                       disabled={isSaving}
                       className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-blue-600/50 text-white py-3 rounded-xl font-semibold mt-4 transition-colors flex items-center justify-center"

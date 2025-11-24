@@ -68,7 +68,7 @@ export const SavingsGoalForm: React.FC<{
       }
     }
   };
-  
+
   const IconDisplay: React.FC<{ name: string; className?: string; }> = ({ name, className }) => {
     const IconComponent = ICONS[name] || ICONS.Target;
     return <IconComponent className={className} />;
@@ -89,11 +89,11 @@ export const SavingsGoalForm: React.FC<{
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.98 }}
             transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-            className="relative bg-zinc-900 rounded-3xl shadow-2xl w-full max-w-md max-h-[85vh] overflow-hidden flex flex-col border border-zinc-800/60"
+            className="relative bg-zinc-900 rounded-3xl shadow-2xl w-full h-full overflow-hidden flex flex-col border border-zinc-800/60"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="sticky top-0 bg-zinc-900/95 backdrop-blur-xl px-6 py-5 border-b border-zinc-800/60 z-10 flex-shrink-0">
-                <h2 className="text-xl font-semibold text-white tracking-tight">{goal ? t('editGoal') : t('createGoal')}</h2>
+              <h2 className="text-xl font-semibold text-white tracking-tight">{goal ? t('editGoal') : t('createGoal')}</h2>
             </div>
             <form onSubmit={handleSubmit} className="overflow-y-auto">
               <div className="px-6 py-6 space-y-4">
@@ -120,10 +120,10 @@ export const SavingsGoalForm: React.FC<{
                   <div>
                     <label htmlFor="currency" className="block text-sm font-medium text-zinc-300 mb-1.5">{t('currency')}</label>
                     <div className="relative">
-                        <select name="currency" value={formData.currency} onChange={handleChange} className="w-full appearance-none px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-600 transition-all duration-200 pr-10">
-                          {COMMON_CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
-                        </select>
-                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 pointer-events-none" />
+                      <select name="currency" value={formData.currency} onChange={handleChange} className="w-full appearance-none px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-600 transition-all duration-200 pr-10">
+                        {COMMON_CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                      <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 pointer-events-none" />
                     </div>
                   </div>
                 </div>

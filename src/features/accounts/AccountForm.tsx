@@ -13,10 +13,10 @@ interface AccountFormProps {
 }
 
 const defaultState = {
-    name: '',
-    currency: 'USD',
-    gradient: ACCOUNT_GRADIENTS[0].class,
-    type: AccountType.CARD,
+  name: '',
+  currency: 'USD',
+  gradient: ACCOUNT_GRADIENTS[0].class,
+  type: AccountType.CARD,
 };
 
 export const AccountForm: React.FC<AccountFormProps> = ({ isOpen, onClose, onSave, account }) => {
@@ -28,17 +28,17 @@ export const AccountForm: React.FC<AccountFormProps> = ({ isOpen, onClose, onSav
   // чтобы случайно не захватить 'balance' или 'id'.
   useEffect(() => {
     if (isOpen) {
-        if (account) {
-          // Явно выбираем только те поля, которые есть в форме
-          setFormData({
-            name: account.name,
-            currency: account.currency,
-            gradient: account.gradient,
-            type: account.type,
-          });
-        } else {
-          setFormData(defaultState);
-        }
+      if (account) {
+        // Явно выбираем только те поля, которые есть в форме
+        setFormData({
+          name: account.name,
+          currency: account.currency,
+          gradient: account.gradient,
+          type: account.type,
+        });
+      } else {
+        setFormData(defaultState);
+      }
     }
   }, [account, isOpen]);
 
@@ -50,19 +50,19 @@ export const AccountForm: React.FC<AccountFormProps> = ({ isOpen, onClose, onSav
   const handleGradientChange = (gradientClass: string) => {
     setFormData(prev => ({ ...prev, gradient: gradientClass }));
   };
-  
+
   const handleTypeChange = (type: AccountType) => {
-      setFormData(prev => ({ ...prev, type }));
+    setFormData(prev => ({ ...prev, type }));
   }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (formData.name) {
-        if (account && 'id' in account) {
-            onSave({ ...formData, id: account.id });
-        } else {
-            onSave(formData);
-        }
+      if (account && 'id' in account) {
+        onSave({ ...formData, id: account.id });
+      } else {
+        onSave(formData);
+      }
     }
   };
 
@@ -81,13 +81,13 @@ export const AccountForm: React.FC<AccountFormProps> = ({ isOpen, onClose, onSav
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.98 }}
             transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-            className="relative bg-zinc-900 rounded-3xl shadow-2xl w-full max-w-md max-h-[85vh] overflow-hidden flex flex-col border border-zinc-800/60"
+            className="relative bg-zinc-900 rounded-3xl shadow-2xl w-full h-full overflow-hidden flex flex-col border border-zinc-800/60"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="sticky top-0 bg-zinc-900/95 backdrop-blur-xl px-6 py-5 border-b border-zinc-800/60 z-10 flex-shrink-0">
-                <h2 className="text-xl font-semibold text-white tracking-tight">{account ? t('editAccount') : t('createAccount')}</h2>
+              <h2 className="text-xl font-semibold text-white tracking-tight">{account ? t('editAccount') : t('createAccount')}</h2>
             </div>
-            
+
             <form onSubmit={handleSubmit} className="overflow-y-auto">
               <div className="px-6 py-6 space-y-4">
                 <div>
@@ -104,11 +104,11 @@ export const AccountForm: React.FC<AccountFormProps> = ({ isOpen, onClose, onSav
                   </div>
                 </div>
                 <div>
-                   <label className="block text-sm font-medium text-zinc-300 mb-1.5">{t('accountType')}</label>
-                   <div className="mt-1 flex gap-2">
-                      <button type="button" onClick={() => handleTypeChange(AccountType.CARD)} className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${formData.type === AccountType.CARD ? 'bg-blue-600 text-white' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'}`}>{t('card')}</button>
-                      <button type="button" onClick={() => handleTypeChange(AccountType.CASH)} className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${formData.type === AccountType.CASH ? 'bg-blue-600 text-white' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'}`}>{t('cash')}</button>
-                   </div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-1.5">{t('accountType')}</label>
+                  <div className="mt-1 flex gap-2">
+                    <button type="button" onClick={() => handleTypeChange(AccountType.CARD)} className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${formData.type === AccountType.CARD ? 'bg-blue-600 text-white' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'}`}>{t('card')}</button>
+                    <button type="button" onClick={() => handleTypeChange(AccountType.CASH)} className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${formData.type === AccountType.CASH ? 'bg-blue-600 text-white' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'}`}>{t('cash')}</button>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-zinc-300 mb-1.5">{t('color')}</label>
