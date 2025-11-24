@@ -547,43 +547,6 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
 
       {/* ================= MODALS ================= */}
 
-      <DebtForm
-        isOpen={isFormOpen}
-        onClose={() => setIsFormOpen(false)}
-        onSave={async (data) => {
-          await handleSaveDebt(
-            editingDebt ? { ...data, id: editingDebt.id } : data,
-            !editingDebt,
-            accounts[0]?.id
-          );
-          setIsFormOpen(false);
-        }}
-        debt={editingDebt}
-        defaultCurrency={displayCurrency}
-        categories={['Personal', 'Work', 'Family', 'Other']}
-      />
-
-      <DebtHistoryModal
-        isOpen={isHistoryOpen}
-        onClose={() => setIsHistoryOpen(false)}
-        debt={selectedDebtForHistory}
-        transactions={transactions}
-        onDeleteTransaction={handleDeleteTransaction}
-        currency={selectedDebtForHistory?.currency || displayCurrency}
-      />
-
-      {/* НОВАЯ МОДАЛКА ДЕТАЛЕЙ */}
-      {detailsDebt && (
-        <DebtDetailsModal
-          isOpen={!!detailsDebt}
-          onClose={() => setDetailsDebt(null)}
-          debt={detailsDebt}
-          onDelete={(d) => { handleDeleteClick(d); setDetailsDebt(null); }}
-          onEdit={(d) => { handleEdit(d); setDetailsDebt(null); }}
-          onHistory={(d) => { handleOpenHistory(d); setDetailsDebt(null); }}
-        />
-      )}
-
       {isTxFormOpen && prefilledTx && (
         <TransactionForm
           transaction={prefilledTx as Transaction}
@@ -611,6 +574,22 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
         message={t('deleteDebtMessage')}
         onConfirm={confirmDelete}
         onCancel={() => setDeleteConfirmation(null)}
+      />
+
+      <DebtForm
+        isOpen={isFormOpen}
+        onClose={() => setIsFormOpen(false)}
+        onSave={async (data) => {
+          await handleSaveDebt(
+            editingDebt ? { ...data, id: editingDebt.id } : data,
+            !editingDebt,
+            accounts[0]?.id
+          );
+          setIsFormOpen(false);
+        }}
+        debt={editingDebt}
+        defaultCurrency={displayCurrency}
+        categories={['Personal', 'Work', 'Family', 'Other']}
       />
     </div>
   );

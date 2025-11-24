@@ -2,6 +2,7 @@
 // ФОРМА СОЗДАНИЯ/РЕДАКТИРОВАНИЯ ДОЛГА (С ФУНКЦИЕЙ ШАРИНГА)
 
 import React, { useState, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Debt, DebtType, DebtStatus } from '../../core/types'; // Добавлен DebtStatus
 import { useLocalization } from '../../core/context/LocalizationContext';
@@ -170,7 +171,7 @@ export const DebtForm: React.FC<DebtFormProps> = ({
   const safeDate = new Date(formData.date);
   const safeDueDate = formData.due_date ? new Date(formData.due_date) : null;
 
-  return (
+  return ReactDOM.createPortal(
     <>
       <AnimatePresence>
         {isOpen && (
@@ -442,6 +443,7 @@ export const DebtForm: React.FC<DebtFormProps> = ({
           />
         )}
       </AnimatePresence>
-    </>
+    </>,
+    document.body
   );
 };
