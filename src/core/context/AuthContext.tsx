@@ -11,7 +11,7 @@ interface AuthContextType {
   isDevLoggingIn: boolean;
   isAppExpanded: boolean;
   isAppFullscreen: boolean;
-  handleDevLogin: (userId: string) => Promise<void>;
+  handleDevLogin: (email: string, password?: string) => Promise<void>;
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
   error: string | null;
   logout: () => void; // Добавили функцию логаута для сброса ошибок
@@ -131,16 +131,51 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(userWithDetails);
   };
 
-  const handleDevLogin = async (userId: string) => {
+  const handleDevLogin = async (email: string, password?: string) => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
-      if (error) throw error;
+      let profileData = null;
+
+      // 1. Если есть пароль, пробуем реальную авторизацию (чтобы работал RLS)
+      if (password) {
+        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+          email,
+          password
+        });
+
+        if (!authError && authData.user) {
+          // Авторизация успешна, получаем профиль
+          const { data, error } = await supabase.from('profiles').select('*').eq('id', authData.user.id).single();
+          if (!error && data) {
+            profileData = data;
+          }
+        } else {
+          console.warn("Dev Login: Real auth failed, falling back to mock profile lookup.", authError);
+        }
+      }
+
+      // 2. Если реальная авторизация не удалась или пароля нет, ищем профиль по email (Mock Mode)
+      if (!profileData) {
+        const { data, error } = await supabase.from('profiles').select('*').eq('email', email).single();
+        if (data && !error) {
+          profileData = data;
+        } else {
+          // Если по email не нашли, пробуем как ID
+          const { data: dataById, error: errorById } = await supabase.from('profiles').select('*').eq('id', email).single();
+          if (dataById && !errorById) {
+            profileData = dataById;
+          }
+        }
+      }
+
+      if (!profileData) {
+        throw new Error('User not found');
+      }
 
       const userWithDetails: User = {
-        ...data,
-        name: data.full_name || data.username || 'User',
-        email: data.email
+        ...profileData,
+        name: profileData.full_name || profileData.username || 'User',
+        email: profileData.email
       };
 
       setUser(userWithDetails);

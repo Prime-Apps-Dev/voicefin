@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import ReactDOM from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle, X, AlertCircle, ArrowRight } from 'lucide-react';
 import { DebtType, DebtStatus } from '../../core/types';
@@ -79,7 +80,7 @@ export const IncomingDebtModal: React.FC<IncomingDebtModalProps> = ({
 
   if (!debtId) return null;
 
-  return (
+  return ReactDOM.createPortal(
     <AnimatePresence>
       <motion.div
         initial={{ opacity: 0 }}
@@ -148,6 +149,7 @@ export const IncomingDebtModal: React.FC<IncomingDebtModalProps> = ({
           </div>
         </motion.div>
       </motion.div>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 };

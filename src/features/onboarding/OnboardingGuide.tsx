@@ -1,6 +1,7 @@
 // src/features/onboarding/OnboardingGuide.tsx
 
 import React, { useState, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocalization } from '../../core/context/LocalizationContext';
 import { Mic, Type, Wallet, LayoutGrid, PartyPopper, ArrowRight, CheckCircle, Loader2, X } from 'lucide-react';
@@ -9,10 +10,8 @@ import { DebtType, DebtStatus } from '../../core/types';
 
 interface OnboardingGuideProps {
     onFinish: () => void;
-    // НОВЫЕ ПРОПСЫ ДЛЯ ОБРАБОТКИ ДОЛГА ПРИ ОНБОРДИНГЕ
     initialDebtId: string | null;
     onDebtActionComplete: (debtId: string | null) => void;
-    // ---
 }
 
 const steps = [
@@ -48,11 +47,10 @@ const steps = [
     },
 ];
 
-// НОВЫЙ КОМПОНЕНТ ДЛЯ ПЕРВОГО ШАГА ОНБОРДИНГА (ТОЛЬКО ДЛЯ DEEP LINK)
 interface DebtOnboardingStepProps {
     debtId: string;
-    onComplete: () => void; // Вызывается для перехода к следующему шагу
-    onDebtActionComplete: (debtId: string | null) => void; // Вызывается для очистки initialDebtId в App.tsx
+    onComplete: () => void;
+    onDebtActionComplete: (debtId: string | null) => void;
 }
 
 const DebtOnboardingStep: React.FC<DebtOnboardingStepProps> = ({ debtId, onComplete, onDebtActionComplete }) => {
@@ -63,7 +61,6 @@ const DebtOnboardingStep: React.FC<DebtOnboardingStepProps> = ({ debtId, onCompl
     const [error, setError] = useState<string | null>(null);
     const [status, setStatus] = useState<'pending' | 'accepted' | 'declined'>('pending');
 
-    // Логика загрузки долга (взята из IncomingDebtModal.tsx)
     useEffect(() => {
         const loadDebt = async () => {
             try {
@@ -93,7 +90,6 @@ const DebtOnboardingStep: React.FC<DebtOnboardingStepProps> = ({ debtId, onCompl
                 ? DebtType.OWED_TO_ME
                 : DebtType.I_OWE;
 
-            // 1. Создаем долг у себя
             const newDebt = await api.addDebt({
                 person: sharedDebt.owner_name || 'Друг',
                 amount: sharedDebt.amount,
@@ -107,12 +103,11 @@ const DebtOnboardingStep: React.FC<DebtOnboardingStepProps> = ({ debtId, onCompl
                 parent_debt_id: sharedDebt.id
             });
 
-            // 2. ВАЖНО: Связываем пользователей в базе (Handshake)
             await api.linkDebtPartners(sharedDebt.id, newDebt.id);
 
             setStatus('accepted');
             setError(null);
-            onDebtActionComplete(null); // Очищаем initialDebtId в App.tsx
+            onDebtActionComplete(null);
         } catch (err) {
             console.error(err);
             setError('Ошибка при сохранении долга. Попробуйте пропустить и добавить позже.');
@@ -125,7 +120,7 @@ const DebtOnboardingStep: React.FC<DebtOnboardingStepProps> = ({ debtId, onCompl
     const handleDecline = () => {
         setStatus('declined');
         setError(null);
-        onDebtActionComplete(null); // Очищаем initialDebtId в App.tsx
+        onDebtActionComplete(null);
     };
 
     const isInteractionDisabled = isProcessing || status !== 'pending';
@@ -231,17 +226,14 @@ const DebtOnboardingStep: React.FC<DebtOnboardingStepProps> = ({ debtId, onCompl
     );
 };
 
-
 export const OnboardingGuide: React.FC<OnboardingGuideProps> = ({ onFinish, initialDebtId, onDebtActionComplete }) => {
     const { t } = useLocalization();
     const [currentStep, setCurrentStep] = useState(0);
     const [direction, setDirection] = useState(0);
 
-    // Определяем, должен ли первый шаг быть специальным шагом для долга
     const hasDebtStep = !!initialDebtId;
     const debtStepIndex = 0;
 
-    // Если есть шаг долга, добавляем его в начало массива шагов.
     const effectiveSteps = hasDebtStep
         ? [{ titleKey: 'onboardingDebtTitle', textKey: 'onboardingDebtText', icon: ArrowRight }, ...steps]
         : steps;
@@ -252,7 +244,6 @@ export const OnboardingGuide: React.FC<OnboardingGuideProps> = ({ onFinish, init
     };
 
     const handleDebtComplete = () => {
-        // Переход на следующий шаг после обработки долга
         paginate(1);
     };
 
@@ -279,8 +270,8 @@ export const OnboardingGuide: React.FC<OnboardingGuideProps> = ({ onFinish, init
         })
     };
 
-    return (
-        <div className="w-full h-full flex items-center justify-center px-4 py-[88px] bg-black/60 backdrop-blur-lg z-[9999] fixed inset-0">
+    return ReactDOM.createPortal(
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-lg z-[9999] flex items-center justify-center px-4 py-[88px]">
             <motion.div
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
@@ -300,7 +291,6 @@ export const OnboardingGuide: React.FC<OnboardingGuideProps> = ({ onFinish, init
                 <div className="flex-grow relative flex items-center justify-center">
                     <AnimatePresence initial={false} custom={direction}>
                         {hasDebtStep && currentStep === debtStepIndex ? (
-                            // Рендерим специальный шаг для долга
                             <motion.div
                                 key="debt-step"
                                 custom={direction}
@@ -321,7 +311,6 @@ export const OnboardingGuide: React.FC<OnboardingGuideProps> = ({ onFinish, init
                                 />
                             </motion.div>
                         ) : (
-                            // Рендерим обычный шаг онбординга
                             <motion.div
                                 key={currentStep}
                                 custom={direction}
@@ -345,7 +334,6 @@ export const OnboardingGuide: React.FC<OnboardingGuideProps> = ({ onFinish, init
                     </AnimatePresence>
                 </div>
 
-                {/* Навигация (кнопки) скрыта, если активен шаг долга и он не завершен */}
                 {!(hasDebtStep && currentStep === debtStepIndex) && (
                     <div className="p-6 flex flex-col items-center gap-4 border-t border-zinc-800/60">
                         <div className="flex gap-2">
@@ -383,8 +371,8 @@ export const OnboardingGuide: React.FC<OnboardingGuideProps> = ({ onFinish, init
                         </div>
                     </div>
                 )}
-
             </motion.div>
-        </div>
+        </div>,
+        document.body
     );
 };

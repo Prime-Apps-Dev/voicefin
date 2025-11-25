@@ -317,17 +317,14 @@ const AppContent: React.FC = () => {
       <LoadingScreen isLoading={isLoading} />
 
       {/* Слой Онбординга */}
-      <AnimatePresence>
-        {showOnboarding && (
-          <div className="fixed inset-0 z-50 overflow-y-auto">
-            <OnboardingGuide
-              onFinish={handleFinishOnboarding}
-              initialDebtId={initialDebtId}
-              onDebtActionComplete={() => setInitialDebtId(null)}
-            />
-          </div>
-        )}
-      </AnimatePresence>
+      {/* Слой Онбординга */}
+      {showOnboarding && (
+        <OnboardingGuide
+          onFinish={handleFinishOnboarding}
+          initialDebtId={initialDebtId}
+          onDebtActionComplete={() => setInitialDebtId(null)}
+        />
+      )}
 
       {/* Основной контейнер с Blur эффектом */}
       <div
