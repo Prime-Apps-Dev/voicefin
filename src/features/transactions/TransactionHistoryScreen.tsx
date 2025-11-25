@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
+import { formatMoney } from '../../utils/formatMoney';
+import { useLocalization } from '../../core/context/LocalizationContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Transaction, Account, Category, ExchangeRates, TransactionType } from '../../core/types';
-import { useLocalization } from '../../core/context/LocalizationContext';
 import { ChevronLeft, Search, SlidersHorizontal, ArrowDownUp, X } from 'lucide-react';
 import { TransactionItem } from './TransactionItem';
 import { FilterModal, Filters } from '../../shared/ui/modals/FilterModal';
@@ -20,17 +21,13 @@ interface TransactionHistoryScreenProps {
 
 type SortOption = 'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc';
 
-export const TransactionHistoryScreen: React.FC<TransactionHistoryScreenProps> = (props) => {
-  const {
-    transactions, accounts, categories, rates,
-    defaultCurrency, onSelectTransaction, onDeleteTransaction, onBack
-  } = props;
-  const { t } = useLocalization();
+export const TransactionHistoryScreen: React.FC<TransactionHistoryScreenProps> = ({ transactions, accounts, categories, rates, defaultCurrency, onSelectTransaction, onDeleteTransaction, onBack }) => {
+  const { t, language } = useLocalization();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [sortOption, setSortOption] = useState<SortOption>('date-desc');
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
-  
+
   const initialFilters = useMemo((): Filters => ({
     type: 'all',
     selectedCategories: [],
@@ -69,7 +66,7 @@ export const TransactionHistoryScreen: React.FC<TransactionHistoryScreenProps> =
     if (filters.selectedCategories.length > 0) {
       filtered = filtered.filter(tx => filters.selectedCategories.includes(tx.category));
     }
-    
+
     const { min, max, currency: filterCurrency } = filters.amountFilter;
     if ((min !== null && min !== '') || (max !== null && max !== '')) {
       filtered = filtered.filter(tx => {
@@ -87,16 +84,16 @@ export const TransactionHistoryScreen: React.FC<TransactionHistoryScreenProps> =
         break;
       case 'amount-desc':
         filtered.sort((a, b) => {
-            const amountB = convertCurrency(b.amount, b.currency, defaultCurrency, rates);
-            const amountA = convertCurrency(a.amount, a.currency, defaultCurrency, rates);
-            return amountB - amountA;
+          const amountB = convertCurrency(b.amount, b.currency, defaultCurrency, rates);
+          const amountA = convertCurrency(a.amount, a.currency, defaultCurrency, rates);
+          return amountB - amountA;
         });
         break;
       case 'amount-asc':
         filtered.sort((a, b) => {
-            const amountA = convertCurrency(a.amount, a.currency, defaultCurrency, rates);
-            const amountB = convertCurrency(b.amount, b.currency, defaultCurrency, rates);
-            return amountA - amountB;
+          const amountA = convertCurrency(a.amount, a.currency, defaultCurrency, rates);
+          const amountB = convertCurrency(b.amount, b.currency, defaultCurrency, rates);
+          return amountA - amountB;
         });
         break;
       case 'date-desc':
@@ -107,11 +104,11 @@ export const TransactionHistoryScreen: React.FC<TransactionHistoryScreenProps> =
 
     return filtered;
   }, [transactions, searchTerm, sortOption, filters, defaultCurrency, rates]);
-  
+
   const totalAmount = useMemo(() => {
     return filteredAndSortedTransactions.reduce((acc, tx) => {
-        const amount = convertCurrency(tx.amount, tx.currency, defaultCurrency, rates);
-        return acc + (tx.type === TransactionType.INCOME ? amount : -amount);
+      const amount = convertCurrency(tx.amount, tx.currency, defaultCurrency, rates);
+      return acc + (tx.type === TransactionType.INCOME ? amount : -amount);
     }, 0);
   }, [filteredAndSortedTransactions, defaultCurrency, rates]);
 
@@ -120,9 +117,9 @@ export const TransactionHistoryScreen: React.FC<TransactionHistoryScreenProps> =
     const currentIndex = options.indexOf(sortOption);
     setSortOption(options[(currentIndex + 1) % options.length]);
   };
-  
+
   const getSortLabel = () => {
-    switch(sortOption) {
+    switch (sortOption) {
       case 'date-desc': return t('dateNewest');
       case 'date-asc': return t('dateOldest');
       case 'amount-desc': return t('amountHighLow');
@@ -143,7 +140,7 @@ export const TransactionHistoryScreen: React.FC<TransactionHistoryScreenProps> =
           <h1 className="text-xl font-bold text-white">{t('transactionHistory')}</h1>
           <div className="w-10 h-10" />
         </div>
-        
+
         <div className="pt-4 space-y-4">
           {/* Search Bar */}
           <div className="relative">
@@ -163,63 +160,63 @@ export const TransactionHistoryScreen: React.FC<TransactionHistoryScreenProps> =
           </div>
           {/* Filter/Sort Buttons */}
           <div className="grid grid-cols-2 gap-3">
-             <button onClick={() => setIsFilterModalOpen(true)} className="flex items-center justify-center gap-2 py-3 bg-gray-800 rounded-xl text-white font-medium hover:bg-gray-700">
-                 <SlidersHorizontal className="w-4 h-4"/>
-                 <span>{t('filters')}</span>
-             </button>
-             <button onClick={cycleSortOption} className="flex items-center justify-center gap-2 py-3 bg-gray-800 rounded-xl text-white font-medium hover:bg-gray-700">
-                 <ArrowDownUp className="w-4 h-4"/>
-                 <span className="truncate text-sm">{getSortLabel()}</span>
-             </button>
+            <button onClick={() => setIsFilterModalOpen(true)} className="flex items-center justify-center gap-2 py-3 bg-gray-800 rounded-xl text-white font-medium hover:bg-gray-700">
+              <SlidersHorizontal className="w-4 h-4" />
+              <span>{t('filters')}</span>
+            </button>
+            <button onClick={cycleSortOption} className="flex items-center justify-center gap-2 py-3 bg-gray-800 rounded-xl text-white font-medium hover:bg-gray-700">
+              <ArrowDownUp className="w-4 h-4" />
+              <span className="truncate text-sm">{getSortLabel()}</span>
+            </button>
           </div>
-          
-           {/* Results Summary */}
-           <div className="px-2 text-sm text-gray-400 flex justify-between">
-                <span>{t('resultsSummary', { count: filteredAndSortedTransactions.length })}</span>
-                <span>{t('total')}: <span className="font-semibold text-white">{new Intl.NumberFormat(undefined, {style: 'currency', currency: defaultCurrency}).format(totalAmount)}</span></span>
-           </div>
+
+          {/* Results Summary */}
+          <div className="px-2 text-sm text-gray-400 flex justify-between">
+            <span>{t('resultsSummary', { count: filteredAndSortedTransactions.length })}</span>
+            <span>{t('total')}: <span className="font-semibold text-white">{formatMoney(totalAmount, defaultCurrency, language === 'ru' ? 'ru-RU' : 'en-US')}</span></span>
+          </div>
         </div>
       </header>
 
       {/* 3. Основной контент (только список), который будет скроллиться */}
       <main className="flex-grow overflow-y-auto px-4 py-2 pb-24">
-            <AnimatePresence>
-                {filteredAndSortedTransactions.length > 0 ? (
-                    <motion.ul
-                        className="space-y-3"
-                        initial="hidden"
-                        animate="visible"
-                        variants={{
-                          hidden: { opacity: 0 },
-                          visible: { opacity: 1, transition: { staggerChildren: 0.05 } },
-                        }}
-                    >
-                        {filteredAndSortedTransactions.map(tx => (
-                            <motion.li key={tx.id} variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }}>
-                                <TransactionItem
-                                    transaction={tx}
-                                    account={accountsById[tx.accountId]}
-                                    onSelect={onSelectTransaction}
-                                    onDelete={onDeleteTransaction}
-                                    rates={rates}
-                                />
-                            </motion.li>
-                        ))}
-                    </motion.ul>
-                ) : (
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className="text-center py-20 px-6 text-gray-500"
-                    >
-                        <Search className="w-16 h-16 mx-auto mb-4" />
-                        <h3 className="text-xl font-semibold text-gray-200 mb-2">{t('noTransactionsFound')}</h3>
-                        <p>{t('tryDifferentFilters')}</p>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+        <AnimatePresence>
+          {filteredAndSortedTransactions.length > 0 ? (
+            <motion.ul
+              className="space-y-3"
+              initial="hidden"
+              animate="visible"
+              variants={{
+                hidden: { opacity: 0 },
+                visible: { opacity: 1, transition: { staggerChildren: 0.05 } },
+              }}
+            >
+              {filteredAndSortedTransactions.map(tx => (
+                <motion.li key={tx.id} variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }}>
+                  <TransactionItem
+                    transaction={tx}
+                    account={accountsById[tx.accountId]}
+                    onSelect={onSelectTransaction}
+                    onDelete={onDeleteTransaction}
+                    rates={rates}
+                  />
+                </motion.li>
+              ))}
+            </motion.ul>
+          ) : (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="text-center py-20 px-6 text-gray-500"
+            >
+              <Search className="w-16 h-16 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold text-gray-200 mb-2">{t('noTransactionsFound')}</h3>
+              <p>{t('tryDifferentFilters')}</p>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </main>
-      
+
       <FilterModal
         isOpen={isFilterModalOpen}
         onClose={() => setIsFilterModalOpen(false)}

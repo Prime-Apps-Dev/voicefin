@@ -1,10 +1,11 @@
 // src/components/AccountList.tsx
 
 import React from 'react';
+import { formatMoney } from '../../utils/formatMoney';
+import { useLocalization } from '../../core/context/LocalizationContext';
 import { Account, ExchangeRates, Transaction, TransactionType } from '../../core/types'; // Добавил TransactionType
 import { AccountCard } from './AccountCard';
 import { convertCurrency } from '../../core/services/currency';
-import { useLocalization } from '../../core/context/LocalizationContext';
 
 interface AccountListProps {
   accounts: Account[];
@@ -18,53 +19,51 @@ interface AccountListProps {
 
 // ✅ ИСПРАВЛЕННАЯ ФУНКЦИЯ ПОДСЧЕТА БАЛАНСА
 const calculateAccountBalance = (accountId: string, transactions: Transaction[], rates: ExchangeRates, accountCurrency: string) => {
-    return transactions.reduce((sum, tx) => {
-        // 1. Конвертируем сумму транзакции в валюту этого счета
-        const amountInAccountCurrency = convertCurrency(tx.amount, tx.currency, accountCurrency, rates);
+  return transactions.reduce((sum, tx) => {
+    // 1. Конвертируем сумму транзакции в валюту этого счета
+    const amountInAccountCurrency = convertCurrency(tx.amount, tx.currency, accountCurrency, rates);
 
-        // 2. Логика для разных типов транзакций
-        if (tx.type === TransactionType.INCOME && tx.accountId === accountId) {
-            return sum + amountInAccountCurrency;
-        } 
-        else if (tx.type === TransactionType.EXPENSE && tx.accountId === accountId) {
-            return sum - amountInAccountCurrency;
-        }
-        else if (tx.type === TransactionType.TRANSFER) {
-            // Если это перевод, проверяем роль счета
-            if (tx.accountId === accountId) {
-                // Мы отправитель -> вычитаем
-                return sum - amountInAccountCurrency;
-            } else if (tx.toAccountId === accountId) {
-                // Мы получатель -> прибавляем
-                return sum + amountInAccountCurrency;
-            }
-        }
-        
-        return sum;
-    }, 0);
+    // 2. Логика для разных типов транзакций
+    if (tx.type === TransactionType.INCOME && tx.accountId === accountId) {
+      return sum + amountInAccountCurrency;
+    }
+    else if (tx.type === TransactionType.EXPENSE && tx.accountId === accountId) {
+      return sum - amountInAccountCurrency;
+    }
+    else if (tx.type === TransactionType.TRANSFER) {
+      // Если это перевод, проверяем роль счета
+      if (tx.accountId === accountId) {
+        // Мы отправитель -> вычитаем
+        return sum - amountInAccountCurrency;
+      } else if (tx.toAccountId === accountId) {
+        // Мы получатель -> прибавляем
+        return sum + amountInAccountCurrency;
+      }
+    }
+
+    return sum;
+  }, 0);
 };
 
 export const AccountList: React.FC<AccountListProps> = ({ accounts, transactions, rates, selectedAccountId, onSelectAccount, totalBalance, defaultCurrency }) => {
-  const { t } = useLocalization();
-  
+  const { t, language } = useLocalization();
+
   if (accounts.length === 0) {
     return (
-        <div className="px-6 py-8 text-center text-gray-500">
-            <p>No accounts found.</p>
-            <p className="text-sm">Go to Profile {'>'} Settings to add your first account.</p>
-        </div>
+      <div className="px-6 py-8 text-center text-gray-500">
+        <p>No accounts found.</p>
+        <p className="text-sm">Go to Profile {'>'} Settings to add your first account.</p>
+      </div>
     );
   }
 
-  const formattedTotalBalance = new Intl.NumberFormat(undefined, {
-    style: 'currency',
-    currency: defaultCurrency,
-  }).format(totalBalance);
+  const locale = language === 'ru' ? 'ru-RU' : 'en-US';
+  const formattedTotalBalance = formatMoney(totalBalance, defaultCurrency, locale);
 
   return (
     <div className="space-y-4">
       <h2 className="text-xl font-semibold text-gray-100 px-6">
-          {t('accounts')}
+        {t('accounts')}
       </h2>
       <div className="overflow-x-auto scrollbar-hide">
         <div className="flex space-x-4 px-6 py-4">

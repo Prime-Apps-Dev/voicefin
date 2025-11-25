@@ -22,6 +22,7 @@ import LongPressWrapper from '../../shared/layout/LongPressWrapper';
 import { ConfirmationModal } from '../../shared/ui/modals/ConfirmationModal';
 import { convertCurrency } from '../../core/services/currency';
 import { getDebtTransactionType, getDebtTransactionCategory } from '../../utils/constants';
+import { formatMoney } from '../../utils/formatMoney';
 
 // Импорты модальных окон
 import { DebtForm } from './DebtForm';
@@ -56,6 +57,7 @@ const DebtWidgetCard = ({
   active?: boolean;
 }) => {
   const { t, language } = useLocalization();
+  const locale = language === 'ru' ? 'ru-RU' : 'en-US';
 
   const styles = {
     net: {
@@ -113,11 +115,7 @@ const DebtWidgetCard = ({
 
         <div>
           <div className="text-3xl font-extrabold tracking-tight drop-shadow-sm">
-            {new Intl.NumberFormat(language === 'ru' ? 'ru-RU' : 'en-US', {
-              style: 'currency',
-              currency,
-              maximumFractionDigits: 0
-            }).format(amount)}
+            {formatMoney(amount, currency, locale, { maximumFractionDigits: 0 })}
           </div>
           <div className="mt-2 flex items-center gap-2 text-xs font-medium text-white/90 bg-black/10 w-fit px-3 py-1 rounded-full backdrop-blur-sm">
             <Layers className="w-3 h-3" />
@@ -148,6 +146,12 @@ const DebtItem = ({
   defaultCurrency: string;
 }) => {
   const { t, language } = useLocalization();
+  const locale = language === 'ru' ? 'ru-RU' : 'en-US';
+
+  const formatCurrency = (amount: number, currency: string) => {
+    return formatMoney(amount, currency, locale);
+  };
+
   const isIOwe = debt.type === DebtType.I_OWE;
   const totalAmount = debt.amount;
   const currentDebt = debt.current_amount;
@@ -231,7 +235,7 @@ const DebtItem = ({
             <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border border-white/5 ${isOverdue ? 'bg-red-500/10 text-red-400' : 'bg-zinc-800 text-zinc-400'}`}>
               <Calendar className="w-3 h-3" />
               <span className="text-xs font-medium">
-                {new Date(debt.due_date).toLocaleDateString(language === 'ru' ? 'ru-RU' : 'en-US', { month: 'short', day: 'numeric' })}
+                {new Date(debt.due_date).toLocaleDateString(locale, { month: 'short', day: 'numeric' })}
               </span>
               {isOverdue && <AlertCircle className="w-3 h-3 ml-1" />}
             </div>
@@ -241,7 +245,7 @@ const DebtItem = ({
         <div className="mt-4 mb-4">
           <div className="flex items-baseline gap-2">
             <span className={`text-2xl font-bold tracking-tight ${theme.amountText}`}>
-              {new Intl.NumberFormat(language === 'ru' ? 'ru-RU' : 'en-US', { style: 'currency', currency: debt.currency }).format(debt.current_amount)}
+              {formatCurrency(debt.current_amount, debt.currency)}
             </span>
             <span className="text-sm text-zinc-500 font-medium">{t('remaining')}</span>
           </div>

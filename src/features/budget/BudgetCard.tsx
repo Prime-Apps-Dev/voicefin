@@ -1,9 +1,10 @@
 import React from 'react';
+import { formatMoney } from '../../utils/formatMoney';
+import { useLocalization } from '../../core/context/LocalizationContext';
 import { motion } from 'framer-motion';
 import LongPressWrapper from '../../shared/layout/LongPressWrapper';
 import { Budget } from '../../core/types';
 import { ICONS } from '../../shared/ui/icons/icons';
-import { useLocalization } from '../../core/context/LocalizationContext';
 import { Trash2 } from 'lucide-react';
 
 interface BudgetCardProps {
@@ -20,17 +21,13 @@ const IconDisplay: React.FC<{ name: string; className?: string; }> = ({ name, cl
     return <IconComponent className={className} />;
 };
 
-const formatCurrency = (amount: number, currency: string) => {
-    return new Intl.NumberFormat(undefined, {
-      style: 'currency',
-      currency: currency,
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
+const formatCurrency = (amount: number, currency: string, language: string) => {
+    const locale = language === 'ru' ? 'ru-RU' : 'en-US';
+    return formatMoney(amount, currency, locale);
 };
 
 export const BudgetCard: React.FC<BudgetCardProps> = ({ budget, spent, onTap, onDoubleTap, onLongPress, onSwipeLeft }) => {
-    const { t } = useLocalization();
+    const { t, language } = useLocalization();
     const progress = budget.limit > 0 ? (spent / budget.limit) * 100 : 0;
     const isOver = spent > budget.limit;
     const remaining = budget.limit - spent;
@@ -67,8 +64,8 @@ export const BudgetCard: React.FC<BudgetCardProps> = ({ budget, spent, onTap, on
                                         <h3 className="font-bold text-lg break-words">{budget.category}</h3>
                                         <p className="text-sm text-white/80">
                                             {isOver
-                                                ? `${t('exceededBy')} ${formatCurrency(spent - budget.limit, budget.currency)}`
-                                                : `${formatCurrency(remaining, budget.currency)} ${t('remaining')}`
+                                                ? `${t('exceededBy')} ${formatCurrency(spent - budget.limit, budget.currency, language)}`
+                                                : `${formatCurrency(remaining, budget.currency, language)} ${t('remaining')}`
                                             }
                                         </p>
                                     </div>
@@ -76,8 +73,8 @@ export const BudgetCard: React.FC<BudgetCardProps> = ({ budget, spent, onTap, on
                             </div>
                             <div className="space-y-2">
                                 <div className="flex justify-between text-sm font-medium text-white/90">
-                                    <span>{formatCurrency(spent, budget.currency)}</span>
-                                    <span>{formatCurrency(budget.limit, budget.currency)}</span>
+                                    <span className="text-white font-medium">{formatCurrency(spent, budget.currency, language)}</span>
+                                    <span className="text-gray-400"> / {formatCurrency(budget.amount, budget.currency, language)}</span>
                                 </div>
                                 <div className="w-full bg-black/20 rounded-full h-2.5">
                                     <div

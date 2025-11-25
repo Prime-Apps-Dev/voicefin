@@ -1,18 +1,20 @@
 import React from 'react';
+import { formatMoney } from '../../utils/formatMoney';
+import { useLocalization } from '../../core/context/LocalizationContext';
 import { Account } from '../../core/types';
 
 interface AccountCardProps {
   account: Account;
-  balance: number;
   isActive: boolean;
   onClick: () => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
 }
 
-export const AccountCard: React.FC<AccountCardProps> = ({ account, balance, isActive, onClick }) => {
-  const formattedBalance = new Intl.NumberFormat(undefined, {
-    style: 'currency',
-    currency: account.currency,
-  }).format(balance);
+export const AccountCard: React.FC<AccountCardProps> = ({ account, onEdit, onDelete, isActive, onClick }) => {
+  const { language } = useLocalization();
+  const locale = language === 'ru' ? 'ru-RU' : 'en-US';
+  const formattedBalance = formatMoney(account.balance, account.currency, locale);
 
   return (
     <div

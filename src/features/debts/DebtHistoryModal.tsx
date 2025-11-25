@@ -1,10 +1,11 @@
 // src/features/debts/DebtHistoryModal.tsx
 
 import React from 'react';
+import { formatMoney } from '../../utils/formatMoney';
+import { useLocalization } from '../../core/context/LocalizationContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Trash2, ArrowUpRight, ArrowDownLeft, Calendar } from 'lucide-react';
 import { Debt, Transaction, TransactionType, DebtType } from '../../core/types';
-import { useLocalization } from '../../core/context/LocalizationContext';
 import { DEBT_SYSTEM_CATEGORIES } from '../../utils/constants';
 
 interface DebtHistoryModalProps {
@@ -25,6 +26,7 @@ export const DebtHistoryModal: React.FC<DebtHistoryModalProps> = ({
   currency, // Валюта долга
 }) => {
   const { t, language } = useLocalization();
+  const locale = language === 'ru' ? 'ru-RU' : 'en-US';
 
   if (!debt) return null;
 
@@ -39,13 +41,6 @@ export const DebtHistoryModal: React.FC<DebtHistoryModalProps> = ({
       month: 'long',
       year: 'numeric',
     });
-  };
-
-  const formatCurrency = (amount: number, curr: string) => {
-    return new Intl.NumberFormat(language === 'ru' ? 'ru-RU' : 'en-US', {
-      style: 'currency',
-      currency: curr,
-    }).format(amount);
   };
 
   // Определяем, является ли транзакция "выдачей" или "погашением"
@@ -132,10 +127,8 @@ export const DebtHistoryModal: React.FC<DebtHistoryModalProps> = ({
                     </div>
 
                     <div className="flex items-center gap-4">
-                      <span className={`font-bold ${tx.type === TransactionType.INCOME ? 'text-emerald-400' : 'text-red-400'
-                        }`}>
-                        {tx.type === TransactionType.INCOME ? '+' : '-'}
-                        {formatCurrency(tx.amount, tx.currency)}
+                      <span className={`font-medium ${tx.type === TransactionType.INCOME ? 'text-emerald-400' : 'text-red-400'}`}>
+                        {tx.type === TransactionType.INCOME ? '+' : '-'}{formatMoney(tx.amount, tx.currency, locale)}
                       </span>
                       <button
                         onClick={() => onDeleteTransaction(tx.id)}
@@ -153,7 +146,7 @@ export const DebtHistoryModal: React.FC<DebtHistoryModalProps> = ({
             <div className="p-4 bg-zinc-800/30 border-t border-zinc-800 text-center">
               <p className="text-xs text-zinc-400 mb-1">Remaining Balance</p>
               <p className="text-xl font-bold text-white">
-                {formatCurrency(debt.current_amount, debt.currency)}
+                {formatMoney(debt.current_amount, debt.currency, locale)}
               </p>
             </div>
           </motion.div>

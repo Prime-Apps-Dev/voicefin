@@ -1,31 +1,29 @@
 
 import React from 'react';
-import { Sparkles } from 'lucide-react';
+import { formatMoney } from '../../utils/formatMoney';
 import { useLocalization } from '../../core/context/LocalizationContext';
+import { Sparkles } from 'lucide-react';
 
 interface BudgetSummaryProps {
-  monthlyIncome: number;
-  monthlyExpense: number;
-  incomeGoal: number;
-  expenseGoal: number;
-  defaultCurrency: string;
-  onGenerateTips: () => void;
-  isGeneratingTips: boolean;
+    monthlyIncome: number;
+    monthlyExpense: number;
+    incomeGoal: number;
+    expenseGoal: number;
+    defaultCurrency: string;
+    onGenerateTips: () => void;
+    isGeneratingTips: boolean;
 }
 
-const formatCurrency = (amount: number, currency: string) => {
-    return new Intl.NumberFormat(undefined, {
-        style: 'currency',
-        currency: currency,
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0,
-    }).format(amount);
+const formatCurrency = (amount: number, currency: string, language: string) => {
+    const locale = language === 'ru' ? 'ru-RU' : 'en-US';
+    return formatMoney(amount, currency, locale);
 };
 
 const BudgetScale = ({ title, current, goal, currency, colorClass }: { title: string; current: number; goal: number; currency: string; colorClass: string; }) => {
+    const { language } = useLocalization();
     const { t } = useLocalization();
     const percentage = goal > 0 ? (current / goal) * 100 : 0;
-    
+
     return (
         <div className="bg-gray-800 p-4 rounded-lg">
             <h3 className="text-sm font-semibold text-white mb-3">{title}</h3>
@@ -36,8 +34,8 @@ const BudgetScale = ({ title, current, goal, currency, colorClass }: { title: st
                 ></div>
             </div>
             <div className="flex justify-between text-xs text-gray-400 mt-2">
-                <span className="font-medium">{formatCurrency(current, currency)}</span>
-                <span className="opacity-70">{t('goal')}: {formatCurrency(goal, currency)}</span>
+                <span className="font-medium">{formatCurrency(current, currency, language)}</span>
+                <span className="opacity-70">{t('goal')}: {formatCurrency(goal, currency, language)}</span>
             </div>
         </div>
     );

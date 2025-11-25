@@ -1,5 +1,6 @@
 import React from 'react';
 import { SummaryCard } from '../../shared/ui/cards/SummaryCard';
+import { formatMoney } from '../../utils/formatMoney';
 // Иконка Wallet удалена, так как карточка Total Balance больше не используется
 import { ArrowDownCircle, ArrowUpCircle, PiggyBank } from 'lucide-react';
 import { useLocalization } from '../../core/context/LocalizationContext';
@@ -10,7 +11,7 @@ interface FinancialOverviewProps {
     // totalBalance: number; // УДАЛЕНА: Информация дублируется в списке счетов
     totalSavings: number;
     defaultCurrency: string;
-    
+
     // onNavigate оставляем, но предполагаем, что он будет расширен в родительском компоненте.
     // Пока оставляем его для навигации на "savings".
     onNavigate: (screen: 'home' | 'savings' | 'profile') => void;
@@ -21,17 +22,13 @@ interface FinancialOverviewProps {
     onIncomeClick: () => void;
 }
 
-const formatCurrency = (amount: number, currency: string) => {
-    // В дальнейшем эту функцию следует вынести в отдельный файл src/utils/currency.ts, 
-    // как мы обсуждали ранее, для централизованного форматирования.
-    return new Intl.NumberFormat(undefined, {
-        style: 'currency',
-        currency: currency,
-    }).format(amount);
+const formatCurrency = (amount: number, currency: string, language: string) => {
+    const locale = language === 'ru' ? 'ru-RU' : 'en-US';
+    return formatMoney(amount, currency, locale);
 };
 
 export const FinancialOverview: React.FC<FinancialOverviewProps> = (props) => {
-    const { t } = useLocalization();
+    const { t, language } = useLocalization();
 
     const {
         monthlyIncome,
@@ -42,7 +39,7 @@ export const FinancialOverview: React.FC<FinancialOverviewProps> = (props) => {
         onExpenseClick, // Деструктурируем новый обработчик
         onIncomeClick,  // Деструктурируем новый обработчик
     } = props;
-    
+
     return (
         <div className="px-6 py-6 space-y-6">
             <h2 className="text-xl font-semibold text-gray-100 px-2">
@@ -53,31 +50,31 @@ export const FinancialOverview: React.FC<FinancialOverviewProps> = (props) => {
                 <SummaryCard
                     title={t('monthlyIncome')}
                     subtitle={t('thisMonth')}
-                    amount={formatCurrency(monthlyIncome, defaultCurrency)}
+                    amount={formatCurrency(monthlyIncome, defaultCurrency, language)}
                     icon={ArrowUpCircle}
                     gradient="bg-gradient-to-br from-green-start to-green-end"
                     // ИЗМЕНЕНИЕ: Используем новый обработчик для перехода на "Transactions History" (Доходы)
                     onClick={onIncomeClick}
                 />
-                
+
                 {/* КАРТОЧКА РАСХОДОВ */}
                 <SummaryCard
                     title={t('monthlyExpense')}
                     subtitle={t('thisMonth')}
-                    amount={formatCurrency(monthlyExpense, defaultCurrency)}
+                    amount={formatCurrency(monthlyExpense, defaultCurrency, language)}
                     icon={ArrowDownCircle}
                     gradient="bg-gradient-to-br from-red-start to-red-end"
                     // ИЗМЕНЕНИЕ: Используем новый обработчик для перехода на "Transactions History" (Расходы)
                     onClick={onExpenseClick}
                 />
-                
+
                 {/* КАРТОЧКА TOTAL BALANCE УДАЛЕНА */}
-                
+
                 {/* КАРТОЧКА НАКОПЛЕНИЙ */}
                 <SummaryCard
                     title={t('savings')}
                     subtitle={t('totalSaved')}
-                    amount={formatCurrency(totalSavings, defaultCurrency)}
+                    amount={formatCurrency(totalSavings, defaultCurrency, language)}
                     icon={PiggyBank}
                     gradient="bg-gradient-to-br from-purple-start to-purple-end"
                     onClick={() => {

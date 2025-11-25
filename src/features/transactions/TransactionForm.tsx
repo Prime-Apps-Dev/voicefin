@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { formatMoney } from '../../utils/formatMoney';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Transaction, TransactionType, Account, SavingsGoal, Category, Budget, ExchangeRates, Debt, DebtType, DebtStatus
@@ -322,8 +323,9 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
     }
   }, [formData.category, formData.date, formData.type, formData.amount, formData.currency, budgets, transactions, rates, transaction, isTransfer]);
 
-  const formatCurrencyLocal = (amount: number, currency: string) => {
-    return new Intl.NumberFormat(language, { style: 'currency', currency: currency, minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(amount);
+  const formatCurrency = (amount: number, currency: string) => {
+    const locale = language === 'ru' ? 'ru-RU' : 'en-US';
+    return formatMoney(amount, currency, locale);
   };
 
   const safeDate = useMemo(() => {
@@ -512,7 +514,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
                               <optgroup label={language === 'ru' ? 'Активные долги' : 'Active Debts'}>
                                 {debts.filter(d => d.status === DebtStatus.ACTIVE).map((d) => (
                                   <option key={d.id} value={d.id}>
-                                    {d.person} ({formatCurrencyLocal(d.current_amount, d.currency)})
+                                    {d.person} ({formatCurrency(d.current_amount, d.currency)})
                                   </option>
                                 ))}
                               </optgroup>
@@ -557,7 +559,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
                           <div className="text-right">
                             <p className="text-zinc-400 text-xs">{language === 'ru' ? 'Остаток' : 'Remaining'}</p>
                             <p className="text-white font-bold text-lg">
-                              {formatCurrencyLocal(debtWidgetData.current, debtWidgetData.currency)}
+                              {formatCurrency(debtWidgetData.current, debtWidgetData.currency)}
                             </p>
                           </div>
                         </div>
@@ -572,11 +574,11 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
                             ></div>
                           </div>
                           <div className="flex justify-between items-center text-xs text-zinc-400">
-                            <span>{language === 'ru' ? 'Всего: ' : 'Total: '}{formatCurrencyLocal(debtWidgetData.total, debtWidgetData.currency)}</span>
+                            <span>{language === 'ru' ? 'Всего: ' : 'Total: '}{formatCurrency(debtWidgetData.total, debtWidgetData.currency)}</span>
                             {parseFloat(amountStr) > 0 && (
                               <span className="text-white font-medium flex items-center gap-1">
                                 <span>→</span>
-                                {formatCurrencyLocal(debtWidgetData.projected, debtWidgetData.currency)}
+                                {formatCurrency(debtWidgetData.projected, debtWidgetData.currency)}
                               </span>
                             )}
                           </div>
@@ -614,7 +616,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
                             <div className="w-8 h-8 flex-shrink-0 flex items-center justify-center bg-zinc-700 rounded-lg"><IconDisplay name={budgetInfo.budget.icon} className="w-5 h-5 text-white" /></div>
                             <div className="flex-grow min-w-0">
                               <p className="text-sm font-medium text-white truncate">{budgetInfo.budget.category} Budget</p>
-                              <p className="text-xs text-zinc-400">{formatCurrencyLocal(budgetInfo.spent, budgetInfo.budget.currency)} of {formatCurrencyLocal(budgetInfo.budget.limit, budgetInfo.budget.currency)}</p>
+                              <p className="text-xs text-zinc-400">{formatCurrency(budgetInfo.spent, budgetInfo.budget.currency)} of {formatCurrency(budgetInfo.budget.limit, budgetInfo.budget.currency)}</p>
                             </div>
                           </div>
                           <div className="w-full bg-zinc-700 rounded-full h-1.5"><div className={`h-1.5 rounded-full ${budgetInfo.progress > 85 ? 'bg-red-500' : 'bg-brand-blue'}`} style={{ width: `${Math.min(budgetInfo.progress, 100)}%` }} /></div>

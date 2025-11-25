@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import { formatMoney } from '../../utils/formatMoney';
 import { motion } from 'framer-motion';
 import { Budget, Transaction, TransactionType, Category, ExchangeRates } from '../../core/types';
 import { useLocalization } from '../../core/context/LocalizationContext';
@@ -21,31 +22,27 @@ interface BudgetPlanningScreenProps {
     defaultCurrency: string;
 }
 
-const formatCurrency = (amount: number, currency: string) => {
-    return new Intl.NumberFormat(undefined, {
-        style: 'currency',
-        currency: currency,
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0,
-    }).format(amount);
+const formatCurrency = (amount: number, currency: string, language: string) => {
+    const locale = language === 'ru' ? 'ru-RU' : 'en-US';
+    return formatMoney(amount, currency, locale);
 };
 
 export const BudgetPlanningScreen: React.FC<BudgetPlanningScreenProps> = (props) => {
-    const { 
-        budgets, transactions, onBack, onAddBudget, onEditBudget, 
+    const {
+        budgets, transactions, onBack, onAddBudget, onEditBudget,
         onDeleteBudget, onAddTransaction, onViewHistory, onCarryOver,
         rates, defaultCurrency
     } = props;
     const { t, language } = useLocalization();
     const [selectedDate, setSelectedDate] = useState(new Date());
 
-    const currentMonthKey = useMemo(() => `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}`, [selectedDate]);
+    const currentMonthKey = React.useMemo(() => `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}`, [selectedDate]);
 
     useEffect(() => {
         const now = new Date();
         const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
         const selectedMonthStart = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
-        
+
         const monthlyBudgets = budgets.filter(b => b.monthKey === currentMonthKey);
 
         if (selectedMonthStart > currentMonthStart && monthlyBudgets.length === 0) {
@@ -59,16 +56,16 @@ export const BudgetPlanningScreen: React.FC<BudgetPlanningScreenProps> = (props)
         }
     }, [selectedDate, budgets, currentMonthKey, onCarryOver]);
 
-    const monthlyBudgets = useMemo(() => budgets.filter(b => b.monthKey === currentMonthKey), [budgets, currentMonthKey]);
-    
+    const monthlyBudgets = React.useMemo(() => budgets.filter(b => b.monthKey === currentMonthKey), [budgets, currentMonthKey]);
+
     const getSpentAmount = (budget: Budget) => {
         return transactions
             .filter(t => {
                 const txDate = new Date(t.date);
                 return t.category === budget.category &&
-                       t.type === TransactionType.EXPENSE &&
-                       txDate.getFullYear() === selectedDate.getFullYear() &&
-                       txDate.getMonth() === selectedDate.getMonth();
+                    t.type === TransactionType.EXPENSE &&
+                    txDate.getFullYear() === selectedDate.getFullYear() &&
+                    txDate.getMonth() === selectedDate.getMonth();
             })
             .reduce((sum, t) => {
                 const amountInBudgetCurrency = convertCurrency(t.amount, t.currency, budget.currency, rates);
@@ -85,51 +82,51 @@ export const BudgetPlanningScreen: React.FC<BudgetPlanningScreenProps> = (props)
         });
     };
 
-    const monthlySummary = useMemo(() => {
+    const monthlySummary = React.useMemo(() => {
         const totalPlanned = monthlyBudgets.reduce((sum, b) => sum + convertCurrency(b.limit, b.currency, defaultCurrency, rates), 0);
-        
+
         const relevantTransactions = transactions.filter(t => {
             const txDate = new Date(t.date);
             return t.type === TransactionType.EXPENSE &&
-                   txDate.getFullYear() === selectedDate.getFullYear() &&
-                   txDate.getMonth() === selectedDate.getMonth() &&
-                   monthlyBudgets.some(b => b.category === t.category);
+                txDate.getFullYear() === selectedDate.getFullYear() &&
+                txDate.getMonth() === selectedDate.getMonth() &&
+                monthlyBudgets.some(b => b.category === t.category);
         });
-        
+
         const totalSpent = relevantTransactions.reduce((sum, t) => sum + convertCurrency(t.amount, t.currency, defaultCurrency, rates), 0);
 
         return { totalPlanned, totalSpent };
     }, [monthlyBudgets, transactions, selectedDate, defaultCurrency, rates]);
-    
-    const sortedBudgets = useMemo(() => {
+
+    const sortedBudgets = React.useMemo(() => {
         return [...monthlyBudgets].sort((a, b) => {
-          const spentA = getSpentAmount(a);
-          const spentB = getSpentAmount(b);
-          const progressA = a.limit > 0 ? (spentA / a.limit) * 100 : 0;
-          const progressB = b.limit > 0 ? (spentB / b.limit) * 100 : 0;
-          
-          const isOverA = spentA > a.limit;
-          const isOverB = spentB > b.limit;
+            const spentA = getSpentAmount(a);
+            const spentB = getSpentAmount(b);
+            const progressA = a.limit > 0 ? (spentA / a.limit) * 100 : 0;
+            const progressB = b.limit > 0 ? (spentB / b.limit) * 100 : 0;
 
-          if(isOverA && !isOverB) return -1;
-          if(!isOverA && isOverB) return 1;
+            const isOverA = spentA > a.limit;
+            const isOverB = spentB > b.limit;
 
-          return progressB - progressA;
+            if (isOverA && !isOverB) return -1;
+            if (!isOverA && isOverB) return 1;
+
+            return progressB - progressA;
         });
-      }, [monthlyBudgets, transactions, selectedDate, rates]);
+    }, [monthlyBudgets, transactions, selectedDate, rates]);
 
 
     return (
         // Корневой div с отступом для маски
         <div className="min-h-screen bg-gray-900 flex flex-col pb-24">
-            
+
             {/* "Липкий" header */}
             <header className="px-4 pb-4 pt-4 flex items-center justify-between sticky top-0 bg-gray-900/80 backdrop-blur-sm z-10">
                 <button onClick={onBack} className="p-2 rounded-full hover:bg-gray-700"><ChevronLeft className="w-6 h-6 text-white" /></button>
                 <h1 className="text-xl font-bold text-white">{t('budgetPlanningTitle')}</h1>
                 <button onClick={() => onAddBudget(currentMonthKey)} className="p-2 rounded-full hover:bg-gray-700" aria-label={t('addBudget')}><Plus className="w-6 h-6 text-white" /></button>
             </header>
-            
+
             {/* Основной контент */}
             <main className="flex-grow px-4 space-y-6">
                 <div className="bg-gray-800/70 backdrop-blur-sm rounded-2xl p-4 border border-gray-700/50">
@@ -150,15 +147,15 @@ export const BudgetPlanningScreen: React.FC<BudgetPlanningScreenProps> = (props)
                     <div className="grid grid-cols-3 gap-4 text-center">
                         <div>
                             <div className="text-xs opacity-70">{t('totalBudget')}</div>
-                            <div className="text-lg font-bold">{formatCurrency(monthlySummary.totalPlanned, defaultCurrency)}</div>
+                            <div className="text-lg font-bold">{formatCurrency(monthlySummary.totalPlanned, defaultCurrency, language)}</div>
                         </div>
                         <div>
                             <div className="text-xs opacity-70">{t('spent')}</div>
-                            <div className="text-lg font-bold">{formatCurrency(monthlySummary.totalSpent, defaultCurrency)}</div>
+                            <div className="text-lg font-bold">{formatCurrency(monthlySummary.totalSpent, defaultCurrency, language)}</div>
                         </div>
                         <div>
                             <div className="text-xs opacity-70">{t('remaining')}</div>
-                            <div className="text-lg font-bold">{formatCurrency(monthlySummary.totalPlanned - monthlySummary.totalSpent, defaultCurrency)}</div>
+                            <div className="text-lg font-bold">{formatCurrency(monthlySummary.totalPlanned - monthlySummary.totalSpent, defaultCurrency, language)}</div>
                         </div>
                     </div>
                     <div className="w-full bg-white/20 rounded-full h-2 mt-4">

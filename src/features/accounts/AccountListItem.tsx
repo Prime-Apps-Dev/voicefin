@@ -1,21 +1,22 @@
 import React from 'react';
+import { formatMoney } from '../../utils/formatMoney';
+import { useLocalization } from '../../core/context/LocalizationContext';
 import { motion } from 'framer-motion';
-import { Account } from '../core/types';
+import { Account } from '../../core/types';
 import { MoreHorizontal } from 'lucide-react';
 
 interface AccountListItemProps {
   account: Account & { balance: number };
   onOpenActions: () => void;
+  isSelected?: boolean;
+  onClick?: () => void;
 }
 
-const formatCurrency = (amount: number, currency: string) => {
-  return new Intl.NumberFormat(undefined, {
-    style: 'currency',
-    currency: currency,
-  }).format(amount);
-};
+export const AccountListItem: React.FC<AccountListItemProps> = ({ account, isSelected, onClick, onOpenActions }) => {
+  const { language } = useLocalization();
+  const locale = language === 'ru' ? 'ru-RU' : 'en-US';
+  const formattedBalance = formatMoney(account.balance, account.currency, locale);
 
-export const AccountListItem: React.FC<AccountListItemProps> = ({ account, onOpenActions }) => {
   return (
     <motion.div
       variants={{
@@ -43,7 +44,7 @@ export const AccountListItem: React.FC<AccountListItemProps> = ({ account, onOpe
       </div>
 
       <div className="relative z-10 text-right">
-        <p className="text-3xl font-semibold">{formatCurrency(account.balance, account.currency)}</p>
+        <p className="text-3xl font-semibold">{formattedBalance}</p>
         <p className="text-sm opacity-80">Current Balance</p>
       </div>
     </motion.div>

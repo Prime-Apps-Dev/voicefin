@@ -1,4 +1,6 @@
 import React from 'react';
+import { formatMoney } from '../../utils/formatMoney';
+import { useLocalization } from '../../core/context/LocalizationContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, Share2, Trash2, Calendar, FileText,

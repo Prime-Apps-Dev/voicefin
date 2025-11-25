@@ -1,8 +1,9 @@
 import React from 'react';
+import { formatMoney } from '../../utils/formatMoney';
+import { useLocalization } from '../../core/context/LocalizationContext';
 import { Transaction, TransactionType, Account, ExchangeRates } from '../../core/types';
 import { ArrowUpCircle, ArrowDownCircle, Trash2, ArrowRightLeft } from 'lucide-react';
 import LongPressWrapper from '../../shared/layout/LongPressWrapper';
-import { useLocalization } from '../../core/context/LocalizationContext';
 import { convertCurrency } from '../../core/services/currency';
 import { getLocalizedCategoryName } from '../../utils/constants';
 
@@ -16,20 +17,16 @@ interface TransactionItemProps {
 }
 
 export const TransactionItem: React.FC<TransactionItemProps> = ({ transaction, account, onSelect, onDelete, rates, allAccounts }) => {
-  const { language } = useLocalization();
+  const { t, language } = useLocalization();
   const isIncome = transaction.type === TransactionType.INCOME;
   const isExpense = transaction.type === TransactionType.EXPENSE;
   const isTransfer = transaction.type === TransactionType.TRANSFER;
-  
-  const locale = language === 'ru' ? 'ru-RU' : 'en-US';
 
-  const formattedAmount = new Intl.NumberFormat(locale, {
-    style: 'currency',
-    currency: transaction.currency,
-  }).format(transaction.amount);
-  
+  const locale = language === 'ru' ? 'ru-RU' : 'en-US';
+  const formattedAmount = formatMoney(transaction.amount, transaction.currency, locale);
+
   const transactionDate = new Date(transaction.date);
-  
+
   const formattedDate = new Intl.DateTimeFormat(locale, {
     year: '2-digit',
     month: 'short',
@@ -46,20 +43,19 @@ export const TransactionItem: React.FC<TransactionItemProps> = ({ transaction, a
   let formattedConvertedAmount = '';
 
   if (isConverted) {
-      const convertedAmount = convertCurrency(transaction.amount, transaction.currency, account.currency, rates);
-      formattedConvertedAmount = new Intl.NumberFormat(locale, {
-          style: 'currency',
-          currency: account.currency,
-      }).format(convertedAmount);
+    const convertedAmount = convertCurrency(transaction.amount, transaction.currency, account.currency, rates);
+    if (convertedAmount !== undefined) {
+      formattedConvertedAmount = formatMoney(convertedAmount, account.currency, locale);
+    }
   }
 
   // Определяем имя целевого счета для перевода
   const toAccountName = React.useMemo(() => {
-      if (isTransfer && transaction.toAccountId && allAccounts) {
-          const toAccount = allAccounts.find(a => a.id === transaction.toAccountId);
-          return toAccount ? toAccount.name : '...';
-      }
-      return '';
+    if (isTransfer && transaction.toAccountId && allAccounts) {
+      const toAccount = allAccounts.find(a => a.id === transaction.toAccountId);
+      return toAccount ? toAccount.name : '...';
+    }
+    return '';
   }, [isTransfer, transaction.toAccountId, allAccounts]);
 
   const handleTap = (item: Transaction) => onSelect(item);
@@ -72,22 +68,22 @@ export const TransactionItem: React.FC<TransactionItemProps> = ({ transaction, a
   let sign = '-';
 
   if (isIncome) {
-      IconComponent = ArrowUpCircle;
-      iconBgClass = 'bg-green-500/10 text-green-400';
-      amountColorClass = 'text-green-400';
-      sign = '+';
+    IconComponent = ArrowUpCircle;
+    iconBgClass = 'bg-green-500/10 text-green-400';
+    amountColorClass = 'text-green-400';
+    sign = '+';
   } else if (isTransfer) {
-      IconComponent = ArrowRightLeft;
-      iconBgClass = 'bg-blue-500/10 text-blue-400'; // Синий/Голубой цвет для переводов
-      amountColorClass = 'text-blue-400';
-      sign = ''; // Для переводов знак можно опустить или использовать стрелку
+    IconComponent = ArrowRightLeft;
+    iconBgClass = 'bg-blue-500/10 text-blue-400'; // Синий/Голубой цвет для переводов
+    amountColorClass = 'text-blue-400';
+    sign = ''; // Для переводов знак можно опустить или использовать стрелку
   }
 
   // --- ИСПОЛЬЗУЕМ ЛОКАЛИЗАЦИЮ ДЛЯ КАТЕГОРИИ ---
   const localizedCategory = getLocalizedCategoryName(transaction.category, language);
 
-  const subtitle = isTransfer 
-    ? `${language === 'ru' ? 'Перевод на' : 'Transfer to'} ${toAccountName}` 
+  const subtitle = isTransfer
+    ? `${language === 'ru' ? 'Перевод на' : 'Transfer to'} ${toAccountName}`
     : `${localizedCategory} • ${account?.name}`;
 
   return (
@@ -98,7 +94,7 @@ export const TransactionItem: React.FC<TransactionItemProps> = ({ transaction, a
         onSwipeLeft={handleSwipeLeft}
         swipeDeleteIcon={Trash2}
         children={
-          <div 
+          <div
             className="bg-gray-800 p-4 rounded-2xl flex items-center space-x-4 cursor-pointer hover:bg-gray-700/50 transition-colors duration-200 border border-gray-700/50 w-full"
             aria-label={`Transaction: ${transaction.name}`}
             role="button"

@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle, X, AlertCircle, ArrowRight } from 'lucide-react';
 import { DebtType, DebtStatus } from '../../core/types';
 import * as api from '../../core/services/api';
+import { formatMoney } from '../../utils/formatMoney';
+import { useLocalization } from '../../core/context/LocalizationContext';
 
 interface IncomingDebtModalProps {
   debtId: string | null;
@@ -21,6 +23,13 @@ export const IncomingDebtModal: React.FC<IncomingDebtModalProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [sharedDebt, setSharedDebt] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const { t, language } = useLocalization();
+  const locale = language === 'ru' ? 'ru-RU' : 'en-US';
+
+  const formatCurrency = (amount: number, currency: string) => {
+    return formatMoney(amount, currency, locale);
+  };
 
   React.useEffect(() => {
     if (!debtId) return;
