@@ -104,6 +104,7 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [rates, setRates] = useState<ExchangeRates>({});
 
   const [isDataLoading, setIsDataLoading] = useState(false);
+  const [isDataLoaded, setIsDataLoaded] = useState(false); // НОВОЕ
   const [dataError, setDataError] = useState<string | null>(null);
   const [selectedAccountId, setSelectedAccountId] = useState<string>('all');
 
@@ -166,6 +167,7 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
       setDataError(err.message || "Failed to load data");
     } finally {
       setIsDataLoading(false);
+      setIsDataLoaded(true); // Data load attempt finished
     }
   };
 
@@ -755,7 +757,8 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   return (
     <AppDataContext.Provider value={{
-      transactions, accounts, categories, savingsGoals, budgets, debts, debtCategories, rates, requests, isDataLoading, dataError,
+      transactions, accounts, categories, savingsGoals, budgets, debts, debtCategories, rates, requests,
+      isDataLoading, isDataLoaded, dataError,
       displayCurrency, totalBalance, totalSavings, summary, daysActive,
       refreshData: loadData,
       refreshDebts,

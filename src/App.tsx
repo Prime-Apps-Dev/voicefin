@@ -63,7 +63,7 @@ const AppContent: React.FC = () => {
 
   const {
     transactions, accounts, categories, savingsGoals, budgets, rates,
-    isDataLoading, dataError, totalBalance, totalSavings, summary, daysActive,
+    isDataLoading, isDataLoaded, dataError, totalBalance, totalSavings, summary, daysActive,
     displayCurrency, selectedAccountId, setSelectedAccountId,
     handleAddTransaction, handleUpdateTransaction, handleDeleteTransaction,
     handleSaveAccount, handleDeleteAccount,
@@ -230,13 +230,13 @@ const AppContent: React.FC = () => {
     );
   }
 
-  // КРИТИЧЕСКАЯ ОШИБКА АВТОРИЗАЦИИ (Вместо тёмного экрана)
-  if (!isAuthLoading && authError) {
+  // КРИТИЧЕСКАЯ ОШИБКА АВТОРИЗАЦИИ ИЛИ ДАННЫХ (Вместо тёмного экрана)
+  if (!isAuthLoading && (authError || dataError)) {
     return (
       <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center p-6 text-center">
         <AlertTriangle className="w-16 h-16 text-red-500 mb-4" />
         <h2 className="text-xl font-bold text-white mb-2">Connection Error</h2>
-        <p className="text-gray-400 mb-6 max-w-xs break-words">{authError}</p>
+        <p className="text-gray-400 mb-6 max-w-xs break-words">{authError || dataError}</p>
         <button
           onClick={() => window.location.reload()}
           className="bg-blue-600 active:bg-blue-700 text-white px-6 py-3 rounded-xl flex items-center gap-2"
@@ -305,11 +305,12 @@ const AppContent: React.FC = () => {
   // Определяем, должен ли Onboarding взять на себя обработку долга
   const isDebtHandledInOnboarding = showOnboarding && initialDebtId;
   // Общий флаг загрузки: если грузимся - контент не показываем
-  const isLoading = isAuthLoading || isDataLoading;
+  // Ждем пока загрузится Auth И Data (если есть юзер)
+  const isLoading = isAuthLoading || (!!user && !isDataLoaded);
 
   // Если мы в процессе онбординга, но данные уже есть (технически), мы все равно можем показать SafeBackground
   // чтобы не отвлекать пользователя сложным интерфейсом под блюром
-  const showSafeBackground = showOnboarding || (accounts && accounts.length === 0 && !isDataLoading);
+  const showSafeBackground = showOnboarding || (accounts && accounts.length === 0 && isDataLoaded);
 
   return (
     <div className="min-h-screen bg-gray-900 relative overflow-hidden">
