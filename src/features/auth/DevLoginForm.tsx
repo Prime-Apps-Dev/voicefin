@@ -11,7 +11,7 @@ interface DevLoginFormProps {
 }
 
 export const DevLoginForm: React.FC<DevLoginFormProps> = ({ onSubmit, error, isLoading }) => {
-  const [email, setEmail] = useState('test@example.com'); 
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
   const { t } = useLocalization();
@@ -30,7 +30,7 @@ export const DevLoginForm: React.FC<DevLoginFormProps> = ({ onSubmit, error, isL
         <p className="text-center text-brand-purple mb-6 text-sm font-medium">
           {t('devLoginTitle')}
         </p>
-        
+
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <label className="text-sm font-medium text-gray-400 block mb-2" htmlFor="email">
@@ -67,7 +67,7 @@ export const DevLoginForm: React.FC<DevLoginFormProps> = ({ onSubmit, error, isL
               </button>
             </div>
           </div>
-          
+
           {error && (
             <p className="text-sm text-red-400 text-center">{error}</p>
           )}

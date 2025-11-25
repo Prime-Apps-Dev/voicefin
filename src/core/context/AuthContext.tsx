@@ -132,55 +132,108 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const handleDevLogin = async (email: string, password?: string) => {
+    console.log("AuthContext: handleDevLogin started", email);
+    // Log config (masked)
+    const sbUrl = import.meta.env.VITE_SUPABASE_URL;
+    console.log("AuthContext: Supabase URL:", sbUrl ? sbUrl.substring(0, 15) + '...' : 'MISSING');
+
     setIsLoading(true);
     try {
-      let profileData = null;
+      // Timeout wrapper
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Login timed out after 10s')), 10000)
+      );
 
-      // 1. Если есть пароль, пробуем реальную авторизацию (чтобы работал RLS)
-      if (password) {
-        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-          email,
-          password
-        });
+      const loginPromise = (async () => {
+        let profileData = null;
+        let emailFromAuth: string | undefined;
 
-        if (!authError && authData.user) {
-          // Авторизация успешна, получаем профиль
-          const { data, error } = await supabase.from('profiles').select('*').eq('id', authData.user.id).single();
-          if (!error && data) {
+        // 1. Если есть пароль, пробуем реальную авторизацию (чтобы работал RLS)
+        if (password) {
+          console.log("AuthContext: Attempting real auth...");
+          const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+            email,
+            password
+          });
+          console.log("AuthContext: Auth result:", authData, authError);
+
+          if (!authError && authData.user) {
+            emailFromAuth = authData.user.email;
+            // Авторизация успешна, получаем профиль
+            console.log("AuthContext: Fetching profile for", authData.user.id);
+            const { data, error } = await supabase.from('profiles').select('*').eq('id', authData.user.id).single();
+            console.log("AuthContext: Profile result:", data, error);
+
+            if (!error && data) {
+              console.log("AuthContext: Profile found in DB");
+              profileData = data;
+            } else if (error && error.code === 'PGRST116') {
+              // Profile missing, but auth success. Create mock profile to proceed.
+              console.warn("AuthContext: Profile missing for authenticated user. Creating mock profile.");
+              profileData = {
+                id: authData.user.id,
+                email: authData.user.email,
+                username: email.split('@')[0],
+                full_name: 'New User',
+                has_completed_onboarding: false,
+                default_currency: 'USD',
+                avatar_url: null,
+                telegram_id: null,
+                updated_at: new Date().toISOString()
+              };
+            }
+          } else {
+            console.warn("Dev Login: Real auth failed, falling back to mock profile lookup.", authError);
+          }
+        }
+
+        console.log("AuthContext: Password check done. profileData:", profileData);
+
+        // 2. Если реальная авторизация не удалась или пароля нет, ищем профиль по email (Mock Mode)
+        if (!profileData) {
+          console.log("AuthContext: Falling back to email lookup...");
+          const { data, error } = await supabase.from('profiles').select('*').eq('email', email).single();
+          if (data && !error) {
             profileData = data;
-          }
-        } else {
-          console.warn("Dev Login: Real auth failed, falling back to mock profile lookup.", authError);
-        }
-      }
-
-      // 2. Если реальная авторизация не удалась или пароля нет, ищем профиль по email (Mock Mode)
-      if (!profileData) {
-        const { data, error } = await supabase.from('profiles').select('*').eq('email', email).single();
-        if (data && !error) {
-          profileData = data;
-        } else {
-          // Если по email не нашли, пробуем как ID
-          const { data: dataById, error: errorById } = await supabase.from('profiles').select('*').eq('id', email).single();
-          if (dataById && !errorById) {
-            profileData = dataById;
+          } else {
+            // Если по email не нашли, пробуем как ID
+            const { data: dataById, error: errorById } = await supabase.from('profiles').select('*').eq('id', email).single();
+            if (dataById && !errorById) {
+              profileData = dataById;
+            }
           }
         }
-      }
 
-      if (!profileData) {
-        throw new Error('User not found');
-      }
+        if (!profileData) {
+          console.error("AuthContext: User not found after all checks");
+          throw new Error('User not found');
+        }
 
-      const userWithDetails: User = {
-        ...profileData,
-        name: profileData.full_name || profileData.username || 'User',
-        email: profileData.email
-      };
+        console.log("AuthContext: Constructing user object manually");
+        const userWithDetails: User = {
+          id: profileData.id,
+          email: profileData.email || emailFromAuth, // Ensure email is present
+          name: profileData.full_name || profileData.username || 'User',
+          username: profileData.username,
+          full_name: profileData.full_name,
+          avatar_url: profileData.avatar_url,
+          telegram_id: profileData.telegram_id ? Number(profileData.telegram_id) : null, // Ensure number
+          has_completed_onboarding: profileData.has_completed_onboarding,
+          default_currency: profileData.default_currency || 'USD',
+          updated_at: profileData.updated_at
+        };
 
+        console.log("AuthContext: Returning user object", userWithDetails);
+        return userWithDetails;
+      })();
+
+      const userWithDetails = await Promise.race([loginPromise, timeoutPromise]) as User;
+
+      console.log("AuthContext: Setting user and closing dev login");
       setUser(userWithDetails);
       setIsDevLoggingIn(false);
     } catch (e: any) {
+      console.error("AuthContext: Login error", e);
       setError(e.message);
     } finally {
       setIsLoading(false);
