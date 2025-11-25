@@ -134,20 +134,21 @@ const AppContent: React.FC = () => {
     if (error) setErrorLog(prev => [...prev, `App Error: ${error}`]);
   }, [authError, dataError, error]);
 
-  // Логика онбординга
+  // Логика онбординга и Deep Link
   useEffect(() => {
     if (isAuthLoading) return;
 
-    // Если юзер загрузился, но у него флаг "новый" -> Онбординг
+    // 1. Приоритет: Онбординг. Если юзер новый - показываем гайд.
     if (user && !user.has_completed_onboarding) {
       setShowOnboarding(true);
     }
-    // Если юзер есть, онбординг пройден, и есть ID долга -> Модалка
-    else if (user?.has_completed_onboarding && initialDebtId) {
+    // 2. Если онбординг завершен (или не требуется) И есть отложенный Deep Link -> запускаем его.
+    // Важно: проверяем !showOnboarding, чтобы гарантировать последовательность.
+    else if (user?.has_completed_onboarding && initialDebtId && !showOnboarding) {
       setIncomingDebtId(initialDebtId);
       setInitialDebtId(null);
     }
-  }, [user, initialDebtId, isAuthLoading]);
+  }, [user, initialDebtId, isAuthLoading, showOnboarding]);
 
   // Deep Link Logic
   useEffect(() => {
@@ -380,7 +381,7 @@ const AppContent: React.FC = () => {
         <RecordingOverlay transcription={transcription} stream={stream} onStop={handleRecordingStopLogic} isRecording={isRecording} audioContext={audioContext} />
       )}
 
-      {incomingDebtId && (
+      {incomingDebtId && !showOnboarding && (
         <IncomingDebtModal
           debtId={incomingDebtId}
           onClose={() => setIncomingDebtId(null)}
