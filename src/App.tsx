@@ -230,8 +230,8 @@ const AppContent: React.FC = () => {
     );
   }
 
-  // КРИТИЧЕСКАЯ ОШИБКА АВТОРИЗАЦИИ ИЛИ ДАННЫХ (Вместо тёмного экрана)
-  if (!isAuthLoading && (authError || dataError)) {
+  // КРИТИЧЕСКАЯ ОШИБКА АВТОРИЗАЦИИ (Вместо тёмного экрана)
+  if (!isAuthLoading && authError) {
     return (
       <div className="min-h-screen bg-gray-900 flex flex-col items-center justify-center p-6 text-center">
         <AlertTriangle className="w-16 h-16 text-red-500 mb-4" />
