@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AnimatePresence } from 'framer-motion';
-import { AlertTriangle, RefreshCw, LogOut } from 'lucide-react'; // Добавлены иконки для экрана ошибки
+import { AlertTriangle, RefreshCw, LogOut } from 'lucide-react';
 import * as api from './core/services/api';
 
 // Context Providers
@@ -16,6 +16,7 @@ import { RecordingOverlay } from './shared/ui/screens/RecordingOverlay';
 import { BottomNavBar } from './shared/layout/BottomNavBar';
 import { AppModals } from './shared/ui/modals/AppModals';
 import { IncomingDebtModal } from './features/debts/IncomingDebtModal';
+import { ErrorConsole } from './shared/ui/components/ErrorConsole';
 
 // Screens
 import { SavingsScreen } from './features/savings/SavingsScreen';
@@ -79,6 +80,10 @@ const AppContent: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
 
+  // New State for Error Logging and Force Load
+  const [errorLog, setErrorLog] = useState<string[]>([]);
+  const [forceLoad, setForceLoad] = useState(false);
+
   // Transaction State
   const [potentialTransaction, setPotentialTransaction] = useState<Omit<Transaction, 'id'> | null>(null);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
@@ -114,16 +119,20 @@ const AppContent: React.FC = () => {
     startRecording, stopRecording, audioContext, processAudioResult
   } = useAudioTransaction((msg) => setError(msg));
 
-  // Синхронизация ошибок
+  // Force load timeout
   useEffect(() => {
-    if (authError) {
-      console.error("Global Auth Error Caught:", authError);
-    }
-    if (dataError) {
-      console.error("Global Data Error Caught:", dataError);
-      setError(dataError);
-    }
-  }, [authError, dataError]);
+    const timer = setTimeout(() => {
+      setForceLoad(true);
+    }, 5000); // Force load after 5 seconds
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Error collection
+  useEffect(() => {
+    if (authError) setErrorLog(prev => [...prev, `Auth Error: ${authError}`]);
+    if (dataError) setErrorLog(prev => [...prev, `Data Error: ${dataError}`]);
+    if (error) setErrorLog(prev => [...prev, `App Error: ${error}`]);
+  }, [authError, dataError, error]);
 
   // Логика онбординга
   useEffect(() => {
@@ -304,9 +313,10 @@ const AppContent: React.FC = () => {
 
   // Определяем, должен ли Onboarding взять на себя обработку долга
   const isDebtHandledInOnboarding = showOnboarding && initialDebtId;
+
   // Общий флаг загрузки: если грузимся - контент не показываем
-  // Ждем пока загрузится Auth И Data (если есть юзер)
-  const isLoading = isAuthLoading || (!!user && !isDataLoaded);
+  // Ждем пока загрузится Auth И Data (если есть юзер), НО если сработал forceLoad - показываем что есть
+  const isLoading = !forceLoad && (isAuthLoading || (!!user && !isDataLoaded));
 
   // Если мы в процессе онбординга, но данные уже есть (технически), мы все равно можем показать SafeBackground
   // чтобы не отвлекать пользователя сложным интерфейсом под блюром
@@ -317,7 +327,8 @@ const AppContent: React.FC = () => {
       {/* Экран загрузки показывается ТОЛЬКО если правда грузимся */}
       <LoadingScreen isLoading={isLoading} />
 
-      {/* Слой Онбординга */}
+      <ErrorConsole errors={errorLog} onClear={() => setErrorLog([])} />
+
       {/* Слой Онбординга */}
       {showOnboarding && (
         <OnboardingGuide
@@ -336,7 +347,8 @@ const AppContent: React.FC = () => {
         <div className={paddingTopClass}>
           {!isLoading && (
             // Если данных нет (новый юзер) или идет онбординг, показываем заглушку, чтобы реальный рендер не упал
-            showSafeBackground ? <SafeBackgroundPlaceholder /> : renderContent()
+            // Если сработал forceLoad, мы хотим показать контент (даже если он пустой), а не вечную загрузку
+            showSafeBackground && !forceLoad ? <SafeBackgroundPlaceholder /> : renderContent()
           )}
         </div>
       </div>
