@@ -14,11 +14,15 @@ if (!rootElement) {
   throw new Error("Could not find root element to mount to");
 }
 
+import { GlobalErrorBoundary } from './shared/ui/components/GlobalErrorBoundary';
+
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <LocalizationProvider>
-      <App />
-    </LocalizationProvider>
+    <GlobalErrorBoundary>
+      <LocalizationProvider>
+        <App />
+      </LocalizationProvider>
+    </GlobalErrorBoundary>
   </React.StrictMode>
 );
