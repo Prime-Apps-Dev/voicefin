@@ -769,3 +769,18 @@ export const updateRequestStatus = async (requestId: string, status: 'COMPLETED'
     
   if (error) throw error;
 };
+
+/**
+ * Разорвать связь с другим долгом (сделать независимым)
+ */
+export const unlinkDebt = async (debtId: string): Promise<void> => {
+  const { error } = await supabase
+    .from('debts')
+    .update({ 
+      linked_user_id: null,
+      parent_debt_id: null 
+    })
+    .eq('id', debtId);
+  
+  if (error) throw error;
+};

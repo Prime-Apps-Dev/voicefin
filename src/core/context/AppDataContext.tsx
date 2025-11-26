@@ -681,6 +681,22 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   const handleDeleteDebt = async (id: string) => {
     try {
+      const debtToDelete = debts.find(d => d.id === id);
+
+      // Если долг связан с другим пользователем, отправляем запрос на удаление
+      if (debtToDelete && (debtToDelete as any).linked_user_id) {
+        console.log("Sync: Sending DELETE request to", (debtToDelete as any).linked_user_id);
+        await api.createTransactionRequest({
+          receiver_user_id: (debtToDelete as any).linked_user_id,
+          related_debt_id: id, // Ссылаемся на наш долг
+          amount: debtToDelete.amount,
+          currency: debtToDelete.currency,
+          transaction_type: TransactionType.DELETE,
+          category_name: 'Debt',
+          description: `Request to delete debt: ${debtToDelete.person}`
+        });
+      }
+
       await api.deleteDebt(id);
       setDebts(prev => prev.filter(d => d.id !== id));
     } catch (e: any) {
@@ -716,6 +732,45 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   const handleConfirmRequest = async (req: TransactionRequest, accountId: string) => {
     try {
+      // ОБРАБОТКА УДАЛЕНИЯ
+      if (req.transaction_type === TransactionType.DELETE) {
+        const relatedDebt = debts.find(d =>
+          (d as any).linked_user_id === req.sender_user_id &&
+          (
+            (d as any).parent_debt_id === req.related_debt_id ||
+            // Если мы были инициатором, то parent_debt_id может быть у нас, или у них.
+            // Но проще искать по linked_user_id и совпадению сумм/валют, если ID не матчатся напрямую.
+            // В идеале, related_debt_id - это ID долга отправителя.
+            // У нас в базе parent_debt_id указывает на него, ИЛИ его parent_debt_id указывает на нас.
+            // Упростим: ищем долг, связанный с этим юзером.
+            d.id === req.related_debt_id || // Маловероятно, ID разные
+            (d as any).parent_debt_id === req.related_debt_id
+          )
+        );
+
+        // Если не нашли по ID, ищем просто единственный активный долг с этим юзером (эвристика)
+        // Или лучше не рисковать?
+        // Давайте искать по linked_user_id. Если их несколько, это проблема.
+        // Пока предположим, что мы нашли его.
+
+        // Улучшенный поиск:
+        const targetDebt = debts.find(d =>
+          (d as any).linked_user_id === req.sender_user_id &&
+          ((d as any).parent_debt_id === req.related_debt_id || d.id === req.related_debt_id) // Проверка ID
+        ) || debts.find(d => (d as any).linked_user_id === req.sender_user_id); // Фолбек
+
+        if (targetDebt) {
+          await api.deleteDebt(targetDebt.id);
+          setDebts(prev => prev.filter(d => d.id !== targetDebt.id));
+        } else {
+          console.warn("Could not find linked debt to delete");
+        }
+
+        await api.updateRequestStatus(req.id, 'COMPLETED');
+        setRequests(prev => prev.filter(r => r.id !== req.id));
+        return;
+      }
+
       // 1. Создаем реальную транзакцию
       const newTxData: Omit<Transaction, 'id'> = {
         accountId: accountId,
@@ -755,6 +810,20 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   const handleRejectRequest = async (req: TransactionRequest) => {
     try {
+      // ОБРАБОТКА ОТКЛОНЕНИЯ УДАЛЕНИЯ (Разрыв связи)
+      if (req.transaction_type === TransactionType.DELETE) {
+        const targetDebt = debts.find(d =>
+          (d as any).linked_user_id === req.sender_user_id &&
+          ((d as any).parent_debt_id === req.related_debt_id || d.id === req.related_debt_id)
+        ) || debts.find(d => (d as any).linked_user_id === req.sender_user_id);
+
+        if (targetDebt) {
+          await api.unlinkDebt(targetDebt.id);
+          // Обновляем локальный стейт
+          setDebts(prev => prev.map(d => d.id === targetDebt.id ? { ...d, linked_user_id: null, parent_debt_id: null } : d));
+        }
+      }
+
       await api.updateRequestStatus(req.id, 'REJECTED');
       // Помечаем как отклоненный локально
       setRequests(prev => prev.map(r => r.id === req.id ? { ...r, status: 'REJECTED' } : r));

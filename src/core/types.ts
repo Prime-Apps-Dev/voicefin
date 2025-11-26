@@ -3,7 +3,8 @@
 export enum TransactionType {
   INCOME = 'INCOME',
   EXPENSE = 'EXPENSE',
-  TRANSFER = 'TRANSFER', // Новый тип транзакции
+  TRANSFER = 'TRANSFER',
+  DELETE = 'DELETE', // Для запросов на удаление
 }
 
 export enum AccountType {
