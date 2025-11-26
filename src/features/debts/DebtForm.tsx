@@ -174,6 +174,7 @@ export const DebtForm: React.FC<DebtFormProps> = ({
     onSave({
       ...formData,
       amount: parseFloat(formData.amount),
+      current_amount: parseFloat(formData.amount), // Ensure current_amount is set
       id: savedDebtId,
       date: (formData.date && formData.date.trim() !== '') ? formData.date : new Date().toISOString(),
       due_date: (formData.due_date && formData.due_date.trim() !== '') ? formData.due_date : null,
