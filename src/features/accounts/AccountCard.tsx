@@ -9,12 +9,13 @@ interface AccountCardProps {
   onClick: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
+  balance: number;
 }
 
-export const AccountCard: React.FC<AccountCardProps> = ({ account, onEdit, onDelete, isActive, onClick }) => {
+export const AccountCard: React.FC<AccountCardProps> = ({ account, balance, onEdit, onDelete, isActive, onClick }) => {
   const { language } = useLocalization();
   const locale = language === 'ru' ? 'ru-RU' : 'en-US';
-  const formattedBalance = formatMoney(account.balance, account.currency, locale);
+  const formattedBalance = formatMoney(balance, account.currency, locale);
 
   return (
     <div

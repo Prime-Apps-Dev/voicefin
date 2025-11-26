@@ -113,9 +113,8 @@ export const DebtForm: React.FC<DebtFormProps> = ({
       currency: formData.currency,
       type: formData.type,
       status: DebtStatus.ACTIVE, // Используем Enum
-      date: formData.date || new Date().toISOString(), // Защита от пустой даты
-      // КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Явно передаем null, если строка пустая
-      due_date: formData.due_date && formData.due_date.trim() !== '' ? formData.due_date : null,
+      date: (formData.date && formData.date.trim() !== '') ? formData.date : new Date().toISOString(),
+      due_date: (formData.due_date && formData.due_date.trim() !== '') ? formData.due_date : null,
     };
 
     try {
