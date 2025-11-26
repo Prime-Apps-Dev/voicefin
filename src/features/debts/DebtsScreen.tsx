@@ -588,7 +588,7 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
             // Use the first account or fallback to a default if available
             const accountId = accounts.length > 0 ? accounts[0].id : undefined;
 
-            await handleSaveDebt(
+            const result = await handleSaveDebt(
               editingDebt ? { ...data, id: editingDebt.id } : data,
               !editingDebt,
               accountId
@@ -597,8 +597,10 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
             if (editingDebt) {
               setIsFormOpen(false);
             }
+            return result;
           } catch (error) {
             console.error("Failed to save debt:", error);
+            throw error; // Re-throw so DebtForm knows it failed
           }
         }}
         debt={editingDebt}
