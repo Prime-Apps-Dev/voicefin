@@ -14,7 +14,7 @@ import * as api from '../../core/services/api';
 interface DebtFormProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (debt: any) => void;
+  onSave: (debt: any) => Promise<Debt | void>;
   debt?: Debt | null;
   defaultCurrency: string;
   categories: string[];
@@ -133,12 +133,15 @@ export const DebtForm: React.FC<DebtFormProps> = ({
 
       if (debt) {
         // Редактирование
-        onSave({ ...debtPayload, id: debt.id });
+        await onSave({ ...debtPayload, id: debt.id });
+        onClose(); // Close immediately on edit
       } else {
         // Создание (с шарингом)
-        // Используем 'as any', так как Supabase примет null для due_date нормально
-        const newDebt = await api.addDebt(debtPayload as any);
-        setSavedDebtId(newDebt.id);
+        // Используем onSave, который теперь возвращает созданный долг
+        const newDebt = await onSave(debtPayload);
+        if (newDebt) {
+          setSavedDebtId(newDebt.id);
+        }
       }
     } catch (error: any) {
       console.error("Error saving debt:", error);
@@ -170,18 +173,10 @@ export const DebtForm: React.FC<DebtFormProps> = ({
   };
 
   const handleFinish = async () => {
-    // 1. Update Debt (sanitize dates)
-    onSave({
-      ...formData,
-      amount: parseFloat(formData.amount),
-      current_amount: parseFloat(formData.amount), // Ensure current_amount is set
-      id: savedDebtId,
-      date: (formData.date && formData.date.trim() !== '') ? formData.date : new Date().toISOString(),
-      due_date: (formData.due_date && formData.due_date.trim() !== '') ? formData.due_date : null,
-    });
+    // 1. Debt is already saved in handleSubmit. We don't need to update it again here.
 
     // 2. Create Transaction automatically
-    if (onAddTransaction && selectedAccountId) {
+    if (onAddTransaction && selectedAccountId && savedDebtId) {
       try {
         const amountVal = parseFloat(formData.amount);
         const isIOwe = formData.type === DebtType.I_OWE;

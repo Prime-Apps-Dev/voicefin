@@ -672,7 +672,10 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
         setTransactions(prev => [newTx, ...prev]);
         const debtWithLink = await api.updateDebt({ ...savedDebt, initial_transaction_id: newTx.id });
         setDebts(prev => prev.map(d => d.id === debtWithLink.id ? debtWithLink : d));
+        return debtWithLink;
       }
+
+      return savedDebt;
     } catch (e: any) {
       console.error("Error in handleSaveDebt:", e);
       const errorMessage = e.message || (typeof e === 'object' ? JSON.stringify(e) : String(e));
