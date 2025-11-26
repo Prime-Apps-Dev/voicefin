@@ -4,9 +4,9 @@
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Debt, DebtType, DebtStatus } from '../../core/types'; // Добавлен DebtStatus
+import { Debt, DebtType, DebtStatus, Account, TransactionType } from '../../core/types'; // Добавлен DebtStatus
 import { useLocalization } from '../../core/context/LocalizationContext';
-import { COMMON_CURRENCIES } from '../../utils/constants';
+import { COMMON_CURRENCIES, DEBT_SYSTEM_CATEGORIES } from '../../utils/constants';
 import { ChevronDown, Calendar, X, Share, CheckCircle } from 'lucide-react';
 import { DatePicker } from '../../shared/ui/modals/DatePicker';
 import * as api from '../../core/services/api';
@@ -18,6 +18,8 @@ interface DebtFormProps {
   debt?: Debt | null;
   defaultCurrency: string;
   categories: string[];
+  accounts?: Account[];
+  onAddTransaction?: (tx: any) => Promise<void>;
 }
 
 const defaultState = {
@@ -37,7 +39,9 @@ export const DebtForm: React.FC<DebtFormProps> = ({
   onSave,
   debt,
   defaultCurrency,
-  categories
+  categories,
+  accounts = [],
+  onAddTransaction
 }) => {
   const { t } = useLocalization();
 
@@ -48,6 +52,13 @@ export const DebtForm: React.FC<DebtFormProps> = ({
 
   const [savedDebtId, setSavedDebtId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [selectedAccountId, setSelectedAccountId] = useState<string>('');
+
+  useEffect(() => {
+    if (accounts.length > 0 && !selectedAccountId) {
+      setSelectedAccountId(accounts[0].id);
+    }
+  }, [accounts]);
 
   useEffect(() => {
     if (isOpen) {
@@ -158,7 +169,8 @@ export const DebtForm: React.FC<DebtFormProps> = ({
     handleFinish();
   };
 
-  const handleFinish = () => {
+  const handleFinish = async () => {
+    // 1. Update Debt (sanitize dates)
     onSave({
       ...formData,
       amount: parseFloat(formData.amount),
@@ -166,6 +178,36 @@ export const DebtForm: React.FC<DebtFormProps> = ({
       date: (formData.date && formData.date.trim() !== '') ? formData.date : new Date().toISOString(),
       due_date: (formData.due_date && formData.due_date.trim() !== '') ? formData.due_date : null,
     });
+
+    // 2. Create Transaction automatically
+    if (onAddTransaction && selectedAccountId) {
+      try {
+        const amountVal = parseFloat(formData.amount);
+        const isIOwe = formData.type === DebtType.I_OWE;
+
+        // Logic:
+        // I_OWE -> I received money (Borrowing) -> INCOME
+        // OWED_TO_ME -> I gave money (Lending) -> EXPENSE
+
+        const txType = isIOwe ? TransactionType.INCOME : TransactionType.EXPENSE;
+        const txCategory = isIOwe ? DEBT_SYSTEM_CATEGORIES.BORROWING : DEBT_SYSTEM_CATEGORIES.LENDING;
+
+        await onAddTransaction({
+          accountId: selectedAccountId,
+          amount: amountVal,
+          currency: formData.currency,
+          date: new Date().toISOString(),
+          name: formData.person,
+          type: txType,
+          category: txCategory,
+          debtId: savedDebtId,
+          description: formData.description || 'Initial debt record'
+        });
+      } catch (e) {
+        console.error("Failed to auto-create transaction:", e);
+      }
+    }
+
     onClose();
   };
 
@@ -181,7 +223,7 @@ export const DebtForm: React.FC<DebtFormProps> = ({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] px-4 py-[88px]"
-            onClick={onClose}
+            onClick={savedDebtId ? undefined : onClose} // Disable closing by background click if success screen is shown
           >
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
@@ -200,8 +242,34 @@ export const DebtForm: React.FC<DebtFormProps> = ({
 
                   <h2 className="text-2xl font-bold text-white mb-2">Debt Created!</h2>
                   <p className="text-zinc-400 mb-8">
-                    The debt has been successfully saved. Do you want to send a notification to {formData.person}?
+                    The debt has been successfully saved.
                   </p>
+
+                  {/* Account Selector for Auto-Transaction */}
+                  {accounts.length > 0 && (
+                    <div className="w-full mb-6 text-left">
+                      <label className="block text-sm font-medium text-zinc-400 mb-2">
+                        Select account for transaction:
+                      </label>
+                      <div className="relative">
+                        <select
+                          value={selectedAccountId}
+                          onChange={(e) => setSelectedAccountId(e.target.value)}
+                          className="w-full appearance-none bg-zinc-800 border border-zinc-700 rounded-xl p-3 text-white focus:outline-none focus:border-blue-500 pr-10"
+                        >
+                          {accounts.map(acc => (
+                            <option key={acc.id} value={acc.id}>
+                              {acc.name} ({acc.currency})
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400 pointer-events-none" />
+                      </div>
+                      <p className="text-xs text-zinc-500 mt-2">
+                        A transaction will be automatically created for this account.
+                      </p>
+                    </div>
+                  )}
 
                   <button
                     onClick={handleShare}

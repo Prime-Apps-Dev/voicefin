@@ -593,18 +593,19 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
               !editingDebt,
               accountId
             );
-            setIsFormOpen(false);
+            // Don't close here, let DebtForm handle it after transaction step
+            if (editingDebt) {
+              setIsFormOpen(false);
+            }
           } catch (error) {
             console.error("Failed to save debt:", error);
-            // Error is already set in context, so we just prevent the crash and keep modal open?
-            // Or maybe we should close it? Let's keep it open so user can retry or see error.
-            // Actually, if dataError is set, the global error screen might show up?
-            // No, dataError is just state.
           }
         }}
         debt={editingDebt}
         defaultCurrency={displayCurrency}
         categories={['Personal', 'Work', 'Family', 'Other']}
+        accounts={accounts}
+        onAddTransaction={handleAddTransaction}
       />
     </div>
   );
