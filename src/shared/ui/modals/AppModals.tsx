@@ -12,6 +12,7 @@ import { ConfirmationModal } from './ConfirmationModal';
 import { TextInputModal } from './TextInputModal';
 import { GoalTransactionsModal } from '../../../features/savings/GoalTransactionsModal';
 import { BudgetTransactionsModal } from '../../../features/budget/BudgetTransactionsModal';
+import { BudgetRolloverModal } from '../../../features/budget/BudgetRolloverModal';
 import { useLocalization } from '../../../core/context/LocalizationContext';
 
 // Props contain all state controls needed for modals
@@ -90,28 +91,35 @@ interface AppModalsProps {
   savingsGoals: SavingsGoal[];
   budgets: Budget[];
   transactions: Transaction[];
-  rates: any;
   displayCurrency: string;
   debts: Debt[]; // ДОБАВЛЕНО
+
+  // Rollover
+  isRolloverModalOpen: boolean;
+  setIsRolloverModalOpen: (v: boolean) => void;
+  rolloverData: { category: string; amount: number }[] | null;
+  onConfirmRollover: (cats: string[]) => void;
+  onSkipRollover: () => void;
 }
 
 export const AppModals: React.FC<AppModalsProps> = (props) => {
   const { t } = useLocalization();
-  
+
   const {
-      potentialTransaction, editingTransaction, onConfirmTransaction, onCancelTransaction,
-      goalForDeposit, isCategoryLockedInForm, 
-      isAccountFormOpen, setIsAccountFormOpen, editingAccount, onSaveAccount,
-      isGoalFormOpen, setIsGoalFormOpen, editingGoal, onSaveGoal, setEditingGoal,
-      isBudgetFormOpen, setIsBudgetFormOpen, editingBudget, setEditingBudget, onSaveBudget, budgetsForMonth,
-      categoryFormState, setCategoryFormState, onSaveCategory, onDeleteCategory,
-      accountForActions, setAccountForActions, onAddTxFromAccount, onEditAccountRequest, onDeleteAccountRequest,
-      itemToDelete, setItemToDelete, onDeleteItem,
-      isTextInputOpen, setIsTextInputOpen, textInputValue, setTextInputValue, onTextTransactionSubmit, isProcessingText,
-      goalForHistory, setGoalForHistory, budgetForHistory, setBudgetForHistory, onDeleteTransaction, onSelectTransaction,
-      carryOverInfo, setCarryOverInfo, onConfirmCarryOver,
-      categories, accounts, savingsGoals, budgets, transactions, rates, displayCurrency,
-      debts // ДОБАВЛЕНО
+    potentialTransaction, editingTransaction, onConfirmTransaction, onCancelTransaction,
+    goalForDeposit, isCategoryLockedInForm,
+    isAccountFormOpen, setIsAccountFormOpen, editingAccount, onSaveAccount,
+    isGoalFormOpen, setIsGoalFormOpen, editingGoal, onSaveGoal, setEditingGoal,
+    isBudgetFormOpen, setIsBudgetFormOpen, editingBudget, setEditingBudget, onSaveBudget, budgetsForMonth,
+    categoryFormState, setCategoryFormState, onSaveCategory, onDeleteCategory,
+    accountForActions, setAccountForActions, onAddTxFromAccount, onEditAccountRequest, onDeleteAccountRequest,
+    itemToDelete, setItemToDelete, onDeleteItem,
+    isTextInputOpen, setIsTextInputOpen, textInputValue, setTextInputValue, onTextTransactionSubmit, isProcessingText,
+    goalForHistory, setGoalForHistory, budgetForHistory, setBudgetForHistory, onDeleteTransaction, onSelectTransaction,
+    carryOverInfo, setCarryOverInfo, onConfirmCarryOver,
+    categories, accounts, savingsGoals, budgets, transactions, rates, displayCurrency,
+    debts, // ДОБАВЛЕНО
+    isRolloverModalOpen, setIsRolloverModalOpen, rolloverData, onConfirmRollover, onSkipRollover
   } = props;
 
   return (
@@ -129,9 +137,9 @@ export const AppModals: React.FC<AppModalsProps> = (props) => {
           isCategoryLocked={isCategoryLockedInForm}
           budgets={budgets}
           transactions={transactions}
-          onCreateBudget={(cat, monthKey) => { 
-              setEditingBudget({ monthKey, category: cat, icon: categories.find(c=>c.name===cat)?.icon || 'LayoutGrid', limit: 0, currency: displayCurrency }); 
-              setIsBudgetFormOpen(true); 
+          onCreateBudget={(cat, monthKey) => {
+            setEditingBudget({ monthKey, category: cat, icon: categories.find(c => c.name === cat)?.icon || 'LayoutGrid', limit: 0, currency: displayCurrency });
+            setIsBudgetFormOpen(true);
           }}
           rates={rates}
           defaultCurrency={displayCurrency}
@@ -139,101 +147,109 @@ export const AppModals: React.FC<AppModalsProps> = (props) => {
         />
       )}
 
-      <AccountForm 
-        isOpen={isAccountFormOpen} 
-        onClose={() => setIsAccountFormOpen(false)} 
-        onSave={onSaveAccount} 
-        account={editingAccount} 
+      <AccountForm
+        isOpen={isAccountFormOpen}
+        onClose={() => setIsAccountFormOpen(false)}
+        onSave={onSaveAccount}
+        account={editingAccount}
       />
 
-      <SavingsGoalForm 
-        isOpen={isGoalFormOpen} 
-        onClose={() => { setIsGoalFormOpen(false); setEditingGoal(null); }} 
-        onSave={onSaveGoal} 
-        goal={editingGoal} 
-        defaultCurrency={displayCurrency} 
+      <SavingsGoalForm
+        isOpen={isGoalFormOpen}
+        onClose={() => { setIsGoalFormOpen(false); setEditingGoal(null); }}
+        onSave={onSaveGoal}
+        goal={editingGoal}
+        defaultCurrency={displayCurrency}
       />
 
-      <BudgetForm 
-        isOpen={isBudgetFormOpen} 
-        onClose={() => { setIsBudgetFormOpen(false); setEditingBudget(null); }} 
-        onSave={onSaveBudget} 
-        budget={editingBudget} 
-        allCategories={categories} 
-        budgetsForMonth={budgetsForMonth} 
-        onCreateNewCategory={() => setCategoryFormState({ isOpen: true, category: null, context: {type: TransactionType.EXPENSE, from: 'budget'} })} 
-        defaultCurrency={displayCurrency} 
+      <BudgetForm
+        isOpen={isBudgetFormOpen}
+        onClose={() => { setIsBudgetFormOpen(false); setEditingBudget(null); }}
+        onSave={onSaveBudget}
+        budget={editingBudget}
+        allCategories={categories}
+        budgetsForMonth={budgetsForMonth}
+        onCreateNewCategory={() => setCategoryFormState({ isOpen: true, category: null, context: { type: TransactionType.EXPENSE, from: 'budget' } })}
+        defaultCurrency={displayCurrency}
       />
 
-      <CategoryForm 
-        isOpen={categoryFormState.isOpen} 
-        onClose={() => setCategoryFormState({isOpen: false, category: null})} 
-        onSave={onSaveCategory} 
-        onDelete={onDeleteCategory} 
-        category={categoryFormState.category} 
-        isFavoriteDisabled={!categoryFormState.category?.isFavorite && categories.filter(c => c.isFavorite).length >= 10} 
-        categories={categories} 
+      <CategoryForm
+        isOpen={categoryFormState.isOpen}
+        onClose={() => setCategoryFormState({ isOpen: false, category: null })}
+        onSave={onSaveCategory}
+        onDelete={onDeleteCategory}
+        category={categoryFormState.category}
+        isFavoriteDisabled={!categoryFormState.category?.isFavorite && categories.filter(c => c.isFavorite).length >= 10}
+        categories={categories}
       />
 
-      <AccountActionsModal 
-        isOpen={!!accountForActions} 
-        account={accountForActions} 
-        onClose={() => setAccountForActions(null)} 
-        onAddTransaction={(acc) => onAddTxFromAccount(acc.id)} 
-        onEdit={(acc) => onEditAccountRequest(acc)} 
-        onDelete={(acc) => onDeleteAccountRequest(acc)} 
+      <AccountActionsModal
+        isOpen={!!accountForActions}
+        account={accountForActions}
+        onClose={() => setAccountForActions(null)}
+        onAddTransaction={(acc) => onAddTxFromAccount(acc.id)}
+        onEdit={(acc) => onEditAccountRequest(acc)}
+        onDelete={(acc) => onDeleteAccountRequest(acc)}
       />
 
-      <ConfirmationModal 
-        isOpen={!!itemToDelete} 
-        onCancel={() => setItemToDelete(null)} 
-        onConfirm={onDeleteItem} 
-        title={ itemToDelete ? ('id' in itemToDelete ? t('confirmDeleteTitle') : itemToDelete.type === 'account' ? t('confirmDeleteAccountTitle') : itemToDelete.type === 'savingsGoal' ? t('confirmDeleteGoalTitle') : itemToDelete.type === 'budget' ? t('confirmDeleteBudgetTitle') : t('confirmDeleteCategoryTitle')) : '' } 
-        message={ itemToDelete ? ('id' in itemToDelete ? t('confirmDelete', { name: itemToDelete.name }) : itemToDelete.type === 'category' ? t('confirmDeleteCategoryMessage', { name: itemToDelete.value.name }) : itemToDelete.type === 'account' ? t('confirmDeleteAccountMessage', { name: itemToDelete.value.name }) : itemToDelete.type === 'savingsGoal' ? t('confirmDeleteGoalMessage', { name: itemToDelete.value.name }) : itemToDelete.type === 'budget' ? t('confirmDeleteBudgetMessage', { name: itemToDelete.value.category }) : '') : '' } 
+      <ConfirmationModal
+        isOpen={!!itemToDelete}
+        onCancel={() => setItemToDelete(null)}
+        onConfirm={onDeleteItem}
+        title={itemToDelete ? ('id' in itemToDelete ? t('confirmDeleteTitle') : itemToDelete.type === 'account' ? t('confirmDeleteAccountTitle') : itemToDelete.type === 'savingsGoal' ? t('confirmDeleteGoalTitle') : itemToDelete.type === 'budget' ? t('confirmDeleteBudgetTitle') : t('confirmDeleteCategoryTitle')) : ''}
+        message={itemToDelete ? ('id' in itemToDelete ? t('confirmDelete', { name: itemToDelete.name }) : itemToDelete.type === 'category' ? t('confirmDeleteCategoryMessage', { name: itemToDelete.value.name }) : itemToDelete.type === 'account' ? t('confirmDeleteAccountMessage', { name: itemToDelete.value.name }) : itemToDelete.type === 'savingsGoal' ? t('confirmDeleteGoalMessage', { name: itemToDelete.value.name }) : itemToDelete.type === 'budget' ? t('confirmDeleteBudgetMessage', { name: itemToDelete.value.category }) : '') : ''}
       />
 
-      <ConfirmationModal 
-        isOpen={!!carryOverInfo} 
-        onCancel={() => setCarryOverInfo(null)} 
-        onConfirm={onConfirmCarryOver} 
-        title={t('carryOverBudgetsTitle')} 
-        message={t('carryOverBudgetsMessage')} 
+      <ConfirmationModal
+        isOpen={!!carryOverInfo}
+        onCancel={() => setCarryOverInfo(null)}
+        onConfirm={onConfirmCarryOver}
+        title={t('carryOverBudgetsTitle')}
+        message={t('carryOverBudgetsMessage')}
       />
 
-      <TextInputModal 
-        isOpen={isTextInputOpen} 
-        isProcessing={isProcessingText} 
-        onClose={() => setIsTextInputOpen(false)} 
-        onSubmit={onTextTransactionSubmit} 
-        text={textInputValue} 
-        onTextChange={setTextInputValue} 
+      <TextInputModal
+        isOpen={isTextInputOpen}
+        isProcessing={isProcessingText}
+        onClose={() => setIsTextInputOpen(false)}
+        onSubmit={onTextTransactionSubmit}
+        text={textInputValue}
+        onTextChange={setTextInputValue}
       />
 
       {goalForHistory && (
-        <GoalTransactionsModal 
-            isOpen={!!goalForHistory} 
-            onClose={() => setGoalForHistory(null)} 
-            goal={goalForHistory} 
-            transactions={transactions} 
-            accounts={accounts} 
-            onSelectTransaction={onSelectTransaction} 
-            onDeleteTransaction={onDeleteTransaction} 
-            rates={rates} 
+        <GoalTransactionsModal
+          isOpen={!!goalForHistory}
+          onClose={() => setGoalForHistory(null)}
+          goal={goalForHistory}
+          transactions={transactions}
+          accounts={accounts}
+          onSelectTransaction={onSelectTransaction}
+          onDeleteTransaction={onDeleteTransaction}
+          rates={rates}
         />
       )}
 
       {budgetForHistory && (
-        <BudgetTransactionsModal 
-            isOpen={!!budgetForHistory} 
-            onClose={() => setBudgetForHistory(null)} 
-            budget={budgetForHistory} 
-            transactions={transactions} 
-            accounts={accounts} 
-            onSelectTransaction={onSelectTransaction} 
-            onDeleteTransaction={onDeleteTransaction} 
-            rates={rates} 
+        <BudgetTransactionsModal
+          isOpen={!!budgetForHistory}
+          onClose={() => setBudgetForHistory(null)}
+          budget={budgetForHistory}
+          transactions={transactions}
+          accounts={accounts}
+          onSelectTransaction={onSelectTransaction}
+          onDeleteTransaction={onDeleteTransaction}
+          rates={rates}
         />
       )}
+
+      <BudgetRolloverModal
+        isOpen={isRolloverModalOpen}
+        onConfirm={onConfirmRollover}
+        onSkip={onSkipRollover}
+        rolloverData={rolloverData}
+        defaultCurrency={displayCurrency}
+      />
     </>
   );
 };

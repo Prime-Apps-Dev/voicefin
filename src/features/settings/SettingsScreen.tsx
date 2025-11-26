@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ChevronLeft, ChevronDown, BookOpen } from 'lucide-react'; 
+import { ChevronLeft, ChevronDown, BookOpen } from 'lucide-react';
 import { useLocalization } from '../../core/context/LocalizationContext';
 import { COMMON_CURRENCIES } from '../../utils/constants';
 
@@ -8,10 +8,12 @@ interface SettingsScreenProps {
     defaultCurrency: string;
     onSetDefaultCurrency: (currency: string) => Promise<void>; // Измененная сигнатура для асинхронного сохранения в БД
     onBack: () => void;
-    onShowOnboarding: () => void; 
+    onShowOnboarding: () => void;
+    rolloverMode: 'DISABLED' | 'MANUAL' | 'AUTO';
+    onSetRolloverMode: (mode: 'DISABLED' | 'MANUAL' | 'AUTO') => Promise<void>;
 }
 
-export const SettingsScreen: React.FC<SettingsScreenProps> = ({ defaultCurrency, onSetDefaultCurrency, onBack, onShowOnboarding }) => {
+export const SettingsScreen: React.FC<SettingsScreenProps> = ({ defaultCurrency, onSetDefaultCurrency, onBack, onShowOnboarding, rolloverMode, onSetRolloverMode }) => {
     const { t, language, setLanguage } = useLocalization();
     const [isSaving, setIsSaving] = useState(false); // Состояние для индикатора загрузки
 
@@ -58,10 +60,10 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ defaultCurrency,
                         <div>
                             <label htmlFor="defaultCurrency" className="block text-base font-medium text-gray-300 mb-2">{t('defaultCurrency')}</label>
                             <div className="relative">
-                                <select 
-                                    id="defaultCurrency" 
-                                    value={defaultCurrency} 
-                                    onChange={handleCurrencyChange} 
+                                <select
+                                    id="defaultCurrency"
+                                    value={defaultCurrency}
+                                    onChange={handleCurrencyChange}
                                     disabled={isSaving} // Отключаем, пока идет сохранение
                                     className="appearance-none w-full bg-gray-700 border-gray-600 rounded-xl py-3 px-4 text-white focus:outline-none focus:ring-2 focus:ring-brand-green disabled:opacity-60 transition-opacity"
                                 >
@@ -80,6 +82,30 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ defaultCurrency,
                                     <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-300 pointer-events-none" />
                                 )}
                             </div>
+                        </div>
+
+
+                        {/* Budget Settings */}
+                        <div>
+                            <label htmlFor="rolloverMode" className="block text-base font-medium text-gray-300 mb-2">{t('budgetRollover') || 'Budget Rollover'}</label>
+                            <div className="relative">
+                                <select
+                                    id="rolloverMode"
+                                    value={rolloverMode}
+                                    onChange={(e) => onSetRolloverMode(e.target.value as any)}
+                                    className="appearance-none w-full bg-gray-700 border-gray-600 rounded-xl py-3 px-4 text-white focus:outline-none focus:ring-2 focus:ring-brand-green transition-opacity"
+                                >
+                                    <option value="DISABLED">{t('disabled') || 'Disabled'}</option>
+                                    <option value="MANUAL">{t('manual') || 'Manual (Ask me)'}</option>
+                                    <option value="AUTO">{t('auto') || 'Automatic'}</option>
+                                </select>
+                                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-300 pointer-events-none" />
+                            </div>
+                            <p className="text-xs text-gray-400 mt-1">
+                                {rolloverMode === 'AUTO'
+                                    ? (t('rolloverAutoDesc') || 'Remaining budget will be automatically carried over to next month.')
+                                    : (t('rolloverManualDesc') || 'You will be asked to carry over budget at the start of the month.')}
+                            </p>
                         </div>
 
                         <div>
@@ -104,6 +130,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ defaultCurrency,
                     </div>
                 </motion.div>
             </main>
-        </div>
+        </div >
     );
 };

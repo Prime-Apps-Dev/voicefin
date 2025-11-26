@@ -660,6 +660,21 @@ export const updateDefaultCurrency = async (userId: string, currency: string): P
 };
 
 /**
+ * Обновляет настройки пользователя
+ */
+export const updateUserPreferences = async (userId: string, preferences: any): Promise<void> => {
+  const { error } = await supabase
+    .from('profiles')
+    .update({ 
+      preferences,
+      updated_at: new Date().toISOString() 
+    })
+    .eq('id', userId);
+
+  if (error) throw error;
+};
+
+/**
  * Получить детали долга по ссылке (для входящего пользователя)
  */
 export const getSharedDebt = async (debtId: string) => {

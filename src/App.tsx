@@ -73,7 +73,9 @@ const AppContent: React.FC = () => {
     handleSaveBudget, handleDeleteBudget,
     updateDefaultCurrency,
     debts,
-    refreshDebts
+    refreshDebts,
+    updateUserPreferences,
+    isRolloverModalOpen, setIsRolloverModalOpen, rolloverData, handleConfirmRollover, handleSkipRollover
   } = useAppData();
 
   const [activeScreen, setActiveScreen] = useState<'home' | 'savings' | 'analytics' | 'profile' | 'accounts' | 'budgetPlanning' | 'categories' | 'settings' | 'comingSoon' | 'history' | 'about' | 'debts'>('home');
@@ -292,7 +294,9 @@ const AppContent: React.FC = () => {
       case 'profile': return <ProfileScreen user={user} daysActive={daysActive} onNavigate={setActiveScreen} />;
       case 'accounts': return <AccountsScreen accounts={safeAccounts} transactions={safeTransactions} rates={rates} onBack={() => setActiveScreen('profile')} onOpenAddForm={() => { setEditingAccount(null); setIsAccountFormOpen(true); }} onOpenActions={setAccountForActions} />;
       case 'categories': return <CategoriesScreen categories={categories} onBack={() => setActiveScreen('profile')} onCreateCategory={(type) => setCategoryFormState({ isOpen: true, category: null, context: { type } })} onEditCategory={(cat) => setCategoryFormState({ isOpen: true, category: cat })} onDeleteCategory={(cat) => setItemToDelete({ type: 'category', value: cat })} onToggleFavorite={(cat) => handleSaveCategory({ ...cat, isFavorite: !cat.isFavorite })} />;
-      case 'settings': return <SettingsScreen onBack={() => setActiveScreen('profile')} defaultCurrency={displayCurrency} onSetDefaultCurrency={updateDefaultCurrency} onShowOnboarding={() => setShowOnboarding(true)} />;
+      case 'categories': return <CategoriesScreen categories={categories} onBack={() => setActiveScreen('profile')} onCreateCategory={(type) => setCategoryFormState({ isOpen: true, category: null, context: { type } })} onEditCategory={(cat) => setCategoryFormState({ isOpen: true, category: cat })} onDeleteCategory={(cat) => setItemToDelete({ type: 'category', value: cat })} onToggleFavorite={(cat) => handleSaveCategory({ ...cat, isFavorite: !cat.isFavorite })} />;
+      case 'settings': return <SettingsScreen onBack={() => setActiveScreen('profile')} defaultCurrency={displayCurrency} onSetDefaultCurrency={updateDefaultCurrency} onShowOnboarding={() => setShowOnboarding(true)} rolloverMode={user?.preferences?.budgetRollover || 'MANUAL'} onSetRolloverMode={(mode) => updateUserPreferences({ ...user?.preferences, budgetRollover: mode })} />;
+      case 'about': return <AboutScreen onBack={() => setActiveScreen('profile')} />;
       case 'about': return <AboutScreen onBack={() => setActiveScreen('profile')} />;
       case 'budgetPlanning': return <BudgetPlanningScreen budgets={budgets} transactions={safeTransactions} categories={categories} onBack={() => setActiveScreen('profile')} onAddBudget={(monthKey) => { setEditingBudget({ monthKey, currency: displayCurrency }); setIsBudgetFormOpen(true); }} onEditBudget={(b) => { setEditingBudget(b); setIsBudgetFormOpen(true); }} onDeleteBudget={(b) => setItemToDelete({ type: 'budget', value: b })} onAddTransaction={(b) => { setIsCategoryLockedInForm(true); setPotentialTransaction({ accountId: safeAccounts[0]?.id, name: '', amount: 0, currency: displayCurrency, category: b.category, date: new Date().toISOString(), type: TransactionType.EXPENSE }); }} onViewHistory={setBudgetForHistory} onCarryOver={(from, to) => setCarryOverInfo({ from, to })} rates={rates} defaultCurrency={displayCurrency} />;
       case 'history': return <TransactionHistoryScreen transactions={safeTransactions} accounts={safeAccounts} categories={categories} rates={rates} defaultCurrency={displayCurrency} onSelectTransaction={setEditingTransaction} onDeleteTransaction={setItemToDelete} onBack={() => setActiveScreen('home')} />;
@@ -370,6 +374,7 @@ const AppContent: React.FC = () => {
           carryOverInfo={carryOverInfo} setCarryOverInfo={setCarryOverInfo} onConfirmCarryOver={() => { if (carryOverInfo) { budgets.filter(b => b.monthKey === carryOverInfo.from).forEach(b => handleSaveBudget({ ...b, monthKey: carryOverInfo.to })); setCarryOverInfo(null); } }}
           categories={categories} accounts={accounts} savingsGoals={savingsGoals} budgets={budgets} transactions={transactions} rates={rates} displayCurrency={displayCurrency}
           debts={debts}
+          isRolloverModalOpen={isRolloverModalOpen} setIsRolloverModalOpen={setIsRolloverModalOpen} rolloverData={rolloverData} onConfirmRollover={handleConfirmRollover} onSkipRollover={handleSkipRollover}
         />
       )}
 

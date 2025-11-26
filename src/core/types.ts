@@ -67,6 +67,11 @@ export interface User {
   telegram_id: number | null;
   has_completed_onboarding: boolean; // Флаг завершения обучения
   default_currency: string; // <-- ДОБАВЛЕНО: Валюта по умолчанию
+  preferences?: UserPreferences; // Настройки пользователя
+}
+
+export interface UserPreferences {
+  budgetRollover: 'DISABLED' | 'MANUAL' | 'AUTO';
 }
 
 
@@ -86,6 +91,7 @@ export interface Budget {
   limit: number;
   icon: string;
   currency: string;
+  rolloverAmount?: number; // Сумма переноса
 }
 
 export interface Category {

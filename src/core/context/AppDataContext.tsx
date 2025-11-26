@@ -79,6 +79,13 @@ interface AppDataContextType {
   // UI States (НОВОЕ)
   isRequestsModalOpen: boolean;
   setIsRequestsModalOpen: (isOpen: boolean) => void;
+
+  // Rollover
+  isRolloverModalOpen: boolean;
+  setIsRolloverModalOpen: (isOpen: boolean) => void;
+  rolloverData: { category: string; amount: number }[] | null;
+  handleConfirmRollover: (selectedCategories: string[]) => Promise<void>;
+  handleSkipRollover: () => void;
 }
 
 const AppDataContext = createContext<AppDataContextType | undefined>(undefined);
@@ -109,6 +116,10 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [selectedAccountId, setSelectedAccountId] = useState<string>('all');
 
   const [isRequestsModalOpen, setIsRequestsModalOpen] = useState(false); // НОВОЕ
+
+  // Rollover State
+  const [isRolloverModalOpen, setIsRolloverModalOpen] = useState(false);
+  const [rolloverData, setRolloverData] = useState<{ category: string; amount: number }[] | null>(null);
 
   // --- Data Loading & Migration ---
   const loadData = async () => {
@@ -735,6 +746,119 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
       setDataError(e.message);
       throw e;
     }
+  };
+
+  // --- ROLLOVER LOGIC ---
+
+  // Check for rollovers when data is loaded
+  useEffect(() => {
+    if (!isDataLoaded || !user || budgets.length === 0) return;
+
+    const checkRollover = async () => {
+      const now = new Date();
+      const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+      // 1. Check if current month has budgets
+      const currentBudgets = budgets.filter(b => b.monthKey === currentMonthKey);
+      if (currentBudgets.length > 0) return; // Already have budgets
+
+      // 2. Check previous month
+      const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const prevMonthKey = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
+      const prevBudgets = budgets.filter(b => b.monthKey === prevMonthKey);
+
+      if (prevBudgets.length === 0) return; // No previous budgets to rollover
+
+      // 3. Calculate rollovers
+      const calculatedRollovers: { category: string; amount: number }[] = [];
+
+      for (const budget of prevBudgets) {
+        // Calculate spent for this budget in previous month
+        const spent = transactions
+          .filter(t => {
+            const txDate = new Date(t.date);
+            return t.category === budget.category &&
+              t.type === TransactionType.EXPENSE &&
+              txDate.getFullYear() === prevDate.getFullYear() &&
+              txDate.getMonth() === prevDate.getMonth();
+          })
+          .reduce((sum, t) => {
+            return sum + convertCurrency(t.amount, t.currency, budget.currency, rates);
+          }, 0);
+
+        const remaining = (budget.limit + (budget.rolloverAmount || 0)) - spent;
+        if (Math.abs(remaining) > 0.01) { // Ignore negligible amounts
+          calculatedRollovers.push({ category: budget.category, amount: remaining });
+        }
+      }
+
+      if (calculatedRollovers.length === 0) return;
+
+      setRolloverData(calculatedRollovers);
+
+      // 4. Check user preferences
+      const mode = user.preferences?.budgetRollover || 'MANUAL';
+
+      if (mode === 'DISABLED') return;
+
+      if (mode === 'AUTO') {
+        // Auto apply all
+        await handleConfirmRollover(calculatedRollovers.map(r => r.category));
+      } else {
+        // Manual: Show modal
+        setIsRolloverModalOpen(true);
+      }
+    };
+
+    checkRollover();
+  }, [isDataLoaded, user?.id, budgets.length]); // Depend on budgets.length to trigger only when budgets change/load
+
+  const handleConfirmRollover = async (selectedCategories: string[]) => {
+    if (!rolloverData) return;
+
+    const now = new Date();
+    const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const prevMonthKey = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
+    const prevBudgets = budgets.filter(b => b.monthKey === prevMonthKey);
+
+    const newBudgets: Budget[] = [];
+
+    for (const prevBudget of prevBudgets) {
+      // Should we carry over this budget?
+      // If it's in rolloverData AND selected, we use the rollover amount.
+      // If it's NOT in rolloverData (exact 0 remaining) but existed, we just copy the plan? 
+      // The requirement says: "If user confirms rollover for category X... create Budget... limit = prev limit... rollover = remaining"
+      // What if user unchecks it? "Skip (create budgets without rollover)"
+
+      const rolloverItem = rolloverData.find(r => r.category === prevBudget.category);
+      const shouldRollover = rolloverItem && selectedCategories.includes(prevBudget.category);
+
+      const rolloverAmount = shouldRollover ? rolloverItem!.amount : 0;
+
+      try {
+        const newBudget = await api.addBudget({
+          monthKey: currentMonthKey,
+          category: prevBudget.category,
+          limit: prevBudget.limit, // Copy plan
+          icon: prevBudget.icon,
+          currency: prevBudget.currency,
+          rolloverAmount: rolloverAmount
+        });
+        newBudgets.push(newBudget);
+      } catch (e) {
+        console.error(`Failed to create rollover budget for ${prevBudget.category}`, e);
+      }
+    }
+
+    setBudgets(prev => [...prev, ...newBudgets]);
+    setIsRolloverModalOpen(false);
+    setRolloverData(null);
+  };
+
+  const handleSkipRollover = async () => {
+    // Create budgets without rollover amounts
+    await handleConfirmRollover([]);
   };
 
   // --- HANDLERS ДЛЯ ЗАПРОСОВ (REQUESTS) ---

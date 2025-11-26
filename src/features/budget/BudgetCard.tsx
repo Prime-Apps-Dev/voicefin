@@ -28,9 +28,10 @@ const formatCurrency = (amount: number, currency: string, language: string) => {
 
 export const BudgetCard: React.FC<BudgetCardProps> = ({ budget, spent, onTap, onDoubleTap, onLongPress, onSwipeLeft }) => {
     const { t, language } = useLocalization();
-    const progress = budget.limit > 0 ? (spent / budget.limit) * 100 : 0;
-    const isOver = spent > budget.limit;
-    const remaining = budget.limit - spent;
+    const totalLimit = budget.limit + (budget.rolloverAmount || 0);
+    const progress = totalLimit > 0 ? (spent / totalLimit) * 100 : 0;
+    const isOver = spent > totalLimit;
+    const remaining = totalLimit - spent;
 
     const getGradient = () => {
         if (isOver) return 'bg-gradient-to-br from-red-500 via-red-600 to-red-700 shadow-red-500/20';
@@ -64,7 +65,7 @@ export const BudgetCard: React.FC<BudgetCardProps> = ({ budget, spent, onTap, on
                                         <h3 className="font-bold text-lg break-words">{budget.category}</h3>
                                         <p className="text-sm text-white/80">
                                             {isOver
-                                                ? `${t('exceededBy')} ${formatCurrency(spent - budget.limit, budget.currency, language)}`
+                                                ? `${t('exceededBy')} ${formatCurrency(spent - totalLimit, budget.currency, language)}`
                                                 : `${formatCurrency(remaining, budget.currency, language)} ${t('remaining')}`
                                             }
                                         </p>
@@ -74,8 +75,13 @@ export const BudgetCard: React.FC<BudgetCardProps> = ({ budget, spent, onTap, on
                             <div className="space-y-2">
                                 <div className="flex justify-between text-sm font-medium text-white/90">
                                     <span className="text-white font-medium">{formatCurrency(spent, budget.currency, language)}</span>
-                                    <span className="text-gray-400"> / {formatCurrency(budget.amount, budget.currency, language)}</span>
+                                    <span className="text-gray-400"> / {formatCurrency(totalLimit, budget.currency, language)}</span>
                                 </div>
+                                {budget.rolloverAmount && Math.abs(budget.rolloverAmount) > 0 && (
+                                    <div className="text-xs text-white/60 text-right">
+                                        {t('includesRollover') || 'Includes rollover'}: {formatCurrency(budget.rolloverAmount, budget.currency, language)}
+                                    </div>
+                                )}
                                 <div className="w-full bg-black/20 rounded-full h-2.5">
                                     <div
                                         className="bg-white h-2.5 rounded-full transition-all duration-500 ease-out"
