@@ -674,8 +674,10 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
         setDebts(prev => prev.map(d => d.id === debtWithLink.id ? debtWithLink : d));
       }
     } catch (e: any) {
-      setDataError(e.message);
-      throw e;
+      console.error("Error in handleSaveDebt:", e);
+      const errorMessage = e.message || (typeof e === 'object' ? JSON.stringify(e) : String(e));
+      setDataError(errorMessage);
+      throw new Error(errorMessage);
     }
   };
 
@@ -700,8 +702,10 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
       await api.deleteDebt(id);
       setDebts(prev => prev.filter(d => d.id !== id));
     } catch (e: any) {
-      setDataError(e.message);
-      throw e;
+      console.error("Error in handleDeleteDebt:", e);
+      const errorMessage = e.message || (typeof e === 'object' ? JSON.stringify(e) : String(e));
+      setDataError(errorMessage);
+      throw new Error(errorMessage);
     }
   };
 
@@ -710,8 +714,10 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
       const updated = await api.archiveDebt(id);
       setDebts(prev => prev.map(d => d.id === updated.id ? updated : d));
     } catch (e: any) {
-      setDataError(e.message);
-      throw e;
+      console.error("Error in handleArchiveDebt:", e);
+      const errorMessage = e.message || (typeof e === 'object' ? JSON.stringify(e) : String(e));
+      setDataError(errorMessage);
+      throw new Error(errorMessage);
     }
   };
 

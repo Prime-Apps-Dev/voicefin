@@ -15,6 +15,7 @@ interface AuthContextType {
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
   error: string | null;
   logout: () => void; // Добавили функцию логаута для сброса ошибок
+  refreshUserProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -29,6 +30,7 @@ const AuthContext = createContext<AuthContextType>({
   setUser: () => { },
   error: null,
   logout: () => { },
+  refreshUserProfile: async () => { },
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -240,10 +242,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const refreshUserProfile = async () => {
+    if (!user) return;
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      if (error) throw error;
+      if (data) {
+        const updatedUser: User = {
+          ...user,
+          ...data,
+          name: data.full_name || data.username || 'User',
+          telegram_id: data.telegram_id ? Number(data.telegram_id) : null,
+          has_completed_onboarding: data.has_completed_onboarding ?? false,
+          default_currency: data.default_currency || 'USD',
+        };
+        setUser(updatedUser);
+      }
+    } catch (e) {
+      console.error("Failed to refresh user profile:", e);
+    }
+  };
+
   return (
     <AuthContext.Provider value={{
       user, isLoading, isBlocked: false, blockMessage: null, isDevLoggingIn,
-      isAppExpanded, isAppFullscreen, handleDevLogin, setUser, error, logout
+      isAppExpanded, isAppFullscreen, handleDevLogin, setUser, error, logout,
+      refreshUserProfile
     }}>
       {children}
     </AuthContext.Provider>

@@ -1,4 +1,5 @@
 import React from 'react';
+import ReactDOM from 'react-dom';
 import { formatMoney } from '../../utils/formatMoney';
 import { useLocalization } from '../../core/context/LocalizationContext';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -45,7 +46,7 @@ export const DebtDetailsModal: React.FC<DebtDetailsModalProps> = ({
     }
   };
 
-  return (
+  return ReactDOM.createPortal(
     <AnimatePresence>
       <motion.div
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -176,7 +177,7 @@ export const DebtDetailsModal: React.FC<DebtDetailsModalProps> = ({
 
           </div>
         </motion.div>
-      </motion.div>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 };

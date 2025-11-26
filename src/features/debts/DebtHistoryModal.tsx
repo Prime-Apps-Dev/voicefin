@@ -1,6 +1,7 @@
 // src/features/debts/DebtHistoryModal.tsx
 
 import React from 'react';
+import ReactDOM from 'react-dom';
 import { formatMoney } from '../../utils/formatMoney';
 import { useLocalization } from '../../core/context/LocalizationContext';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -54,7 +55,7 @@ export const DebtHistoryModal: React.FC<DebtHistoryModalProps> = ({
     return language === 'ru' ? 'Погашение' : 'Repayment';
   };
 
-  return (
+  return ReactDOM.createPortal(
     <AnimatePresence>
       {isOpen && (
         <motion.div
@@ -152,6 +153,8 @@ export const DebtHistoryModal: React.FC<DebtHistoryModalProps> = ({
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 };
+```

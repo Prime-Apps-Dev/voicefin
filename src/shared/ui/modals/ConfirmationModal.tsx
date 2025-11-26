@@ -1,4 +1,5 @@
 import React from 'react';
+import ReactDOM from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertTriangle } from 'lucide-react';
 import { useLocalization } from '../../../core/context/LocalizationContext';
@@ -13,16 +14,16 @@ interface ConfirmationModalProps {
 
 export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({ isOpen, onConfirm, onCancel, title, message }) => {
   const { t } = useLocalization();
-  
-  return (
+
+  return ReactDOM.createPortal(
     <AnimatePresence>
       {isOpen && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center z-50 p-4" 
-          aria-modal="true" 
+          className="fixed inset-0 bg-black/40 backdrop-blur-md flex items-center justify-center z-50 p-4"
+          aria-modal="true"
           role="dialog"
           onClick={onCancel}
         >
@@ -68,6 +69,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({ isOpen, on
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 };

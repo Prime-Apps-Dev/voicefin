@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import ReactDOM from 'react-dom';
 import { formatMoney } from '../../utils/formatMoney';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -332,7 +333,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
     try { const d = new Date(formData.date); if (isNaN(d.getTime())) return new Date(); return d; } catch (e) { return new Date(); }
   }, [formData.date]);
 
-  return (
+  return ReactDOM.createPortal(
     <>
       <motion.div
         initial={{ opacity: 0 }}
@@ -703,6 +704,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = (props) => {
           />
         }
       </AnimatePresence>
-    </>
+    </>,
+    document.body
   );
 };
