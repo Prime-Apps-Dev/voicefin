@@ -162,7 +162,9 @@ export const DebtForm: React.FC<DebtFormProps> = ({
     onSave({
       ...formData,
       amount: parseFloat(formData.amount),
-      id: savedDebtId
+      id: savedDebtId,
+      date: (formData.date && formData.date.trim() !== '') ? formData.date : new Date().toISOString(),
+      due_date: (formData.due_date && formData.due_date.trim() !== '') ? formData.due_date : null,
     });
     onClose();
   };
