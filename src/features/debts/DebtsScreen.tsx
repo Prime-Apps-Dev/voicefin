@@ -584,10 +584,13 @@ export const DebtsScreen: React.FC<DebtsScreenProps> = ({ onBack }) => {
         isOpen={isFormOpen}
         onClose={() => setIsFormOpen(false)}
         onSave={async (data) => {
+          // Use the first account or fallback to a default if available
+          const accountId = accounts.length > 0 ? accounts[0].id : undefined;
+
           await handleSaveDebt(
             editingDebt ? { ...data, id: editingDebt.id } : data,
             !editingDebt,
-            accounts[0]?.id
+            accountId
           );
           setIsFormOpen(false);
         }}

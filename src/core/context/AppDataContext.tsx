@@ -635,6 +635,7 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
   // --- DEBT HANDLERS ---
 
   const handleSaveDebt = async (data: Omit<Debt, 'id'> | Debt, createInitialTransaction: boolean = false, accountId?: string) => {
+    console.log('AppDataContext: handleSaveDebt called', { data, createInitialTransaction, accountId });
     try {
       let savedDebt: Debt;
       if ('id' in data) {
@@ -644,6 +645,14 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
         savedDebt = await api.addDebt(data);
         setDebts(prev => [...prev, savedDebt]);
       }
+
+      console.log('AppDataContext: Debt saved', savedDebt);
+      console.log('AppDataContext: Checking conditions for initial tx:', {
+        createInitialTransaction,
+        isNew: !('id' in data),
+        hasAccountId: !!accountId
+      });
+
       if (createInitialTransaction && !('id' in data) && accountId) {
         const txType = getDebtTransactionType(savedDebt.type, true);
         const txCategory = getDebtTransactionCategory(savedDebt.type, true);
