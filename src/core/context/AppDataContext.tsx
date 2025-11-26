@@ -50,7 +50,7 @@ interface AppDataContextType {
   refreshData: () => Promise<void>;
   refreshDebts: () => Promise<void>;
 
-  handleAddTransaction: (tx: Omit<Transaction, 'id'>) => Promise<void>;
+  handleAddTransaction: (tx: Omit<Transaction, 'id'>, skipRequest?: boolean) => Promise<void>;
   handleUpdateTransaction: (tx: Transaction) => Promise<void>;
   handleDeleteTransaction: (txId: string) => Promise<void>;
 
@@ -371,7 +371,7 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   // --- Transaction Handlers ---
 
-  const handleAddTransaction = async (transactionData: Omit<Transaction, 'id'>) => {
+  const handleAddTransaction = async (transactionData: Omit<Transaction, 'id'>, skipRequest: boolean = false) => {
     try {
       let finalTxData: any = { ...transactionData };
 
@@ -437,7 +437,7 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
         const debt = debts.find(d => d.id === finalTxData.debtId);
         const linkedUserId = (debt as any)?.linked_user_id; // Поле linked_user_id, добавленное в SQL
 
-        if (linkedUserId) {
+        if (linkedUserId && !skipRequest) {
           console.log("Sync: Sending transaction request to", linkedUserId);
 
           // Определяем тип транзакции для получателя (зеркальный)
@@ -795,7 +795,7 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
         newTxData.debtId = relatedDebt.id;
       }
 
-      await handleAddTransaction(newTxData);
+      await handleAddTransaction(newTxData, true); // skipRequest = true
 
       // 2. Обновляем статус на сервере
       await api.updateRequestStatus(req.id, 'COMPLETED');
