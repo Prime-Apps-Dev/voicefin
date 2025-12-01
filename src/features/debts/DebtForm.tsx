@@ -197,7 +197,8 @@ export const DebtForm: React.FC<DebtFormProps> = ({
           type: txType,
           category: txCategory,
           debtId: savedDebtId,
-          description: formData.description || 'Initial debt record'
+          description: formData.description || 'Initial debt record',
+          skipDebtUpdate: true
         });
       } catch (e) {
         console.error("Failed to auto-create transaction:", e);

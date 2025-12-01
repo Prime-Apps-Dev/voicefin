@@ -429,19 +429,21 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
       updateGoalsFromTransaction(finalTxData);
 
       if (finalTxData.debtId) {
-        let amountChange = 0;
-        const isDebtIncrease =
-          finalTxData.category === DEBT_SYSTEM_CATEGORIES.LENDING ||
-          finalTxData.category === DEBT_SYSTEM_CATEGORIES.BORROWING;
+        if (!finalTxData.skipDebtUpdate) {
+          let amountChange = 0;
+          const isDebtIncrease =
+            finalTxData.category === DEBT_SYSTEM_CATEGORIES.LENDING ||
+            finalTxData.category === DEBT_SYSTEM_CATEGORIES.BORROWING;
 
-        if (isDebtIncrease) amountChange = finalTxData.amount;
-        else amountChange = -finalTxData.amount;
+          if (isDebtIncrease) amountChange = finalTxData.amount;
+          else amountChange = -finalTxData.amount;
 
-        updateDebtsFromTransaction(finalTxData);
-        const updatedDebtFromServer = await api.updateDebtBalance(finalTxData.debtId, amountChange);
+          updateDebtsFromTransaction(finalTxData);
+          const updatedDebtFromServer = await api.updateDebtBalance(finalTxData.debtId, amountChange);
 
-        if (updatedDebtFromServer) {
-          setDebts(prev => prev.map(d => d.id === updatedDebtFromServer.id ? updatedDebtFromServer : d));
+          if (updatedDebtFromServer) {
+            setDebts(prev => prev.map(d => d.id === updatedDebtFromServer.id ? updatedDebtFromServer : d));
+          }
         }
 
         // --- НОВОЕ: Отправка запроса другу, если мы связаны ---
@@ -466,6 +468,9 @@ export const AppDataProvider: React.FC<{ children: ReactNode }> = ({ children })
           });
         }
       }
+
+      // Remove auxiliary flags before sending to API
+      delete finalTxData.skipDebtUpdate;
 
       const newTx = await api.addTransaction(finalTxData);
       setTransactions(prev => [newTx, ...prev]);

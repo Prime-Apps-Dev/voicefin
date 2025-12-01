@@ -2,27 +2,37 @@ import React, { useState } from 'react';
 import ReactDOM from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle, X, AlertCircle, ArrowRight } from 'lucide-react';
-import { DebtType, DebtStatus } from '../../core/types';
+import { DebtType, DebtStatus, Account, TransactionType } from '../../core/types';
 import * as api from '../../core/services/api';
 import { formatMoney } from '../../utils/formatMoney';
 import { useLocalization } from '../../core/context/LocalizationContext';
+import { DEBT_SYSTEM_CATEGORIES } from '../../utils/constants';
 
 interface IncomingDebtModalProps {
   debtId: string | null;
   onClose: () => void;
   onDebtAdded: () => void;
   defaultCurrency: string;
+  accounts: Account[];
 }
 
 export const IncomingDebtModal: React.FC<IncomingDebtModalProps> = ({
   debtId,
   onClose,
   onDebtAdded,
-  defaultCurrency
+  defaultCurrency,
+  accounts
 }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [sharedDebt, setSharedDebt] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [selectedAccountId, setSelectedAccountId] = useState<string>('');
+
+  React.useEffect(() => {
+    if (accounts.length > 0 && !selectedAccountId) {
+      setSelectedAccountId(accounts[0].id);
+    }
+  }, [accounts]);
 
   const { t, language } = useLocalization();
   const locale = language === 'ru' ? 'ru-RU' : 'en-US';
@@ -54,6 +64,7 @@ export const IncomingDebtModal: React.FC<IncomingDebtModalProps> = ({
 
   const handleAccept = async () => {
     if (!sharedDebt) return;
+    if (!selectedAccountId && accounts.length > 0) return;
 
     try {
       setIsLoading(true);
@@ -77,6 +88,27 @@ export const IncomingDebtModal: React.FC<IncomingDebtModalProps> = ({
 
       // 2. ВАЖНО: Связываем пользователей в базе (Handshake)
       await api.linkDebtPartners(sharedDebt.id, newDebt.id);
+
+      // 3. Создаем транзакцию (если выбран счет)
+      if (selectedAccountId) {
+        const isIOwe = myType === DebtType.I_OWE;
+        // Если "Я должен" -> значит я взял в долг -> INCOME (получил деньги)
+        // Если "Мне должны" -> значит я дал в долг -> EXPENSE (отдал деньги)
+        const txType = isIOwe ? TransactionType.INCOME : TransactionType.EXPENSE;
+        const txCategory = isIOwe ? DEBT_SYSTEM_CATEGORIES.BORROWING : DEBT_SYSTEM_CATEGORIES.LENDING;
+
+        await api.addTransaction({
+          accountId: selectedAccountId,
+          amount: sharedDebt.amount,
+          currency: sharedDebt.currency,
+          date: new Date().toISOString(),
+          name: sharedDebt.owner_name || 'Debt Partner',
+          type: txType,
+          category: txCategory,
+          debtId: newDebt.id,
+          description: `Linked transaction for debt: ${sharedDebt.description || ''}`
+        });
+      }
 
       onDebtAdded();
       onClose();
@@ -146,6 +178,33 @@ export const IncomingDebtModal: React.FC<IncomingDebtModalProps> = ({
                       : 'Этот пользователь говорит, что вы должны ему.'}
                   </div>
                 </div>
+
+                {/* Выбор счета */}
+                {accounts.length > 0 && (
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-zinc-400 mb-2 text-left">
+                      Записать на счет:
+                    </label>
+                    <div className="relative">
+                      <select
+                        value={selectedAccountId}
+                        onChange={(e) => setSelectedAccountId(e.target.value)}
+                        className="w-full appearance-none bg-zinc-800 border border-zinc-700 rounded-xl p-3 text-white focus:outline-none focus:border-blue-500 pr-10"
+                      >
+                        {accounts.map(acc => (
+                          <option key={acc.id} value={acc.id}>
+                            {acc.name} ({acc.currency})
+                          </option>
+                        ))}
+                      </select>
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-500">
+                        ▼
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+
                 <button
                   onClick={handleAccept}
                   className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3.5 rounded-xl font-bold shadow-lg shadow-blue-900/20 transition-all active:scale-95 flex items-center justify-center gap-2"
@@ -158,7 +217,7 @@ export const IncomingDebtModal: React.FC<IncomingDebtModalProps> = ({
           </div>
         </motion.div>
       </motion.div>
-    </AnimatePresence>,
+    </AnimatePresence >,
     document.body
   );
 };
