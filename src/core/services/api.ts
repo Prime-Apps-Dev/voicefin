@@ -699,8 +699,8 @@ export const generateDebtShareLink = (debtId: string, amount: number, currency: 
   // Формируем текст сообщения
   const isIOwe = type === 'I_OWE'; // Если Я должен
   const text = isIOwe
-    ? `Привет! Я записал, что должен тебе ${amount} ${currency}. Проверь и подтверди:`
-    : `Привет! Напоминаю, что ты должен мне ${amount} ${currency}. Записал, чтобы не забыть:`;
+    ? `Привет! 👋 Я тут записал, что должен тебе ${amount} ${currency}. Глянь, всё ли верно? Если да — можешь принять и отслеживать в приложении, как я возвращаю тебе долг. 👇`
+    : `Привет! 👋 Напоминаю про ${amount} ${currency}. Записал в VoiceFin, чтобы мы оба не забыли. Подтверди, пожалуйста, как будет минутка. 👇`;
 
   // Формат ссылки для шаринга в Telegram
   const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(appLink)}&text=${encodeURIComponent(text)}`;
@@ -743,6 +743,68 @@ export const createTransactionRequest = async (request: {
       sender_user_id: user.id
     });
     
+  if (error) throw error;
+
+  // --- ОТПРАВКА УВЕДОМЛЕНИЯ В TELEGRAM ---
+  try {
+    // 1. Получаем telegram_id получателя
+    const { data: receiverProfile, error: profileError } = await supabase
+      .from('profiles')
+      .select('telegram_id')
+      .eq('id', request.receiver_user_id)
+      .single();
+
+    if (profileError || !receiverProfile?.telegram_id) {
+      console.warn('API: Не удалось получить telegram_id получателя для уведомления', profileError);
+    } else {
+      // 2. Формируем текст уведомления
+      const isRequesting = request.transaction_type === 'EXPENSE'; // Если я прошу вернуть (или напоминаю)
+      // Логика типов может отличаться в зависимости от того, как вы используете transaction_type в реквестах.
+      // Предположим:
+      // Если я создаю реквест на "Ты мне должен" -> это напоминание.
+      // Если я создаю реквест на "Я тебе возвращаю" -> это уведомление о переводе.
+      
+      // Для простоты, пока используем универсальный текст, так как контекст "реквеста"
+      // обычно означает "Подтверди эту транзакцию".
+      
+      const notificationText = `<b>Новый запрос в VoiceFin!</b>\n\n` +
+        `Пользователь просит подтвердить транзакцию:\n` +
+        `<b>${request.amount} ${request.currency}</b>\n` +
+        `Категория: ${request.category_name}\n` +
+        `${request.description ? `Комментарий: ${request.description}` : ''}`;
+
+      // 3. Отправляем уведомление через Edge Function
+      await sendTelegramNotification(
+        receiverProfile.telegram_id,
+        notificationText,
+        `https://t.me/${import.meta.env.VITE_BOT_USERNAME || 'voicefin_bot'}/app`, // Ссылка на открытие приложения
+        'Открыть VoiceFin'
+      );
+    }
+  } catch (notifyError) {
+    console.error('API: Ошибка при отправке уведомления:', notifyError);
+    // Не блокируем основной флоу, если уведомление не ушло
+  }
+};
+
+/**
+ * Отправляет уведомление через Telegram Bot API (Edge Function)
+ */
+export const sendTelegramNotification = async (
+  chatId: number,
+  text: string,
+  actionUrl?: string,
+  actionText?: string
+) => {
+  const { error } = await supabase.functions.invoke('send-telegram-notification', {
+    body: {
+      chat_id: chatId,
+      text,
+      action_url: actionUrl,
+      action_text: actionText
+    }
+  });
+
   if (error) throw error;
 };
 
