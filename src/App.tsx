@@ -393,6 +393,7 @@ const AppContent: React.FC = () => {
           onDebtAdded={async () => { await refreshDebts(); setIncomingDebtId(null); setActiveScreen('debts'); }}
           defaultCurrency={displayCurrency}
           accounts={accounts}
+          onCreateAccount={() => { setIsAccountFormOpen(true); setEditingAccount(null); }}
         />
       )}
 

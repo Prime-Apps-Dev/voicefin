@@ -14,6 +14,7 @@ interface IncomingDebtModalProps {
   onDebtAdded: () => void;
   defaultCurrency: string;
   accounts: Account[];
+  onCreateAccount: () => void;
 }
 
 export const IncomingDebtModal: React.FC<IncomingDebtModalProps> = ({
@@ -21,7 +22,8 @@ export const IncomingDebtModal: React.FC<IncomingDebtModalProps> = ({
   onClose,
   onDebtAdded,
   defaultCurrency,
-  accounts
+  accounts,
+  onCreateAccount
 }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [sharedDebt, setSharedDebt] = useState<any>(null);
@@ -180,7 +182,7 @@ export const IncomingDebtModal: React.FC<IncomingDebtModalProps> = ({
                 </div>
 
                 {/* Выбор счета */}
-                {accounts.length > 0 && (
+                {accounts.length > 0 ? (
                   <div className="mb-4">
                     <label className="block text-sm font-medium text-zinc-400 mb-2 text-left">
                       Записать на счет:
@@ -201,6 +203,21 @@ export const IncomingDebtModal: React.FC<IncomingDebtModalProps> = ({
                         ▼
                       </div>
                     </div>
+                  </div>
+                ) : (
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-zinc-400 mb-2 text-left">
+                      Счет для записи:
+                    </label>
+                    <button
+                      onClick={onCreateAccount}
+                      className="w-full py-3 border-2 border-dashed border-zinc-700 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-500 hover:bg-zinc-800/50 transition-all flex items-center justify-center gap-2"
+                    >
+                      + Создать счет
+                    </button>
+                    <p className="text-xs text-zinc-500 mt-2 text-left">
+                      Чтобы записать транзакцию, нужно создать хотя бы один счет.
+                    </p>
                   </div>
                 )}
 
